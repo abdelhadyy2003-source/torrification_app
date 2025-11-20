@@ -12,27 +12,14 @@ from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 import matplotlib.pyplot as plt
 import tempfile, io, os, glob
+import base64
 
 # ----- CONFIG -----
-st.set_page_config(page_title=" Chemisco - Torrefaction", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Chemisco - Torrefaction", layout="wide", initial_sidebar_state="collapsed")
 
 # ----- SESSION STATE INIT -----
 if 'simulations' not in st.session_state:
-st.session_state.simulations = []
-# أولًا: تعريف الصور الافتراضية أو المرفوعة
-HERO_COVER = find_first_file("cover") or ""
-BANNER_COVER = find_first_file("banner") or HERO_COVER
-LOGO_PATH = find_first_file("logo") or ""
-
-# ثانيًا: تحويلها إلى base64
-import base64
-
-def img_to_base64(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-HERO_B64 = img_to_base64(HERO_COVER) if HERO_COVER else ""
-BANNER_B64 = img_to_base64(BANNER_COVER) if BANNER_COVER else ""
+    st.session_state.simulations = []
 
 # --- Utility: find uploaded image ---
 def find_first_file(containing):
@@ -42,14 +29,16 @@ def find_first_file(containing):
             return c
     return ""
 
-import base64
+# أولًا: تعريف الصور الافتراضية أو المرفوعة
+HERO_COVER = find_first_file("cover") or ""
+BANNER_COVER = find_first_file("banner") or HERO_COVER
+LOGO_PATH = find_first_file("logo") or ""
 
-# تحويل الصورة إلى base64
+# ثانيًا: تحويلها إلى base64
 def img_to_base64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-# تحويل الصور المرفوعة أو الافتراضية
 HERO_B64 = img_to_base64(HERO_COVER) if HERO_COVER else ""
 BANNER_B64 = img_to_base64(BANNER_COVER) if BANNER_COVER else ""
 
@@ -410,6 +399,7 @@ if st.session_state.simulations:
 
  
      
+
 
 
 
