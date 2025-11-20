@@ -240,9 +240,8 @@ st.markdown('<div class="glass">', unsafe_allow_html=True)
 st.subheader("Input Parameters")
 col1,col2,col3=st.columns([1,1,1])
 with col1:
-    waste_type=st.selectbox("Waste Type",['Municipal','Wood','Agricultural','Plastic'])
-    if waste_type=='Plastic':
-        plastic_type=st.selectbox("Plastic Type",['Mixed LDPE','PET','PP'])
+    waste_type=st.selectbox("Waste Type",['Municipal','Wood','Agricultural'])
+   
 with col2:
     mass=st.number_input("Mass (kg)",min_value=1.0,max_value=10000.0,value=50.0,step=1.0,format="%.2f")
     moisture=st.slider("Moisture (%)",0.0,100.0,15.0)
@@ -313,3 +312,4 @@ if st.session_state.simulations:
     if st.button("Print Report"):
         pdf_buffer=create_pdf_report(latest)
         st.download_button("Download Report (PDF)",data=pdf_buffer,file_name="torrefaction_report.pdf",mime="application/pdf")
+
