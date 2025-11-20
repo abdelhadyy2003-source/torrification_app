@@ -281,12 +281,6 @@ if st.session_state.simulations:
     st.subheader("Dashboard — Simulations Overview")
     df = pd.DataFrame(st.session_state.simulations)
     st.dataframe(df.style.format("{:.2f}", subset=[c for c in df.columns if df[c].dtype == float]))
-# ---------- Dashboard ----------
-if st.session_state.simulations:
-    st.markdown("---")
-    st.subheader("Dashboard — Simulations Overview")
-    df = pd.DataFrame(st.session_state.simulations)
-    st.dataframe(df.style.format("{:.2f}", subset=[c for c in df.columns if df[c].dtype == float]))
 
     # KPIs
     latest = st.session_state.simulations[-1]
@@ -361,3 +355,4 @@ if st.session_state.simulations:
 
  
      
+
