@@ -322,4 +322,5 @@ if st.session_state.simulations:
     node_colors = ['#8B4513','#1E90FF','#FFA500','#808080','#2E8B57']
     sources, targets, values, link_colors = [], [], [], []
     for sim in st.session_state.simulations:
-        sources.extend([0,
+        sources.extend([0,]
+
