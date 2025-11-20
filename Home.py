@@ -316,11 +316,25 @@ if st.session_state.simulations:
     fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_block, use_container_width=True)
 
-    # Sankey Flow Sheet
-    st.subheader("Sankey Flow Sheet (All Simulations)")
-    labels = ["Input Waste","Water Loss","Gas & Volatiles","Ash","Biochar"]
-    node_colors = ['#8B4513','#1E90FF','#FFA500','#808080','#2E8B57']
-    sources, targets, values, link_colors = [], [], [], []
-    for sim in st.session_state.simulations:
-        sources.extend([0,]
+        for sim in st.session_state.simulations:
+        sources.extend([0,0,0,0])
+        targets.extend([1,2,3,4])
+        values.extend([sim['Water Loss (kg)'], sim['Gas & Volatiles (kg)'],
+                       sim['Ash (kg)'], sim['Biochar (kg)']])
+        link_colors.extend(node_colors)
+
+    fig_sankey = go.Figure(data=[go.Sankey(
+        node=dict(label=labels, pad=15, thickness=20, color=node_colors),
+        link=dict(source=sources, target=targets, value=values, color=link_colors)
+    )])
+    fig_sankey.update_traces(hovertemplate='From %{source.label} to %{target.label}: %{value} kg<extra></extra>')
+    fig_sankey.update_layout(title_text="Flow Sheet (All Simulations)", font_size=12)
+    st.plotly_chart(fig_sankey, use_container_width=True)
+
+    # Export & PDF
+    st.subheader("Reports & Export")
+    last_sim = st.session_state.simulations[-1]
+    pdf_buf = create_pdf_report(last_sim)
+    st.download_button("Download Premium PDF Report (with cover & charts)", data=pdf_buf,
+                       file_name="Chemisco_Torrefaction_Report.pdf", mime="application/pdf")
 
