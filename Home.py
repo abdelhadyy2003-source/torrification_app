@@ -26,15 +26,16 @@ def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
 
 # ===== PDF Function =====
 def create_pdf_with_charts(results, waste_type, mass, moisture, temp, residence_time):
+    keys = ["Biochar (kg)","Gas & Volatiles (kg)","Ash (kg)","Fixed Carbon (kg)","Water Loss (kg)"]
     # Pie Chart
-    fig_pie = go.Figure(data=[go.Pie(labels=list(results.keys()), 
-                                     values=list(results.values()),
+    fig_pie = go.Figure(data=[go.Pie(labels=keys, 
+                                     values=[results[k] for k in keys],
                                      marker=dict(colors=['#2E8B57','#FFA500','#808080','#1E90FF','#654321']))])
     pie_file = "pie_chart.png"
     fig_pie.write_image(pie_file)
     
     # Line Chart
-    total_mass = sum(results.values())
+    total_mass = sum([results[k] for k in keys])
     time = np.linspace(0,1,100)
     mass_curve = total_mass * (1 - time*(1-0.7))
     fig_line = go.Figure()
@@ -61,8 +62,8 @@ def create_pdf_with_charts(results, waste_type, mass, moisture, temp, residence_
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0,10,"Simulation Results:", ln=True)
     pdf.set_font("Arial", "", 12)
-    for k,v in results.items():
-        pdf.cell(0,10,f"{k}: {v:.2f} kg", ln=True)
+    for k in keys:
+        pdf.cell(0,10,f"{k}: {results[k]:.2f} kg", ln=True)
     
     pdf.ln(5)
     pdf.image(pie_file, x=30, w=150)
@@ -101,14 +102,15 @@ with col1:
     if st.button("Run Simulation"):
         results = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
         # Store in session
-        st.session_state.simulations.append({
+        sim_entry = {
             "Waste Type": waste_type,
             "Mass": mass,
             "Moisture": moisture,
             "Temperature": temp,
             "Residence Time": residence_time,
-            **results
-        })
+        }
+        sim_entry.update(results)
+        st.session_state.simulations.append(sim_entry)
 with col2:
     if st.button("Reset All"):
         st.session_state.simulations = []
@@ -131,10 +133,12 @@ with tabs[1]:
     st.subheader("Comparison Charts")
     if st.session_state.simulations:
         df = pd.DataFrame(st.session_state.simulations)
-        # Pie Chart of last simulation
         last_sim = st.session_state.simulations[-1]
-        fig_pie = go.Figure(data=[go.Pie(labels=list(results.keys()), 
-                                         values=[last_sim[k] for k in results.keys()],
+        keys = ["Biochar (kg)","Gas & Volatiles (kg)","Ash (kg)","Fixed Carbon (kg)","Water Loss (kg)"]
+
+        # Pie Chart of last simulation
+        fig_pie = go.Figure(data=[go.Pie(labels=keys,
+                                         values=[last_sim[k] for k in keys],
                                          marker=dict(colors=['#2E8B57','#FFA500','#808080','#1E90FF','#654321']))])
         fig_pie.update_layout(title="Last Simulation Product Distribution")
         st.plotly_chart(fig_pie, use_container_width=True)
@@ -154,6 +158,7 @@ with tabs[2]:
     st.subheader("Torrefaction Flow Sheet of Last Simulation")
     if st.session_state.simulations:
         last_sim = st.session_state.simulations[-1]
+        keys = ["Biochar (kg)","Gas & Volatiles (kg)","Ash (kg)","Fixed Carbon (kg)","Water Loss (kg)"]
         labels = ["Input Waste", "Water Loss", "Gas & Volatiles", "Ash", "Biochar"]
         values = [last_sim["Mass"], last_sim['Water Loss (kg)'], last_sim['Gas & Volatiles (kg)'], last_sim['Ash (kg)'], last_sim['Biochar (kg)']]
         sources = [0,0,0,0]
@@ -171,11 +176,12 @@ with tabs[2]:
 with tabs[3]:
     st.subheader("Download PDF Reports")
     if st.session_state.simulations:
+        keys = ["Biochar (kg)","Gas & Volatiles (kg)","Ash (kg)","Fixed Carbon (kg)","Water Loss (kg)"]
         for i, sim in enumerate(st.session_state.simulations):
             st.markdown(f"**Simulation #{i+1}: {sim['Waste Type']}**")
-            if st.button(f"📄 Download PDF #{i+1}"):
+            if st.button(f"📄 Download PDF #{i+1}", key=f"pdf_{i}"):
                 pdf_file = create_pdf_with_charts(
-                    {k: sim[k] for k in results.keys()},
+                    {k: sim[k] for k in keys},
                     sim["Waste Type"], sim["Mass"], sim["Moisture"], sim["Temperature"], sim["Residence Time"]
                 )
                 st.download_button("Download PDF", data=pdf_file, file_name=f"Torrefaction_Report_{i+1}.pdf", mime="application/pdf")
