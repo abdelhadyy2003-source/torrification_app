@@ -134,7 +134,7 @@ def _make_matplotlib_charts(sim):
 
     # Pie chart
     pie_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig1, ax1 = plt.subplots(figsize=(2, 2))
+    fig1, ax1 = plt.subplots(figsize=(1, 1))
     if sum(values) == 0: values = [1e-6] * len(values)
     ax1.pie(values, labels=keys, colors=colors_list, autopct=lambda pct: f"{pct:.1f}%", startangle=140, textprops={'fontsize': 8})
     ax1.axis('equal')
@@ -143,7 +143,7 @@ def _make_matplotlib_charts(sim):
 
     # Bar chart
     bar_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig2, ax2 = plt.subplots(figsize=(4, 1))
+    fig2, ax2 = plt.subplots(figsize=(2, 1))
     ax2.bar(keys, values, color=colors_list)
     ax2.set_xticklabels(keys, rotation=45, ha='right', fontsize=6)
     ax2.set_ylabel('kg')
@@ -334,4 +334,5 @@ if st.session_state.simulations:
     fig_block.update_yaxes(range=[1,4], showticklabels=False, showgrid=False, zeroline=False)
     fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_block, use_container_width=True)
+
 
