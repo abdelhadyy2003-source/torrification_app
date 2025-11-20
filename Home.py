@@ -131,25 +131,43 @@ def _make_matplotlib_charts(sim):
     keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Water Loss (kg)']
     values = [sim.get(k, 0.0) for k in keys]
     colors_list = ['#2E8B57', '#1E90FF', '#FFA500', '#808080', '#8B4513']
+# ---------- Charts (Pie + Bar) ----------
+def _make_matplotlib_charts(sim):
+    keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Water Loss (kg)']
+    values = [sim.get(k, 0.0) for k in keys]
+    colors_list = ['#2E8B57', '#1E90FF', '#FFA500', '#808080', '#8B4513']
 
-    # Pie chart
+    # Pie chart - أصغر حجم
     pie_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig1, ax1 = plt.subplots(figsize=(1, 1))
-    if sum(values) == 0: values = [1e-6] * len(values)
-    ax1.pie(values, labels=keys, colors=colors_list, autopct=lambda pct: f"{pct:.1f}%", startangle=140, textprops={'fontsize': 8})
+    fig1, ax1 = plt.subplots(figsize=(3, 3))
+    if sum(values) == 0: 
+        values = [1e-6] * len(values)
+    ax1.pie(values, labels=keys, colors=colors_list,
+            autopct=lambda pct: f"{pct:.1f}%", startangle=140,
+            textprops={'fontsize': 7})
     ax1.axis('equal')
     fig1.savefig(pie_tmp.name, dpi=150, bbox_inches='tight', transparent=True)
     plt.close(fig1)
 
-    # Bar chart
+    # Bar chart - أصغر حجم
     bar_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig2, ax2 = plt.subplots(figsize=(2, 1))
+    fig2, ax2 = plt.subplots(figsize=(5, 2.5))
     ax2.bar(keys, values, color=colors_list)
-    ax2.set_xticklabels(keys, rotation=45, ha='right', fontsize=6)
+    ax2.set_xticklabels(keys, rotation=45, ha='right', fontsize=7)
     ax2.set_ylabel('kg')
     fig2.savefig(bar_tmp.name, dpi=150, bbox_inches='tight', transparent=True)
     plt.close(fig2)
+
     return pie_tmp.name, bar_tmp.name
+
+# ---------- Streamlit Display ----------
+if st.session_state.simulations:
+    latest_sim = st.session_state.simulations[-1]
+    pie_path, bar_path = _make_matplotlib_charts(latest_sim)
+    st.subheader("Visual Summary")
+    st.image(pie_path, caption="Mass Distribution (Pie)", width=300)
+    st.image(bar_path, caption="Mass Components (Bar)", width=500)
+
 
 def create_pdf_report(sim, logo_path=LOGO_PATH):
     buffer = io.BytesIO()
@@ -334,5 +352,6 @@ if st.session_state.simulations:
     fig_block.update_yaxes(range=[1,4], showticklabels=False, showgrid=False, zeroline=False)
     fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_block, use_container_width=True)
+
 
 
