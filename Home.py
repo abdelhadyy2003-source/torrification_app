@@ -192,7 +192,7 @@ def generate_pdf_report(results, biomass, moisture, temp, duration, size):
 
 if __name__ == "__main__":
     main()
-```
+
 
 This comprehensive simulator includes:
 1. User-friendly interface with biomass type selection and parameter adjustment
@@ -204,5 +204,6 @@ This comprehensive simulator includes:
 7. Gas composition estimation
 
 The code is modular and can be extended with additional biomass types, more detailed reaction kinetics, or additional output parameters as needed.
+
 
 
