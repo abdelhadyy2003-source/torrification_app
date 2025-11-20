@@ -194,16 +194,3 @@ if __name__ == "__main__":
     main()
 
 
-This comprehensive simulator includes:
-1. User-friendly interface with biomass type selection and parameter adjustment
-2. Physics-based drying and devolatilization calculations
-3. Empirical yield predictions
-4. Interactive visualization of results
-5. Professional PDF report generation
-6. Mass balance verification
-7. Gas composition estimation
-
-The code is modular and can be extended with additional biomass types, more detailed reaction kinetics, or additional output parameters as needed.
-
-
-
