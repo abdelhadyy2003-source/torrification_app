@@ -1,5 +1,5 @@
 
-Here's a complete Streamlit application for the Chemisco Pro Torrefaction Simulator:
+# Here's a complete Streamlit application for the Chemisco Pro Torrefaction Simulator:
 
 ```bash
 pip install streamlit matplotlib numpy pandas reportlab scipy
@@ -209,3 +209,4 @@ This comprehensive simulator includes:
 7. Gas composition estimation
 
 The code is modular and can be extended with additional biomass types, more detailed reaction kinetics, or additional output parameters as needed.
+
