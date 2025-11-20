@@ -1,5 +1,5 @@
-# chemisco_final.py
-# Final Streamlit app (Single page) with Hero cover A, Banner cover B, branch menus, ReportLab PDF
+# chemisco_final_fixed.py
+# Final fixed Streamlit app (Single page) with Hero cover A, Banner cover B, branching menus, ReportLab PDF
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -11,16 +11,56 @@ from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 import matplotlib.pyplot as plt
-import tempfile, io, os
+import tempfile, io, os, glob
 
 # ----- CONFIG -----
 st.set_page_config(page_title="Chemisco - Ultimate Torrefaction", layout="wide", initial_sidebar_state="collapsed")
 
-# --- Paths to uploaded art (from your session) ---
-# I used the uploaded files — if names differ, change these to exact filenames in /mnt/data/
-HERO_COVER = "/mnt/data/A_cover_page_of_a_report_from_Chemisco_titled_%22Tor.png"
-BANNER_COVER = "/mnt/data/A_cover_page_for_a_report_titled_%22Torrefaction_Rep.png"
-LOGO_PATH = "/mnt/data/enzyme.png"  # your logo
+# --- Utility: find uploaded image by hint (robust against odd filenames) ---
+def find_first_file(containing):
+    """Search /mnt/data for a filename containing the given substring. Return full path or ''."""
+    candidates = glob.glob("/mnt/data/*")
+    for c in candidates:
+        if containing.lower() in os.path.basename(c).lower():
+            return c
+    return ""
+
+# If user uploaded with odd chars, try to find sensible files
+HERO_COVER = find_first_file("cover") or find_first_file("tor") or ""
+BANNER_COVER = find_first_file("refaction") or find_first_file("torrefaction") or HERO_COVER
+LOGO_PATH = find_first_file("enzyme") or find_first_file("logo") or ""
+
+# ---------- Torrefaction simulation function (added to fix NameError) ----------
+def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
+    """
+    Simple physics-inspired torrefaction model (deterministic approx).
+    Returns dict of product masses / losses.
+    """
+    # water removed (kg) - first-order style dependent on residence time
+    water_loss = mass * (moisture / 100.0) * (1.0 - np.exp(-0.6 * residence_time))
+
+    # volatile fraction increases with temperature (simple linear approx)
+    volatile_fraction = 0.30 + 0.12 * ((temp - 200.0) / 100.0)  # 0.30..0.42 across 200..300
+    volatile_fraction = max(0.0, min(0.9, volatile_fraction))
+
+    volatile_loss = max(0.0, (mass - water_loss) * volatile_fraction)
+
+    ash_fraction = 0.05  # fixed ash fraction (approx)
+    ash_mass = mass * ash_fraction
+
+    biochar_mass = mass - water_loss - volatile_loss - ash_mass
+    if biochar_mass < 0:
+        biochar_mass = 0.0
+
+    fixed_carbon = biochar_mass * 0.78  # assume 78% of biochar is fixed carbon
+
+    return {
+        'Biochar (kg)': float(biochar_mass),
+        'Gas & Volatiles (kg)': float(volatile_loss),
+        'Ash (kg)': float(ash_mass),
+        'Fixed Carbon (kg)': float(fixed_carbon),
+        'Water Loss (kg)': float(water_loss)
+    }
 
 # ---------- Helper: ReportLab PDF (professional, multi-page, charts embedded) ----------
 class NumberedCanvas(canvas.Canvas):
@@ -50,7 +90,10 @@ def _make_matplotlib_charts(sim):
 
     pie_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     fig1, ax1 = plt.subplots(figsize=(4,4))
-    ax1.pie(values, labels=keys, colors=colors, autopct='%1.1f%%', startangle=140, textprops={'fontsize':8})
+    # handle case values all zero -> pie would error
+    if sum(values) == 0:
+        values = [1e-6 for _ in values]
+    ax1.pie(values, labels=keys, colors=colors, autopct=lambda pct: f"{pct:.1f}%", startangle=140, textprops={'fontsize':8})
     ax1.axis('equal')
     plt.tight_layout()
     fig1.savefig(pie_tmp.name, dpi=150, bbox_inches='tight', transparent=True)
@@ -175,11 +218,11 @@ def create_pdf_report(sim, logo_path=LOGO_PATH):
 
 # ---------- App UI (Single page) ----------
 # CSS for hero and banner, using uploaded cover images
-st.markdown(f"""
+# If HERO_COVER/BANNER_COVER are empty, CSS will not break; the hero/banner simply show solid background.
+hero_css = f"""
 <style>
-/* Hero cover A (full-screen top) */
 .hero {{
-  background-image: url("file://{HERO_COVER}");
+  background-image: url("file://{HERO_COVER}") ;
   background-size: cover;
   background-position: center;
   height: 40vh;
@@ -191,9 +234,8 @@ st.markdown(f"""
 }}
 .hero h1 {{ font-size: 48px; margin:0; color:#FFD700; }}
 
-/* Banner cover B (small band above inputs) */
 .banner {{
-  background-image: url("file://{BANNER_COVER}");
+  background-image: url("file://{BANNER_COVER}") ;
   background-size: cover;
   background-position: center;
   height: 12vh;
@@ -207,7 +249,6 @@ st.markdown(f"""
   margin-bottom:1rem;
 }}
 
-/* glass card */
 .glass {{
     background: rgba(255,255,255,0.06);
     border-radius: 12px;
@@ -217,7 +258,8 @@ st.markdown(f"""
     border: 1px solid rgba(255,255,255,0.12);
 }}
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(hero_css, unsafe_allow_html=True)
 
 # Hero section (cover A)
 st.markdown('<div class="hero"><h1>Chemisco — Advanced Torrefaction</h1></div>', unsafe_allow_html=True)
@@ -231,7 +273,6 @@ st.subheader("Input Parameters")
 col1, col2, col3 = st.columns([1,1,1])
 with col1:
     waste_type = st.selectbox("Waste Type", ['Municipal', 'Wood', 'Agricultural', 'Plastic'])
-    # branching submenu example: if Plastic, show plastic-type
     if waste_type == 'Plastic':
         plastic_type = st.selectbox("Plastic Type", ['Mixed LDPE', 'PET', 'PP'])
 with col2:
@@ -252,7 +293,6 @@ if st.checkbox("Show advanced settings"):
         atmosphere = st.selectbox("Atmosphere", ['Inert (N2)', 'Air', 'Steam'])
 
 if st.button("Run Simulation"):
-    # set defaults if not in advanced
     try:
         processing_cost_per_kg
     except NameError:
@@ -264,9 +304,7 @@ if st.button("Run Simulation"):
         "Temperature": float(temp),
         "Residence Time": float(residence_time)
     }
-    sim_res = {
-        **simulate_torrefaction(waste_type, float(mass), float(moisture), float(temp), float(residence_time))
-    }
+    sim_res = simulate_torrefaction(waste_type, float(mass), float(moisture), float(temp), float(residence_time))
     sim.update(sim_res)
     sim["Total Cost ($)"] = float(mass) * float(processing_cost_per_kg)
     st.session_state.simulations.append(sim)
