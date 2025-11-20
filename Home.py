@@ -28,10 +28,51 @@ def find_first_file(containing):
             return c
     return ""
 
-# Load default images
-HERO_COVER = find_first_file("cover") or ""
-BANNER_COVER = find_first_file("banner") or HERO_COVER
-LOGO_PATH = find_first_file("logo") or ""
+import base64
+
+# تحويل الصورة إلى base64
+def img_to_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+# تحويل الصور المرفوعة أو الافتراضية
+HERO_B64 = img_to_base64(HERO_COVER) if HERO_COVER else ""
+BANNER_B64 = img_to_base64(BANNER_COVER) if BANNER_COVER else ""
+
+# CSS للـ Hero و Banner
+hero_css = f"""
+<style>
+.hero {{
+  {"background-image: url('data:image/png;base64," + HERO_B64 + "');" if HERO_B64 else ""}
+  background-size: cover;
+  background-position: center;
+  height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-shadow: 2px 2px #000;
+}}
+.hero h1 {{ font-size: 48px; margin:0; color:#FFD700; }}
+
+.banner {{
+  {"background-image: url('data:image/png;base64," + BANNER_B64 + "');" if BANNER_B64 else ""}
+  background-size: cover;
+  background-position: center;
+  height: 12vh;
+  display:flex;
+  align-items:center;
+  padding-left:2rem;
+  color:#fff;
+  text-shadow:1px 1px #000;
+  border-radius:8px;
+  margin-top:1rem;
+  margin-bottom:1rem;
+}}
+</style>
+"""
+st.markdown(hero_css, unsafe_allow_html=True)
+
 
 # ---------- Torrefaction simulation ----------
 def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
@@ -355,6 +396,7 @@ if st.session_state.simulations:
 
  
      
+
 
 
 
