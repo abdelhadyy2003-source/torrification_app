@@ -6,3 +6,5 @@ graphviz
 reportlab
 matplotlib
 fpdf
+kaleido
+
