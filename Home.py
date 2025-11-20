@@ -359,18 +359,7 @@ if st.session_state.simulations:
     for c, k, col_color in zip(kcols, keys, kcolors):
         c.metric(k, f"{latest.get(k, 0):.2f}")
 
-    # Visualizations
-    st.subheader("Visualizations")
-    chart_cols = st.columns([1, 1])
-    with chart_cols[0]:
-        keys_chart = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Water Loss (kg)']
-        fig_pie = go.Figure(data=[go.Pie(labels=keys_chart, values=[df.iloc[-1][k] for k in keys_chart], marker=dict(colors=kcolors))])
-        fig_pie.update_layout(title="Last Simulation Distribution")
-        st.plotly_chart(fig_pie, use_container_width=True)
-    
-    with chart_cols[1]:
-        st.line_chart(df[['Biochar (kg)', 'Gas & Volatiles (kg)', 'Total Cost ($)']])
-
+  
     # Process Flow Diagram
     st.subheader("Process Flow Diagram")
     fig_block = go.Figure()
@@ -399,6 +388,7 @@ if st.session_state.simulations:
 
  
      
+
 
 
 
