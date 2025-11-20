@@ -328,6 +328,41 @@ if st.session_state.simulations:
     fig_block.update_layout(height=300, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_block, use_container_width=True)
 
-    # Sankey Flow Sheet
+ # Sankey Flow Sheet
     st.subheader("Sankey Flow Sheet (All Simulations)")
-    labels =
+    
+    # Preparing data for Sankey diagram
+    if len(st.session_state.simulations) > 1:  # Check if there are multiple simulations
+        labels = []
+        sources = []
+        targets = []
+        values = []
+
+        for i, sim in enumerate(st.session_state.simulations):
+            labels.append(f"Simulation {i + 1} - Biochar")
+            labels.append(f"Simulation {i + 1} - Gas & Volatiles")
+            labels.append(f"Simulation {i + 1} - Ash")
+
+            sources.extend([i * 3, i * 3, i * 3])
+            targets.extend([i * 3 + 1, i * 3 + 2, i * 3 + 3])
+            values.extend([sim['Biochar (kg)'], sim['Gas & Volatiles (kg)'], sim['Ash (kg)']])
+
+        # Create a Sankey diagram
+        fig_sankey = go.Figure(go.Sankey(
+            node=dict(
+                pad=15,
+                thickness=20,
+                line=dict(color="black", width=0.5),
+                label=labels
+            ),
+            link=dict(
+                source=sources,
+                target=targets,
+                value=values
+            )
+        ))
+        
+        fig_sankey.update_layout(title_text="Sankey Flow Sheet of All Simulations", font_size=10)
+        st.plotly_chart(fig_sankey, use_container_width=True)
+    else:
+        st.warning("Please run more than one simulation to view the Sankey Flow Sheet.")
