@@ -281,7 +281,38 @@ if st.session_state.simulations:
     st.subheader("Dashboard — Simulations Overview")
     df = pd.DataFrame(st.session_state.simulations)
     st.dataframe(df.style.format("{:.2f}", subset=[c for c in df.columns if df[c].dtype == float]))
+# ---------- Dashboard ----------
+if st.session_state.simulations:
+    st.markdown("---")
+    st.subheader("Dashboard — Simulations Overview")
+    df = pd.DataFrame(st.session_state.simulations)
+    st.dataframe(df.style.format("{:.2f}", subset=[c for c in df.columns if df[c].dtype == float]))
 
+    # KPIs
+    latest = st.session_state.simulations[-1]
+    kcols = st.columns(5)
+    keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Total Cost ($)']
+    kcolors = ['#2E8B57', '#1E90FF', '#FFA500', '#808080', '#8B4513']
+    for c, k, col_color in zip(kcols, keys, kcolors):
+        c.metric(k, f"{latest.get(k, 0):.2f}")
+
+    # Visualizations
+    st.subheader("Visualizations")
+    # ... (code for visualizations)
+
+    # Printing the report
+    if st.button("Print Report"):
+        if st.session_state.simulations:
+            latest_simulation = st.session_state.simulations[-1]
+            pdf_buffer = create_pdf_report(latest_simulation)  # استدعاء الدالة السابقة لإنشاء التقرير
+            st.download_button(
+                label="Download Report (PDF)",
+                data=pdf_buffer,
+                file_name="torrefaction_report.pdf",
+                mime="application/pdf"
+            )
+        else:
+            st.warning("No simulations available to generate a report.")
     # KPIs
     latest = st.session_state.simulations[-1]
     kcols = st.columns(5)
@@ -366,3 +397,4 @@ if st.session_state.simulations:
         st.plotly_chart(fig_sankey, use_container_width=True)
     else:
         st.warning("Please run more than one simulation to view the Sankey Flow Sheet.")
+
