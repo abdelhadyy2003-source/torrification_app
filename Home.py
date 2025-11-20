@@ -1,30 +1,21 @@
-# ===== Import Libraries =====
+# ===== Imports =====
 import streamlit as st
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+from fpdf import FPDF
+import io
 
-# ===== Functions =====
+# ===== Simulation Function =====
 def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
-    """
-    Simulate torrefaction process.
-    Returns dict of outputs.
-    """
-    # Moisture loss
     water_loss = mass * moisture/100 * (1 - np.exp(-0.5*residence_time))
-    
-    # Volatile loss (simplified)
     volatile_fraction = 0.3 + 0.1*(temp-200)/100
     volatile_loss = (mass - water_loss) * volatile_fraction
-    
-    # Ash fraction fixed
     ash_fraction = 0.05
     ash_mass = mass * ash_fraction
-    
-    # Biochar & fixed carbon
     biochar_mass = mass - water_loss - volatile_loss - ash_mass
     fixed_carbon = biochar_mass * 0.8
-    
     return {
         'Biochar (kg)': biochar_mass,
         'Gas & Volatiles (kg)': volatile_loss,
@@ -33,53 +24,160 @@ def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
         'Water Loss (kg)': water_loss
     }
 
-def plot_results(results):
-    labels = list(results.keys())
-    values = list(results.values())
+# ===== PDF Function =====
+def create_pdf_with_charts(results, waste_type, mass, moisture, temp, residence_time):
+    # Pie Chart
+    fig_pie = go.Figure(data=[go.Pie(labels=list(results.keys()), 
+                                     values=list(results.values()),
+                                     marker=dict(colors=['#2E8B57','#FFA500','#808080','#1E90FF','#654321']))])
+    pie_file = "pie_chart.png"
+    fig_pie.write_image(pie_file)
     
-    # Pie chart
-    fig, axs = plt.subplots(1,2, figsize=(12,5))
-    axs[0].pie(values, labels=labels, autopct='%1.1f%%', startangle=140,
-               colors=['#654321','#FFA500','#808080','#2E8B57','#1E90FF'])
-    axs[0].set_title("Torrefaction Product Distribution")
-    
-    # Mass loss line plot (simplified)
-    total_mass = sum(values)
+    # Line Chart
+    total_mass = sum(results.values())
     time = np.linspace(0,1,100)
-    mass_curve = total_mass * (1 - time*(1-0.7))  # simple approximation
-    axs[1].plot(time, mass_curve, color='red', lw=2)
-    axs[1].set_xlabel('Normalized Time')
-    axs[1].set_ylabel('Mass (kg)')
-    axs[1].set_title('Mass Loss Over Time')
+    mass_curve = total_mass * (1 - time*(1-0.7))
+    fig_line = go.Figure()
+    fig_line.add_trace(go.Scatter(x=time, y=mass_curve, mode='lines', line=dict(color='red', width=2)))
+    fig_line.update_layout(title="Mass Loss Over Time", xaxis_title="Normalized Time", yaxis_title="Mass (kg)")
+    line_file = "line_chart.png"
+    fig_line.write_image(line_file)
     
-    plt.tight_layout()
-    st.pyplot(fig)
+    # PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0,10,"🔥 Torrefaction Simulation Report 🔥", ln=True, align="C")
+    
+    pdf.set_font("Arial", "", 12)
+    pdf.ln(5)
+    pdf.cell(0,10,f"Waste Type: {waste_type}", ln=True)
+    pdf.cell(0,10,f"Mass (kg): {mass}", ln=True)
+    pdf.cell(0,10,f"Moisture (%): {moisture}", ln=True)
+    pdf.cell(0,10,f"Temperature (°C): {temp}", ln=True)
+    pdf.cell(0,10,f"Residence Time (hr): {residence_time}", ln=True)
+    
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0,10,"Simulation Results:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    for k,v in results.items():
+        pdf.cell(0,10,f"{k}: {v:.2f} kg", ln=True)
+    
+    pdf.ln(5)
+    pdf.image(pie_file, x=30, w=150)
+    pdf.ln(80)
+    pdf.image(line_file, x=30, w=150)
+    
+    pdf_buffer = io.BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+    return pdf_buffer
 
 # ===== Streamlit App =====
 st.set_page_config(page_title="Torrefaction Simulator", layout="wide")
-st.title("🔥 Torrefaction Simulator 🔥")
-st.markdown("Simulate the torrefaction process of different waste types with interactive sliders.")
+st.markdown("""
+<style>
+body {font-family: 'Roboto', sans-serif;}
+</style>
+""", unsafe_allow_html=True)
 
-# --- Sidebar Inputs ---
+st.title("🔥 Torrefaction Simulator with Comparison 🔥")
+
+# ===== Session State for Comparisons =====
+if "simulations" not in st.session_state:
+    st.session_state.simulations = []
+
+# Sidebar Inputs
 st.sidebar.header("Input Parameters")
 waste_type = st.sidebar.selectbox("Waste Type", ['Municipal', 'Wood', 'Agricultural', 'Plastic'])
-mass = st.sidebar.slider("Initial Mass (kg)", min_value=1.0, max_value=100.0, value=10.0, step=1.0)
-moisture = st.sidebar.slider("Moisture (%)", min_value=0.0, max_value=100.0, value=20.0, step=1.0)
-temp = st.sidebar.slider("Torrefaction Temperature (°C)", min_value=200, max_value=300, value=250, step=5)
-residence_time = st.sidebar.slider("Residence Time (hr)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
+mass = st.sidebar.slider("Mass (kg)", 1.0, 100.0, 10.0)
+moisture = st.sidebar.slider("Moisture (%)", 0.0, 100.0, 20.0)
+temp = st.sidebar.slider("Temperature (°C)", 200, 300, 250)
+residence_time = st.sidebar.slider("Residence Time (hr)", 0.1, 5.0, 1.0)
 
-# --- Simulation ---
-results = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    if st.button("Run Simulation"):
+        results = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
+        # Store in session
+        st.session_state.simulations.append({
+            "Waste Type": waste_type,
+            "Mass": mass,
+            "Moisture": moisture,
+            "Temperature": temp,
+            "Residence Time": residence_time,
+            **results
+        })
+with col2:
+    if st.button("Reset All"):
+        st.session_state.simulations = []
+        st.experimental_rerun()
 
-# --- Display Results ---
-st.subheader("Simulation Results")
-for k, v in results.items():
-    st.metric(label=k, value=f"{v:.2f} kg")
+# ===== Tabs =====
+tabs = st.tabs(["Simulations Summary", "Charts", "Flow Sheet", "Download PDFs"])
 
-# --- Plots ---
-st.subheader("Visualizations")
-plot_results(results)
+# ===== Simulations Summary Tab =====
+with tabs[0]:
+    st.subheader("All Simulation Results")
+    if st.session_state.simulations:
+        df = pd.DataFrame(st.session_state.simulations)
+        st.dataframe(df)
+    else:
+        st.info("Run a simulation to see results.")
 
-# --- Footer ---
-st.markdown("---")
-st.markdown("Made with ❤️ using Streamlit | Torrefaction Simulator")
+# ===== Charts Tab =====
+with tabs[1]:
+    st.subheader("Comparison Charts")
+    if st.session_state.simulations:
+        df = pd.DataFrame(st.session_state.simulations)
+        # Pie Chart of last simulation
+        last_sim = st.session_state.simulations[-1]
+        fig_pie = go.Figure(data=[go.Pie(labels=list(results.keys()), 
+                                         values=[last_sim[k] for k in results.keys()],
+                                         marker=dict(colors=['#2E8B57','#FFA500','#808080','#1E90FF','#654321']))])
+        fig_pie.update_layout(title="Last Simulation Product Distribution")
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+        # Line Chart comparing Biochar across simulations
+        fig_line = go.Figure()
+        for i, sim in enumerate(st.session_state.simulations):
+            fig_line.add_trace(go.Scatter(x=[sim["Residence Time"]], y=[sim["Biochar (kg)"]],
+                                          mode='markers+lines', name=f"{sim['Waste Type']} #{i+1}"))
+        fig_line.update_layout(title="Biochar Production vs Residence Time", xaxis_title="Residence Time (hr)", yaxis_title="Biochar (kg)")
+        st.plotly_chart(fig_line, use_container_width=True)
+    else:
+        st.info("Run a simulation to see charts.")
+
+# ===== Flow Sheet Tab =====
+with tabs[2]:
+    st.subheader("Torrefaction Flow Sheet of Last Simulation")
+    if st.session_state.simulations:
+        last_sim = st.session_state.simulations[-1]
+        labels = ["Input Waste", "Water Loss", "Gas & Volatiles", "Ash", "Biochar"]
+        values = [last_sim["Mass"], last_sim['Water Loss (kg)'], last_sim['Gas & Volatiles (kg)'], last_sim['Ash (kg)'], last_sim['Biochar (kg)']]
+        sources = [0,0,0,0]
+        targets = [1,2,3,4]
+        fig_sankey = go.Figure(data=[go.Sankey(
+            node=dict(label=labels, pad=15, thickness=20, color=['#8B4513','#1E90FF','#FFA500','#808080','#2E8B57']),
+            link=dict(source=sources, target=targets, value=values[1:])
+        )])
+        fig_sankey.update_layout(title_text="Torrefaction Mass Distribution", font_size=12)
+        st.plotly_chart(fig_sankey, use_container_width=True)
+    else:
+        st.info("Run a simulation to see flow sheet.")
+
+# ===== Download PDFs Tab =====
+with tabs[3]:
+    st.subheader("Download PDF Reports")
+    if st.session_state.simulations:
+        for i, sim in enumerate(st.session_state.simulations):
+            st.markdown(f"**Simulation #{i+1}: {sim['Waste Type']}**")
+            if st.button(f"📄 Download PDF #{i+1}"):
+                pdf_file = create_pdf_with_charts(
+                    {k: sim[k] for k in results.keys()},
+                    sim["Waste Type"], sim["Mass"], sim["Moisture"], sim["Temperature"], sim["Residence Time"]
+                )
+                st.download_button("Download PDF", data=pdf_file, file_name=f"Torrefaction_Report_{i+1}.pdf", mime="application/pdf")
+    else:
+        st.info("Run a simulation to enable PDF downloads.")
