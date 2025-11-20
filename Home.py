@@ -5,13 +5,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from fpdf import FPDF
 import io
-import tempfile
 
-# ===== Page Setup =====
-st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide")
-
-# ===== CSS Background + Company Name =====
-st.markdown("""
+# ===== CSS for Background and Company Logo =====
+st.markdown(
+    """
     <style>
     .stApp {
         background-image: url('https://images.unsplash.com/photo-1599058917216-52c6cd19f2d1?auto=format&fit=crop&w=1950&q=80');
@@ -32,14 +29,8 @@ st.markdown("""
         text-shadow: 1px 1px #000000;
     }
     </style>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="company-name">Chemisco</div>', unsafe_allow_html=True)
-st.markdown("<h2 style='text-align:center;'>🔥 Torrefaction Simulator 🔥</h2>", unsafe_allow_html=True)
-
-# ===== Session State =====
-if "simulations" not in st.session_state:
-    st.session_state.simulations = []
+    """, unsafe_allow_html=True
+)
 
 # ===== Simulation Function =====
 def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
@@ -59,31 +50,37 @@ def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
     }
 
 # ===== Cost Analysis =====
-def calculate_costs(mass, cost_per_kg):
-    return mass * cost_per_kg
+def calculate_costs(mass, processing_cost_per_kg):
+    return mass * processing_cost_per_kg
 
 # ===== PDF Generation =====
-def create_pdf_report(sim_data, chart_img=None):
+def create_pdf_report(simulation_data):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "🔥 Chemisco Torrefaction Report 🔥", ln=True, align="C")
+    pdf.cell(0, 10, "🔥 Torrefaction Simulation Report 🔥", ln=True, align="C")
     pdf.ln(5)
     pdf.set_font("Arial", "", 12)
-    for key, value in sim_data.items():
+    for key, value in simulation_data.items():
         if isinstance(value, (int, float)):
             pdf.cell(0, 10, f"{key}: {value:.2f}", ln=True)
         else:
             pdf.cell(0, 10, f"{key}: {value}", ln=True)
-    # Add chart if exists
-    if chart_img:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
-            chart_img.write_image(tmpfile.name)
-            pdf.image(tmpfile.name, x=30, w=150)
-    buf = io.BytesIO()
-    pdf.output(buf)
-    buf.seek(0)
-    return buf
+    pdf_buffer = io.BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+    return pdf_buffer
+
+# ===== Streamlit Setup =====
+st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide")
+
+# ===== Company Logo/Name =====
+st.markdown('<div class="company-name">Chemisco</div>', unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center;'>🔥 Torrefaction Simulator 🔥</h2>", unsafe_allow_html=True)
+
+# ===== Session State =====
+if "simulations" not in st.session_state:
+    st.session_state.simulations = []
 
 # ===== Input Section =====
 st.subheader("Input Parameters")
@@ -95,21 +92,21 @@ with col1:
 with col2:
     temp = st.slider("Temperature (°C)", 200, 300, 250)
     residence_time = st.slider("Residence Time (hr)", 0.1, 5.0, 1.0)
-    cost_per_kg = st.number_input("Processing Cost per kg ($)", 0.1, 10.0, 1.0)
+    processing_cost_per_kg = st.number_input("Processing Cost per kg ($)", 0.1, 10.0, 1.0)
 
 if st.button("Run Simulation"):
-    res = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
-    total_cost = calculate_costs(mass, cost_per_kg)
-    res['Total Cost ($)'] = total_cost
-    entry = {
+    results = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
+    total_cost = calculate_costs(mass, processing_cost_per_kg)
+    results['Total Cost ($)'] = total_cost
+    sim_entry = {
         "Waste Type": waste_type,
         "Mass": mass,
         "Moisture": moisture,
         "Temperature": temp,
         "Residence Time": residence_time,
-        **res
+        **results
     }
-    st.session_state.simulations.append(entry)
+    st.session_state.simulations.append(sim_entry)
     st.success("Simulation added successfully!")
 
 # ===== Latest Results =====
@@ -117,22 +114,24 @@ if st.session_state.simulations:
     st.subheader("Latest Simulation Results")
     latest = st.session_state.simulations[-1]
     cols = st.columns(5)
-    keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Total Cost ($)']
-    colors = ['#2E8B57','#1E90FF','#FFA500','#808080','#8B4513']
-    for c, k, color in zip(cols, keys, colors):
-        c.metric(label=k, value=f"{latest[k]:.2f}", delta_color="normal")
+    metric_keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Total Cost ($)']
+    colors = ['#2E8B57', '#1E90FF', '#FFA500', '#808080', '#8B4513']
+    for col, key, color in zip(cols, metric_keys, colors):
+        col.metric(label=key, value=f"{latest[key]:.2f}", delta_color="normal")
 
 # ===== Charts =====
 if st.session_state.simulations:
     st.subheader("Charts")
     df = pd.DataFrame(st.session_state.simulations)
-    fig_pie = go.Figure(data=[go.Pie(labels=keys, values=[df.iloc[-1][k] for k in keys], marker=dict(colors=colors))])
+    keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Water Loss (kg)']
+    fig_pie = go.Figure(data=[go.Pie(labels=keys, values=[df.iloc[-1][k] for k in keys],
+                                     marker=dict(colors=colors))])
     fig_pie.update_layout(title="Product Distribution (Last Simulation)", title_font_size=18)
     st.plotly_chart(fig_pie, use_container_width=True)
-    st.line_chart(df[['Biochar (kg)','Gas & Volatiles (kg)','Total Cost ($)']])
+    st.bar_chart(df[['Biochar (kg)', 'Gas & Volatiles (kg)', 'Total Cost ($)']])
 
 # ===== Block Flow Diagram =====
-st.subheader("Block Flow Diagram")
+st.subheader("Block Flow Diagram - Torrefaction Process")
 fig_block = go.Figure()
 blocks = [
     {"name": "Input Waste", "x0":0, "x1":2, "y0":2, "y1":3, "color":"#8B4513"},
@@ -143,9 +142,13 @@ blocks = [
 for block in blocks:
     fig_block.add_shape(type="rect", x0=block["x0"], x1=block["x1"], y0=block["y0"], y1=block["y1"],
                         line=dict(color="black", width=2), fillcolor=block["color"], layer="below")
-    fig_block.add_annotation(x=(block["x0"]+block["x1"])/2, y=(block["y0"]+block["y1"])/2,
-                             text=f"<b>{block['name']}</b>", showarrow=False,
-                             font=dict(color="white", size=16))
+    fig_block.add_annotation(
+        x=(block["x0"]+block["x1"])/2,
+        y=(block["y0"]+block["y1"])/2,
+        text=f"<b>{block['name']}</b>",
+        showarrow=False,
+        font=dict(color="white", size=16)
+    )
 arrows = [(2,2.5,3,2.5),(5,2.5,6,2.5),(8,2.5,9,2.5)]
 for x0,y0,x1,y1 in arrows:
     fig_block.add_annotation(x=x1, y=y1, ax=x0, ay=y0,
@@ -153,32 +156,34 @@ for x0,y0,x1,y1 in arrows:
                              showarrow=True, arrowhead=3, arrowsize=2, arrowwidth=3, arrowcolor="#333333")
 fig_block.update_xaxes(range=[-1,12], showticklabels=False, showgrid=False, zeroline=False)
 fig_block.update_yaxes(range=[1,4], showticklabels=False, showgrid=False, zeroline=False)
-fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="rgba(0,0,0,0)")
+fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="#F5F5F5")
 st.plotly_chart(fig_block, use_container_width=True)
 
-# ===== Sankey Flow =====
+# ===== Sankey Flow Sheet =====
 if st.session_state.simulations:
-    st.subheader("Process Flow Sheet (Sankey)")
-    labels = ["Input Waste","Water Loss","Gas & Volatiles","Ash","Biochar"]
+    st.subheader("Torrefaction Process Flow Sheet")
+    labels = ["Input Waste", "Water Loss", "Gas & Volatiles", "Ash", "Biochar"]
     node_colors = ['#8B4513','#1E90FF','#FFA500','#808080','#2E8B57']
     sources, targets, values, link_colors = [], [], [], []
     for sim in st.session_state.simulations:
         sources.extend([0,0,0,0])
         targets.extend([1,2,3,4])
-        values.extend([sim['Water Loss (kg)'],sim['Gas & Volatiles (kg)'],sim['Ash (kg)'],sim['Biochar (kg)']])
+        values.extend([sim['Water Loss (kg)'], sim['Gas & Volatiles (kg)'], sim['Ash (kg)'], sim['Biochar (kg)']])
         link_colors.extend(node_colors)
-    fig_sankey = go.Figure(data=[go.Sankey(node=dict(label=labels, pad=15, thickness=20, color=node_colors),
-                                           link=dict(source=sources, target=targets, value=values, color=link_colors))])
-    fig_sankey.update_traces(hovertemplate='From %{source.label} to %{target.label}: %{value} kg<extra></extra>')
+    fig_sankey = go.Figure(data=[go.Sankey(
+        node=dict(label=labels, pad=15, thickness=20, color=node_colors),
+        link=dict(source=sources, target=targets, value=values, color=link_colors)
+    )])
     fig_sankey.update_layout(title_text="Flow Sheet (All Simulations)", font_size=12)
     st.plotly_chart(fig_sankey, use_container_width=True)
 
-# ===== Download PDF =====
+# ===== PDF Reports =====
 if st.session_state.simulations:
     st.subheader("Download PDF Reports")
     for i, sim in enumerate(st.session_state.simulations):
-        st.markdown(f"**Simulation #{i+1}: {sim['Waste Type']}**")
-        pdf_file = create_pdf_report(sim, fig_pie)
+        st.markdown(f"**Simulation #{i + 1}: {sim['Waste Type']}**")
+        pdf_key = f"pdf_{i}"
+        pdf_file = create_pdf_report(sim)
         st.download_button("Download PDF", data=pdf_file,
                            file_name=f"Torrefaction_Report_{i+1}.pdf",
-                           mime="application/pdf")
+                           mime="application/pdf", key=pdf_key)
