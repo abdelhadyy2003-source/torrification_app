@@ -244,7 +244,7 @@ with col1:
    
 with col2:
     mass=st.number_input("Mass (kg)",min_value=1.0,max_value=10000.0,value=50.0,step=1.0,format="%.2f")
-    moisture=st.slider("Moisture (%)",0.0,100.0,15.0)
+    moisture=st.slider("Moisture (%)",0.0,45.0,15.0)
 with col3:
     temp=st.slider("Temperature (°C)",200,300,250)
     residence_time=st.slider("Residence Time (hr)",0.1,5.0,1.0)
@@ -312,4 +312,5 @@ if st.session_state.simulations:
     if st.button("Print Report"):
         pdf_buffer=create_pdf_report(latest)
         st.download_button("Download Report (PDF)",data=pdf_buffer,file_name="torrefaction_report.pdf",mime="application/pdf")
+
 
