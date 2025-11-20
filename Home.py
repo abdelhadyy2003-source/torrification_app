@@ -247,7 +247,7 @@ with col2:
     moisture=st.slider("Moisture (%)",0.0,45.0,15.0)
 with col3:
     temp=st.slider("Temperature (°C)",200,300,250)
-    residence_time=st.slider("Residence Time (hr)",0.1,5.0,1.0)
+    residence_time=st.slider("Residence Time (min)",0.1,60,1.0)
 
 if st.checkbox("Show advanced settings"):
     adv_col1,adv_col2=st.columns(2)
@@ -312,5 +312,6 @@ if st.session_state.simulations:
     if st.button("Print Report"):
         pdf_buffer=create_pdf_report(latest)
         st.download_button("Download Report (PDF)",data=pdf_buffer,file_name="torrefaction_report.pdf",mime="application/pdf")
+
 
 
