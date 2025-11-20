@@ -11,15 +11,10 @@ st.markdown(
     """
     <style>
     .stApp {
-        background-image: url('https://images.unsplash.com/photo-1599058917216-52c6cd19f2d1?auto=format&fit=crop&w=1950&q=80');
+        background-image: url('https://images.unsplash.com/photo-1599058917216-52c6cd19f2d1?auto=format&fit=crop&w=1950&q=80'); 
         background-size: cover;
         background-attachment: fixed;
         color: white;
-    }
-    .container {
-        backdrop-filter: brightness(0.6);
-        padding: 20px;
-        border-radius: 10px;
     }
     .company-name {
         text-align: center;
@@ -58,14 +53,18 @@ def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
 def calculate_costs(mass, processing_cost_per_kg):
     return mass * processing_cost_per_kg
 
-# ===== PDF Generation (Fixed) =====
+# ===== PDF Generation with UTF-8 =====
 def create_pdf_report(simulation_data):
-    pdf = FPDF()
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "🔥 Torrefaction Simulation Report 🔥", ln=True, align="C")
+    
+    # استخدم خط يدعم UTF-8
+    pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
+    pdf.set_font("DejaVu", 'B', 16)
+    pdf.multi_cell(0, 10, "🔥 Torrefaction Simulation Report 🔥", align="C")
     pdf.ln(5)
-    pdf.set_font("Arial", "", 12)
+    
+    pdf.set_font("DejaVu", '', 12)
     for key, value in simulation_data.items():
         if isinstance(value, (int, float)):
             pdf.cell(0, 10, f"{key}: {value:.2f}", ln=True)
@@ -73,6 +72,7 @@ def create_pdf_report(simulation_data):
             pdf.cell(0, 10, f"{key}: N/A", ln=True)
         else:
             pdf.cell(0, 10, f"{key}: {value}", ln=True)
+    
     pdf_buffer = io.BytesIO()
     pdf.output(pdf_buffer)
     pdf_buffer.seek(0)
@@ -80,11 +80,6 @@ def create_pdf_report(simulation_data):
 
 # ===== Streamlit Setup =====
 st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide")
-
-# ===== Container Start =====
-st.markdown('<div class="container">', unsafe_allow_html=True)
-
-# ===== Company Logo/Name =====
 st.markdown('<div class="company-name">Chemisco</div>', unsafe_allow_html=True)
 st.markdown("<h2 style='text-align:center;'>🔥 Torrefaction Simulator 🔥</h2>", unsafe_allow_html=True)
 
@@ -92,31 +87,32 @@ st.markdown("<h2 style='text-align:center;'>🔥 Torrefaction Simulator 🔥</h2
 if "simulations" not in st.session_state:
     st.session_state.simulations = []
 
-# ===== Input Section in Form =====
+# ===== Input Section =====
 st.subheader("Input Parameters")
-with st.form("input_form"):
+col1, col2 = st.columns([1,1])
+with col1:
     waste_type = st.selectbox("Waste Type", ['Municipal', 'Wood', 'Agricultural', 'Plastic'])
     mass = st.slider("Mass (kg)", 1.0, 100.0, 10.0)
     moisture = st.slider("Moisture (%)", 0.0, 100.0, 20.0)
+with col2:
     temp = st.slider("Temperature (°C)", 200, 300, 250)
     residence_time = st.slider("Residence Time (hr)", 0.1, 5.0, 1.0)
     processing_cost_per_kg = st.number_input("Processing Cost per kg ($)", 0.1, 10.0, 1.0)
-    submitted = st.form_submit_button("Run Simulation")
 
-    if submitted:
-        results = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
-        total_cost = calculate_costs(mass, processing_cost_per_kg)
-        results['Total Cost ($)'] = total_cost
-        sim_entry = {
-            "Waste Type": waste_type,
-            "Mass": mass,
-            "Moisture": moisture,
-            "Temperature": temp,
-            "Residence Time": residence_time,
-            **results
-        }
-        st.session_state.simulations.append(sim_entry)
-        st.success("Simulation added successfully!")
+if st.button("Run Simulation"):
+    results = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
+    total_cost = calculate_costs(mass, processing_cost_per_kg)
+    results['Total Cost ($)'] = total_cost
+    sim_entry = {
+        "Waste Type": waste_type,
+        "Mass": mass,
+        "Moisture": moisture,
+        "Temperature": temp,
+        "Residence Time": residence_time,
+        **results
+    }
+    st.session_state.simulations.append(sim_entry)
+    st.success("Simulation added successfully!")
 
 # ===== Latest Results =====
 if st.session_state.simulations:
@@ -124,7 +120,7 @@ if st.session_state.simulations:
     latest = st.session_state.simulations[-1]
     cols = st.columns(5)
     metric_keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Total Cost ($)']
-    colors = ['#32CD32', '#1E90FF', '#FFA500', '#A9A9A9', '#8B4513']
+    colors = ['#2E8B57', '#1E90FF', '#FFA500', '#808080', '#8B4513']
     for col, key, color in zip(cols, metric_keys, colors):
         col.metric(label=key, value=f"{latest[key]:.2f}", delta_color="normal")
 
@@ -134,7 +130,7 @@ if st.session_state.simulations:
     df = pd.DataFrame(st.session_state.simulations)
     keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Water Loss (kg)']
     fig_pie = go.Figure(data=[go.Pie(labels=keys, values=[df.iloc[-1][k] for k in keys],
-                                     marker=dict(colors=colors), hoverinfo='label+value+percent')])
+                                     marker=dict(colors=colors))])
     fig_pie.update_layout(title="Product Distribution (Last Simulation)", title_font_size=18)
     st.plotly_chart(fig_pie, use_container_width=True)
     st.bar_chart(df[['Biochar (kg)', 'Gas & Volatiles (kg)', 'Total Cost ($)']])
@@ -165,7 +161,7 @@ for x0,y0,x1,y1 in arrows:
                              showarrow=True, arrowhead=3, arrowsize=2, arrowwidth=3, arrowcolor="#333333")
 fig_block.update_xaxes(range=[-1,12], showticklabels=False, showgrid=False, zeroline=False)
 fig_block.update_yaxes(range=[1,4], showticklabels=False, showgrid=False, zeroline=False)
-fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="rgba(0,0,0,0)")
+fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="#F5F5F5")
 st.plotly_chart(fig_block, use_container_width=True)
 
 # ===== Flow Sheet =====
@@ -191,10 +187,8 @@ if st.session_state.simulations:
     st.subheader("Download PDF Reports")
     for i, sim in enumerate(st.session_state.simulations):
         st.markdown(f"**Simulation #{i + 1}: {sim['Waste Type']}**")
+        pdf_key = f"pdf_{i}"
         pdf_file = create_pdf_report(sim)
         st.download_button("Download PDF", data=pdf_file,
                            file_name=f"Torrefaction_Report_{i+1}.pdf",
-                           mime="application/pdf", key=f"pdf_{i}")
-
-# ===== Container End =====
-st.markdown('</div>', unsafe_allow_html=True)
+                           mime="application/pdf", key=pdf_key)
