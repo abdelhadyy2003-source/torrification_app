@@ -21,7 +21,7 @@ st.set_page_config(page_title="Chemisco - Torrefaction", layout="wide", initial_
 if 'simulations' not in st.session_state:
     st.session_state.simulations = []
 
-# ----- UTILITY FUNCTIONS -----
+# --- Utility: find uploaded image ---
 def find_first_file(containing):
     candidates = glob.glob("/mnt/data/*")
     for c in candidates:
@@ -29,19 +29,19 @@ def find_first_file(containing):
             return c
     return ""
 
-def img_to_base64(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-# ----- LOAD IMAGES -----
+# Images
 HERO_COVER = find_first_file("cover") or ""
 BANNER_COVER = find_first_file("banner") or HERO_COVER
 LOGO_PATH = find_first_file("logo") or ""
 
+def img_to_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
 HERO_B64 = img_to_base64(HERO_COVER) if HERO_COVER else ""
 BANNER_B64 = img_to_base64(BANNER_COVER) if BANNER_COVER else ""
 
-# ----- HERO & BANNER CSS -----
+# Hero & Banner CSS
 hero_css = f"""
 <style>
 .hero {{
@@ -86,7 +86,7 @@ st.markdown(hero_css, unsafe_allow_html=True)
 st.markdown('<div class="hero"><h1>Chemisco Pro — Advanced Torrefaction</h1></div>', unsafe_allow_html=True)
 st.markdown('<div class="banner"><h3>Torrefaction Simulator — Realistic process & analytics</h3></div>', unsafe_allow_html=True)
 
-# ---------- TORREFACTION SIMULATION FUNCTION ----------
+# ---------- Torrefaction simulation ----------
 def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
     water_loss = mass * (moisture / 100.0) * (1.0 - np.exp(-0.6 * residence_time))
     volatile_fraction = np.clip(0.30 + 0.12 * ((temp - 200.0) / 100.0), 0.0, 0.9)
@@ -103,7 +103,7 @@ def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
         'Water Loss (kg)': water_loss
     }
 
-# ---------- PDF REPORT FUNCTION ----------
+# ---------- ReportLab PDF ----------
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -131,50 +131,30 @@ def _make_matplotlib_charts(sim):
     keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Water Loss (kg)']
     values = [sim.get(k, 0.0) for k in keys]
     colors_list = ['#2E8B57', '#1E90FF', '#FFA500', '#808080', '#8B4513']
-# ---------- Charts (Pie + Bar) ----------
-def _make_matplotlib_charts(sim):
-    keys = ['Biochar (kg)', 'Gas & Volatiles (kg)', 'Ash (kg)', 'Fixed Carbon (kg)', 'Water Loss (kg)']
-    values = [sim.get(k, 0.0) for k in keys]
-    colors_list = ['#2E8B57', '#1E90FF', '#FFA500', '#808080', '#8B4513']
 
-    # Pie chart - أصغر حجم
     pie_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     fig1, ax1 = plt.subplots(figsize=(3, 3))
-    if sum(values) == 0: 
-        values = [1e-6] * len(values)
-    ax1.pie(values, labels=keys, colors=colors_list,
-            autopct=lambda pct: f"{pct:.1f}%", startangle=140,
-            textprops={'fontsize': 7})
+    if sum(values) == 0: values = [1e-6] * len(values)
+    ax1.pie(values, labels=keys, colors=colors_list, autopct=lambda pct: f"{pct:.1f}%", startangle=140, textprops={'fontsize': 6})
     ax1.axis('equal')
     fig1.savefig(pie_tmp.name, dpi=150, bbox_inches='tight', transparent=True)
     plt.close(fig1)
 
-    # Bar chart - أصغر حجم
     bar_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig2, ax2 = plt.subplots(figsize=(5, 2.5))
+    fig2, ax2 = plt.subplots(figsize=(4, 2))
     ax2.bar(keys, values, color=colors_list)
-    ax2.set_xticklabels(keys, rotation=45, ha='right', fontsize=7)
-    ax2.set_ylabel('kg')
+    ax2.set_xticklabels(keys, rotation=45, ha='right', fontsize=6)
+    ax2.set_ylabel('kg', fontsize=8)
     fig2.savefig(bar_tmp.name, dpi=150, bbox_inches='tight', transparent=True)
     plt.close(fig2)
-
     return pie_tmp.name, bar_tmp.name
-
-# ---------- Streamlit Display ----------
-if st.session_state.simulations:
-    latest_sim = st.session_state.simulations[-1]
-    pie_path, bar_path = _make_matplotlib_charts(latest_sim)
-    st.subheader("Visual Summary")
-    st.image(pie_path, caption="Mass Distribution (Pie)", width=300)
-    st.image(bar_path, caption="Mass Components (Bar)", width=500)
-
 
 def create_pdf_report(sim, logo_path=LOGO_PATH):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2.5*cm)
     styles = getSampleStyleSheet()
     story = []
-
+    
     title_style = ParagraphStyle('title', parent=styles['Title'], alignment=1, fontSize=28, textColor=colors.HexColor("#1E90FF"))
     subtitle_style = ParagraphStyle('subtitle', parent=styles['Heading2'], alignment=1, fontSize=14, textColor=colors.HexColor("#444444"))
     body_style = styles['BodyText']
@@ -196,9 +176,8 @@ def create_pdf_report(sim, logo_path=LOGO_PATH):
     story.append(Paragraph("Simulation results from Chemisco Torrefaction Simulator.", body_style))
     story.append(Spacer(1,1.8*cm))
 
-    meta = [["Generated by","Chemisco Torrefaction Simulator"],
-            ["Report generated", pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")]]
-    meta_table = Table(meta, colWidths=[5*cm, 8*cm])
+    meta = [["Generated by","Chemisco Torrefaction Simulator"],["Report generated",pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")]]
+    meta_table = Table(meta,colWidths=[5*cm,8*cm])
     meta_table.setStyle(TableStyle([('FONTNAME',(0,0),(-1,-1),'Helvetica'),('FONTSIZE',(0,0),(-1,-1),9),
                                     ('TEXTCOLOR',(0,0),(-1,-1),colors.HexColor("#333333")),
                                     ('BOTTOMPADDING',(0,0),(-1,-1),6)]))
@@ -207,10 +186,10 @@ def create_pdf_report(sim, logo_path=LOGO_PATH):
 
     story.append(Paragraph("Simulation Summary", styles['Heading2']))
     story.append(Spacer(1,0.2*cm))
-    data = [["Parameter","Value"]]
+    data=[["Parameter","Value"]]
     for k,v in sim.items():
-        data.append([k, f"{v:.2f}" if isinstance(v,(int,float)) else str(v)])
-    table = Table(data, colWidths=[9*cm,6*cm])
+        data.append([k,f"{v:.2f}" if isinstance(v,(int,float)) else str(v)])
+    table = Table(data,colWidths=[9*cm,6*cm])
     table.setStyle(TableStyle([
         ('BACKGROUND',(0,0),(-1,0),colors.HexColor("#1E90FF")),
         ('TEXTCOLOR',(0,0),(-1,0),colors.white),
@@ -230,9 +209,9 @@ def create_pdf_report(sim, logo_path=LOGO_PATH):
         story.append(PageBreak())
         story.append(Paragraph("Visual Summary", styles['Heading2']))
         story.append(Spacer(1,0.3*cm))
-        story.append(RLImage(pie_path, width=10*cm, height=10*cm))
+        story.append(RLImage(pie_path,width=8*cm,height=8*cm))
         story.append(Spacer(1,0.5*cm))
-        story.append(RLImage(bar_path, width=14*cm, height=6*cm))
+        story.append(RLImage(bar_path,width=12*cm,height=5*cm))
     except Exception as e:
         story.append(Paragraph("Charts could not be generated.", body_style))
         print(f"Error generating charts: {e}")
@@ -247,7 +226,7 @@ def create_pdf_report(sim, logo_path=LOGO_PATH):
     doc.build(story, canvasmaker=NumberedCanvas)
 
     try:
-        for path in (pie_path, bar_path):
+        for path in (pie_path,bar_path):
             if os.path.exists(path):
                 os.unlink(path)
     except Exception as e:
@@ -256,102 +235,81 @@ def create_pdf_report(sim, logo_path=LOGO_PATH):
     buffer.seek(0)
     return buffer
 
-# ---------- APP UI ----------
+# ---------- App UI ----------
 st.markdown('<div class="glass">', unsafe_allow_html=True)
 st.subheader("Input Parameters")
-col1, col2, col3 = st.columns([1,1,1])
+col1,col2,col3=st.columns([1,1,1])
 with col1:
-    waste_type = st.selectbox("Waste Type", ['Municipal','Wood','Agricultural','Plastic'])
+    waste_type=st.selectbox("Waste Type",['Municipal','Wood','Agricultural','Plastic'])
     if waste_type=='Plastic':
-        plastic_type = st.selectbox("Plastic Type", ['Mixed LDPE','PET','PP'])
+        plastic_type=st.selectbox("Plastic Type",['Mixed LDPE','PET','PP'])
 with col2:
-    mass = st.number_input("Mass (kg)", min_value=1.0, max_value=10000.0, value=50.0, step=1.0, format="%.2f")
-    moisture = st.slider("Moisture (%)", 0.0, 100.0, 15.0)
+    mass=st.number_input("Mass (kg)",min_value=1.0,max_value=10000.0,value=50.0,step=1.0,format="%.2f")
+    moisture=st.slider("Moisture (%)",0.0,100.0,15.0)
 with col3:
-    temp = st.slider("Temperature (°C)", 200, 300, 250)
-    residence_time = st.slider("Residence Time (hr)", 0.1, 5.0, 1.0)
+    temp=st.slider("Temperature (°C)",200,300,250)
+    residence_time=st.slider("Residence Time (hr)",0.1,5.0,1.0)
 
 if st.checkbox("Show advanced settings"):
-    adv_col1, adv_col2 = st.columns(2)
+    adv_col1,adv_col2=st.columns(2)
     with adv_col1:
-        processing_cost_per_kg = st.number_input("Processing Cost per kg ($)", 0.01, 50.0, 1.0, format="%.2f")
-        heating_rate = st.slider("Heating Rate (°C/min)", 1, 50, 10)
+        processing_cost_per_kg=st.number_input("Processing Cost per kg ($)",0.01,50.0,1.0,format="%.2f")
+        heating_rate=st.slider("Heating Rate (°C/min)",1,50,10)
     with adv_col2:
-        reactor_type = st.selectbox("Reactor Type", ['Fixed Bed','Rotary','Fluidized'])
-        atmosphere = st.selectbox("Atmosphere", ['Inert (N2)','Air','Steam'])
+        reactor_type=st.selectbox("Reactor Type",['Fixed Bed','Rotary','Fluidized'])
+        atmosphere=st.selectbox("Atmosphere",['Inert (N2)','Air','Steam'])
 
 if st.button("Run Simulation"):
-    try: processing_cost_per_kg
-    except NameError: processing_cost_per_kg = 1.0
-    sim = {
-        "Waste Type": waste_type,
-        "Mass": mass,
-        "Moisture": moisture,
-        "Temperature": temp,
-        "Residence Time": residence_time
-    }
-    sim_res = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
+    try:
+        processing_cost_per_kg
+    except NameError:
+        processing_cost_per_kg=1.0
+    sim={"Waste Type":waste_type,"Mass":mass,"Moisture":moisture,"Temperature":temp,"Residence Time":residence_time}
+    sim_res=simulate_torrefaction(waste_type,mass,moisture,temp,residence_time)
     sim.update(sim_res)
-    sim["Total Cost ($)"] = mass * processing_cost_per_kg
+    sim["Total Cost ($)"]=mass*processing_cost_per_kg
     st.session_state.simulations.append(sim)
     st.success("Simulation run added to dashboard.")
-
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------- DASHBOARD ----------
+# ---------- Dashboard ----------
 if st.session_state.simulations:
     st.markdown("---")
     st.subheader("Dashboard — Simulations Overview")
-    df = pd.DataFrame(st.session_state.simulations)
-    st.dataframe(df.style.format("{:.2f}", subset=[c for c in df.columns if df[c].dtype == float]))
+    df=pd.DataFrame(st.session_state.simulations)
+    st.dataframe(df.style.format("{:.2f}",subset=[c for c in df.columns if df[c].dtype==float]))
 
-    latest = st.session_state.simulations[-1]
+    latest=st.session_state.simulations[-1]
+    kcols=st.columns(5)
+    keys=['Biochar (kg)','Gas & Volatiles (kg)','Ash (kg)','Fixed Carbon (kg)','Total Cost ($)']
+    kcolors=['#2E8B57','#1E90FF','#FFA500','#808080','#8B4513']
+    for c,k,col_color in zip(kcols,keys,kcolors):
+        c.metric(k,f"{latest.get(k,0):.2f}")
 
-    # KPIs
-    kcols = st.columns(5)
-    keys = ['Biochar (kg)','Gas & Volatiles (kg)','Ash (kg)','Fixed Carbon (kg)','Total Cost ($)']
-    kcolors = ['#2E8B57','#1E90FF','#FFA500','#808080','#8B4513']
-    for c,k,col_color in zip(kcols, keys, kcolors):
-        c.metric(k, f"{latest.get(k,0):.2f}")
-
-    # Charts
-    st.subheader("Visualizations")
-    fig_pie, fig_bar = _make_matplotlib_charts(latest)
-    st.image(fig_pie, caption="Mass Distribution (Pie)", use_column_width=True)
-    st.image(fig_bar, caption="Mass Components (Bar)", use_column_width=True)
-
-    # PDF Download
-    if st.button("Download Report (PDF)"):
-        pdf_buffer = create_pdf_report(latest)
-        st.download_button(
-            label="Download Report (PDF)",
-            data=pdf_buffer,
-            file_name="torrefaction_report.pdf",
-            mime="application/pdf"
-        )
-
-    # Process Flow Diagram
-    st.subheader("Process Flow Diagram")
-    fig_block = go.Figure()
-    blocks = [
-        {"name":"Input Waste","x0":0,"x1":2,"y0":2,"y1":3,"color":"#8B4513"},
-        {"name":"Drying","x0":3,"x1":5,"y0":2,"y1":3,"color":"#1E90FF"},
-        {"name":"Torrefaction","x0":6,"x1":8,"y0":2,"y1":3,"color":"#FFA500"},
-        {"name":"Products","x0":9,"x1":11,"y0":2,"y1":3,"color":"#2E8B57"}
+    # ---------- Compact Flow Diagram ----------
+    st.subheader("Process Flow Diagram (Compact)")
+    fig_block=go.Figure()
+    blocks=[
+        {"name":"Input Waste","x0":0,"x1":1.5,"y0":1.5,"y1":2.5,"color":"#8B4513"},
+        {"name":"Drying","x0":2,"x1":3.5,"y0":1.5,"y1":2.5,"color":"#1E90FF"},
+        {"name":"Torrefaction","x0":4,"x1":5.5,"y0":1.5,"y1":2.5,"color":"#FFA500"},
+        {"name":"Products","x0":6,"x1":7.5,"y0":1.5,"y1":2.5,"color":"#2E8B57"}
     ]
     for block in blocks:
-        fig_block.add_shape(type="rect", x0=block["x0"], x1=block["x1"], y0=block["y0"], y1=block["y1"],
-                            line=dict(color="black", width=2), fillcolor=block["color"], layer="below")
-        fig_block.add_annotation(x=(block["x0"]+block["x1"])/2, y=(block["y0"]+block["y1"])/2,
-                                 text=f"<b>{block['name']}</b>", showarrow=False, font=dict(color="white", size=14))
-    arrows = [(2,2.5,3,2.5),(5,2.5,6,2.5),(8,2.5,9,2.5)]
+        fig_block.add_shape(type="rect",x0=block["x0"],x1=block["x1"],y0=block["y0"],y1=block["y1"],
+                            line=dict(color="black",width=2),fillcolor=block["color"],layer="below")
+        fig_block.add_annotation(x=(block["x0"]+block["x1"])/2,y=(block["y0"]+block["y1"])/2,
+                                 text=f"<b>{block['name']}</b>",showarrow=False,font=dict(color="white",size=12))
+    arrows=[(1.5,2,2,2),(3.5,2,4,2),(5.5,2,6,2)]
     for x0,y0,x1,y1 in arrows:
         fig_block.add_annotation(x=x1,y=y1,ax=x0,ay=y0,xref="x",yref="y",axref="x",ayref="y",
-                                 showarrow=True,arrowhead=3,arrowsize=2,arrowwidth=3,arrowcolor="#333333")
-    fig_block.update_xaxes(range=[-1,12], showticklabels=False, showgrid=False, zeroline=False)
-    fig_block.update_yaxes(range=[1,4], showticklabels=False, showgrid=False, zeroline=False)
-    fig_block.update_layout(height=300, margin=dict(l=20,r=20,t=20,b=20), paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig_block, use_container_width=True)
+                                 showarrow=True,arrowhead=3,arrowsize=1.5,arrowwidth=2,arrowcolor="#333333")
+    fig_block.update_xaxes(range=[-0.5,8],showticklabels=False,showgrid=False,zeroline=False)
+    fig_block.update_yaxes(range=[1,3],showticklabels=False,showgrid=False,zeroline=False)
+    fig_block.update_layout(height=200,margin=dict(l=10,r=10,t=10,b=10),paper_bgcolor="rgba(0,0,0,0)")
+    st.plotly_chart(fig_block,use_container_width=True)
 
-
-
+    # ---------- PDF Report ----------
+    if st.button("Print Report"):
+        pdf_buffer=create_pdf_report(latest)
+        st.download_button("Download Report (PDF)",data=pdf_buffer,file_name="torrefaction_report.pdf",mime="application/pdf")
