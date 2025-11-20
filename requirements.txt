@@ -7,4 +7,6 @@ reportlab
 matplotlib
 fpdf
 kaleido
+scipy
+
 
