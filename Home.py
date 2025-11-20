@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import tempfile, io, os, glob
 
 # ----- CONFIG -----
-st.set_page_config(page_title="Chemisco - Torrefaction", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title=" Chemisco - Torrefaction", layout="wide", initial_sidebar_state="collapsed")
 
 # ----- SESSION STATE INIT -----
 if 'simulations' not in st.session_state:
@@ -355,5 +355,6 @@ if st.session_state.simulations:
 
  
      
+
 
 
