@@ -1,100 +1,85 @@
+# ===== Import Libraries =====
 import streamlit as st
-import pandas as pd
 import numpy as np
-import plotly.express as px
-from io import BytesIO
-from reportlab.pdfgen import canvas
-import graphviz
+import pandas as pd
+import matplotlib.pyplot as plt
 
-# --------- إعداد الصفحة ---------
-st.set_page_config(page_title="Torrification Simulator", layout="wide")
-st.title("🌿 Torrification Simulator")
-st.write("محاكي كامل لتوريفيكاشن: إدخال البيانات، محاكاة، Flow Sheet أفقي، رسومات، تقارير PDF/CSV")
+# ===== Functions =====
+def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
+    """
+    Simulate torrefaction process.
+    Returns dict of outputs.
+    """
+    # Moisture loss
+    water_loss = mass * moisture/100 * (1 - np.exp(-0.5*residence_time))
+    
+    # Volatile loss (simplified)
+    volatile_fraction = 0.3 + 0.1*(temp-200)/100
+    volatile_loss = (mass - water_loss) * volatile_fraction
+    
+    # Ash fraction fixed
+    ash_fraction = 0.05
+    ash_mass = mass * ash_fraction
+    
+    # Biochar & fixed carbon
+    biochar_mass = mass - water_loss - volatile_loss - ash_mass
+    fixed_carbon = biochar_mass * 0.8
+    
+    return {
+        'Biochar (kg)': biochar_mass,
+        'Gas & Volatiles (kg)': volatile_loss,
+        'Ash (kg)': ash_mass,
+        'Fixed Carbon (kg)': fixed_carbon,
+        'Water Loss (kg)': water_loss
+    }
 
-# --------- Sidebar Inputs ---------
-st.sidebar.header("Input Waste Data")
-waste_type = st.sidebar.selectbox("Type of Waste", ["Municipal", "Industrial", "Biomass"])
-total_mass = st.sidebar.number_input("Total Waste Mass (kg)", 0.0, 10000.0, 0.0)
+def plot_results(results):
+    labels = list(results.keys())
+    values = list(results.values())
+    
+    # Pie chart
+    fig, axs = plt.subplots(1,2, figsize=(12,5))
+    axs[0].pie(values, labels=labels, autopct='%1.1f%%', startangle=140,
+               colors=['#654321','#FFA500','#808080','#2E8B57','#1E90FF'])
+    axs[0].set_title("Torrefaction Product Distribution")
+    
+    # Mass loss line plot (simplified)
+    total_mass = sum(values)
+    time = np.linspace(0,1,100)
+    mass_curve = total_mass * (1 - time*(1-0.7))  # simple approximation
+    axs[1].plot(time, mass_curve, color='red', lw=2)
+    axs[1].set_xlabel('Normalized Time')
+    axs[1].set_ylabel('Mass (kg)')
+    axs[1].set_title('Mass Loss Over Time')
+    
+    plt.tight_layout()
+    st.pyplot(fig)
 
-st.sidebar.subheader("🧪 Compositional Data (%)")
-plastic = st.sidebar.number_input("Plastic", 0.0, 100.0, 0.0)
-paper = st.sidebar.number_input("Paper & Cardboard", 0.0, 100.0, 0.0)
-metals = st.sidebar.number_input("Metals", 0.0, 100.0, 0.0)
-textiles = st.sidebar.number_input("Textiles", 0.0, 100.0, 0.0)
-organic = st.sidebar.number_input("Organic Waste", 0.0, 100.0, 0.0)
-inert = st.sidebar.number_input("Inert Materials", 0.0, 100.0, 0.0)
-other = st.sidebar.number_input("Other Materials", 0.0, 100.0, 0.0)
+# ===== Streamlit App =====
+st.set_page_config(page_title="Torrefaction Simulator", layout="wide")
+st.title("🔥 Torrefaction Simulator 🔥")
+st.markdown("Simulate the torrefaction process of different waste types with interactive sliders.")
 
-total_composition = plastic + paper + metals + textiles + organic + inert + other
-st.sidebar.write(f"**Total:** {total_composition:.2f}%")
+# --- Sidebar Inputs ---
+st.sidebar.header("Input Parameters")
+waste_type = st.sidebar.selectbox("Waste Type", ['Municipal', 'Wood', 'Agricultural', 'Plastic'])
+mass = st.sidebar.slider("Initial Mass (kg)", min_value=1.0, max_value=100.0, value=10.0, step=1.0)
+moisture = st.sidebar.slider("Moisture (%)", min_value=0.0, max_value=100.0, value=20.0, step=1.0)
+temp = st.sidebar.slider("Torrefaction Temperature (°C)", min_value=200, max_value=300, value=250, step=5)
+residence_time = st.sidebar.slider("Residence Time (hr)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
 
-st.sidebar.subheader("Initial Moisture Content (%)")
-moisture = st.sidebar.slider("", 0.0, 100.0, 85.0)
+# --- Simulation ---
+results = simulate_torrefaction(waste_type, mass, moisture, temp, residence_time)
 
-st.sidebar.subheader("⚠ Contaminants (Optional)")
-chlorine = st.sidebar.number_input("Chlorine (%)", 0.0, 10.0, 0.07)
-mercury_median = st.sidebar.number_input("Mercury Median (mg/MJ)", 0.0, 1.0, 0.07)
-mercury_80th = st.sidebar.number_input("Mercury 80th Percentile (mg/MJ)", 0.0, 1.0, 0.06)
+# --- Display Results ---
+st.subheader("Simulation Results")
+for k, v in results.items():
+    st.metric(label=k, value=f"{v:.2f} kg")
 
-# --------- محاكاة الحسابات ---------
-# Final Mass و Moisture تقريبي
-final_mass = total_mass * (1 - moisture/100)
-effective_moisture = max(0, moisture - 20)
-HHV = final_mass * 0.1  # مثال dummy heating value
+# --- Plots ---
+st.subheader("Visualizations")
+plot_results(results)
 
-# --------- الرسومات ---------
-st.subheader("📊 Waste Composition")
-comp_data = {"Plastic": plastic, "Paper": paper, "Metals": metals,
-             "Textiles": textiles, "Organic": organic, "Inert": inert, "Other": other}
-comp_df = pd.DataFrame(list(comp_data.items()), columns=["Component", "Percentage"])
-fig_pie = px.pie(comp_df, names='Component', values='Percentage', title="Waste Composition")
-st.plotly_chart(fig_pie, use_container_width=True)
-
-st.subheader("📈 Mass vs Moisture Simulation")
-time = np.linspace(0, 5, 100)
-moisture_profile = moisture * np.exp(-0.05*time)
-fig_line = px.line(x=time, y=moisture_profile, labels={"x":"Time (hours)", "y":"Moisture (%)"}, title="Moisture over Time")
-st.plotly_chart(fig_line, use_container_width=True)
-
-# --------- Flow Sheet أفقي ---------
-st.subheader("⚙ Process Flow (Horizontal)")
-dot = graphviz.Digraph()
-dot.attr(rankdir='LR', size='10')  # Horizontal
-dot.node('A', f'Raw Material\nMass={total_mass}kg')
-dot.node('B', f'Presorting\nMass={total_mass*0.9:.1f}kg')
-dot.node('C', f'Shredding\nMass={total_mass*0.8:.1f}kg')
-dot.node('D', f'Torrefaction\nMass={final_mass:.1f}kg\nMoisture={effective_moisture:.1f}%')
-dot.node('E', 'Final Product')
-dot.edges(['AB', 'BC', 'CD', 'DE'])
-st.graphviz_chart(dot)
-
-# --------- Production Results ---------
-st.subheader("📦 Production Results")
-st.write(f"**Final SRF Mass:** {final_mass:.2f} kg")
-st.write(f"**Effective Moisture:** {effective_moisture:.2f}%")
-st.write(f"**Heating Value (HHV):** {HHV:.2f} MJ/kg")
-st.write("📈 SRF Quality Classification")
-st.write(f"NCV: {HHV:.2f} MJ/kg (Class 5)")
-st.write(f"Chlorine: {chlorine:.2f}% (Class 1)")
-st.write(f"Mercury: Median={mercury_median:.3f}, 80th={mercury_80th:.3f} (Class 3)")
-
-# --------- PDF و CSV ---------
-st.subheader("📄 Download Reports")
-csv = pd.DataFrame({"Component": comp_df['Component'], "Percentage": comp_df['Percentage']}).to_csv(index=False).encode()
-st.download_button("Download CSV", data=csv, file_name="SRF_results.csv", mime="text/csv")
-
-# PDF
-buffer = BytesIO()
-c = canvas.Canvas(buffer)
-c.drawString(50, 800, "SRF Production Report")
-c.drawString(50, 780, f"Waste Type: {waste_type}")
-c.drawString(50, 760, f"Total Mass: {total_mass} kg")
-c.drawString(50, 740, f"Components: {comp_data}")
-c.drawString(50, 720, f"Initial Moisture: {moisture}%")
-c.drawString(50, 700, f"Contaminants: Cl={chlorine}%, Mercury Median={mercury_median}, 80th={mercury_80th}")
-c.drawString(50, 680, f"Final SRF Mass: {final_mass:.2f} kg")
-c.drawString(50, 660, f"Effective Moisture: {effective_moisture:.2f}%")
-c.drawString(50, 640, f"Heating Value: {HHV:.2f} MJ/kg")
-c.showPage()
-c.save()
-st.download_button("Download PDF", data=buffer, file_name="SRF_report.pdf", mime="application/pdf")
+# --- Footer ---
+st.markdown("---")
+st.markdown("Made with ❤️ using Streamlit | Torrefaction Simulator")
