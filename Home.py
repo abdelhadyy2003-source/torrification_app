@@ -167,25 +167,102 @@ def main():
         unsafe_allow_html=True
     )
     
-    # Process Flow Sheet (Stylized Placeholder)
+    # Process Flow Sheet (Professional, Step-by-Step Schematic)
     st.subheader("Process Flow Sheet Schematic")
-    st.markdown(
-        """
-        <div style="border: 2px dashed #4CAF50; padding: 20px; border-radius: 5px; margin-bottom: 20px; text-align: center;">
-            <p style="font-weight: bold; margin-bottom: 15px;">
-                RAW BIOMASS ➡️ DRYING/HEATING ➡️ TORREFACTION REACTOR
-            </p>
-            <p>
-                ⬇️ (Moisture/Water Vapor) &nbsp; &nbsp; &nbsp; ⬇️ (Non-Condensable Gases)
-            </p>
-            <p style="font-weight: bold; margin-top: 15px;">
-                <span style="color: #8B4513;">TORREFIED BIOCHAR</span> ⬅️ COOLING/STORAGE
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    
+    # Define CSS styles for the stages
+    flow_style = """
+    <style>
+        .flow-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 10px 0;
+            overflow-x: auto;
+        }
+        .flow-stage {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px 10px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+            position: relative;
+        }
+        .flow-stage:hover {
+            transform: translateY(-5px);
+        }
+        .arrow {
+            font-size: 30px;
+            margin: 0 10px;
+            color: #4CAF50;
+        }
+        .output-arrow {
+            font-size: 20px;
+            color: #FF9800;
+        }
+        .output-box {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        /* Stage specific colors */
+        .stage-input { background-color: #BBDEFB; color: #1565C0; }
+        .stage-drying { background-color: #FFF9C4; color: #FFD600; }
+        .stage-reactor { background-color: #FFCDD2; color: #D32F2F; }
+        .stage-product { background-color: #C8E6C9; color: #388E3C; }
+    </style>
+    """
+    st.markdown(flow_style, unsafe_allow_html=True)
 
+    # HTML structure for the flow sheet
+    flow_sheet_html = f"""
+    <div class="flow-container">
+        <div class="flow-stage stage-input">
+            <strong>1. Input Preparation</strong>
+            <p style="font-size: 14px; margin: 5px 0 0;">Raw Biomass (Wet)</p>
+        </div>
+
+        <div class="arrow">➡️</div>
+
+        <div class="flow-stage stage-drying">
+            <strong>2. Drying & Preheating</strong>
+            <p style="font-size: 14px; margin: 5px 0 0;">100°C - 200°C</p>
+            <span class="output-arrow">⬇️</span>
+            <div class="output-box" style="background-color: #B3E5FC; color: #0277BD; border: 1px solid #0277BD;">
+                Water Vapor
+            </div>
+        </div>
+
+        <div class="arrow">➡️</div>
+
+        <div class="flow-stage stage-reactor">
+            <strong>3. Torrefaction Reactor</strong>
+            <p style="font-size: 14px; margin: 5px 0 0;">{temperature}°C for {duration} min</p>
+            <span class="output-arrow">⬇️</span>
+            <div class="output-box" style="background-color: #FFC107; color: #E65100; border: 1px solid #E65100;">
+                Volatile Gases (CO, CO₂, etc.)
+            </div>
+        </div>
+
+        <div class="arrow">➡️</div>
+
+        <div class="flow-stage stage-product">
+            <strong>4. Final Product</strong>
+            <p style="font-size: 14px; margin: 5px 0 0;">Torrefied Biochar</p>
+        </div>
+    </div>
+    <div style="height: 60px;"></div> """
+    st.markdown(flow_sheet_html, unsafe_allow_html=True)
+    
+    # ------------------ (End of new Flow Sheet Code) ------------------
     # --- Run Simulation ---
     if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
         st.error("**Input Error:** Initial Moisture and Ash content exceed 100%. Please adjust the parameters.")
@@ -354,3 +431,4 @@ def generate_pdf_report(results):
 
 if __name__ == "__main__":
     main()
+
