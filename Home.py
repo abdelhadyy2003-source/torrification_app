@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-CHEMISCO ENTERPRISE: Integrated Biorefinery Simulation Platform
----------------------------------------------------------------
-Author: Chemisco Development Team
-Version: 4.1.0 (Stable & Clean)
-Description:
-    An advanced engineering tool for simulating biomass torrefaction.
-    No external ML dependencies (sklearn removed) to ensure stability.
+CHEMISCO ULTIMATE: The Complete Biorefinery Platform
+----------------------------------------------------
+Author: Chemisco Dev Team
+Version: 6.0 (Physics + AI + Game + BFD)
 """
 
 import streamlit as st
@@ -15,265 +12,257 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy.integrate import odeint
-import sqlite3
 import time
+import random
 from dataclasses import dataclass
 
 # ==============================================================================
-# 1. CONFIGURATION & STYLING
+# 1. SETUP & STYLING
 # ==============================================================================
 
-st.set_page_config(page_title="Chemisco Enterprise", layout="wide", page_icon="🏭")
+st.set_page_config(page_title="Chemisco Ultimate", layout="wide", page_icon="⚛️")
 
 class AppStyle:
     @staticmethod
     def apply():
         st.markdown("""
         <style>
-            /* Main Theme */
             .stApp { background-color: #0E1117; color: #FAFAFA; }
             
-            /* Metrics */
+            /* Game UI */
+            .game-card {
+                background: linear-gradient(45deg, #2b5876, #4e4376);
+                padding: 20px; border-radius: 15px;
+                border: 2px solid #FFD700; text-align: center;
+                box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+            }
+            
+            /* AI Chat UI */
+            .ai-msg {
+                background-color: #1F2937; padding: 15px; border-radius: 10px;
+                border-left: 4px solid #10B981; margin-bottom: 10px;
+            }
+            
+            /* Metric Cards */
             .metric-card {
-                background: linear-gradient(135deg, #1e232a 0%, #16181d 100%);
-                padding: 20px;
-                border-radius: 10px;
-                border-left: 5px solid #00ADB5;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                background: #161b22; border: 1px solid #30363d;
+                padding: 15px; border-radius: 8px; border-left: 5px solid #00ADB5;
                 margin-bottom: 10px;
             }
-            .metric-title { font-size: 14px; color: #00ADB5; text-transform: uppercase; }
-            .metric-value { font-size: 28px; font-weight: bold; color: white; margin: 5px 0; }
-            .metric-delta { font-size: 12px; color: #8b949e; }
-
-            /* BFD Container */
+            
+            /* BFD (Block Flow Diagram) Styles */
             .bfd-container {
                 display: flex; justify-content: space-around; align-items: center;
-                background-color: #161b22; padding: 30px;
+                background-color: #161b22; padding: 25px;
                 border-radius: 15px; border: 1px solid #30363d; margin: 20px 0;
             }
             .bfd-box {
-                background: #21262d; color: #c9d1d9; padding: 15px 25px;
-                border-radius: 6px; text-align: center; border: 1px solid #30363d; min-width: 120px;
+                background: #21262d; color: #c9d1d9; padding: 15px 20px;
+                border-radius: 8px; text-align: center; border: 1px solid #30363d; min-width: 130px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             }
-            .bfd-arrow { color: #8b949e; font-size: 24px; }
+            .bfd-arrow { color: #8b949e; font-size: 28px; font-weight: bold; }
+            .bfd-label { font-size: 12px; color: #8b949e; text-transform: uppercase; margin-bottom: 5px; }
+            .bfd-value { font-size: 18px; font-weight: bold; color: white; }
         </style>
         """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. DATABASE LAYER
-# ==============================================================================
-
-class DatabaseManager:
-    def __init__(self, db_path="chemisco_logs.db"):
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self.create_tables()
-
-    def create_tables(self):
-        query = """
-        CREATE TABLE IF NOT EXISTS simulations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            biomass_type TEXT,
-            temperature REAL,
-            duration REAL,
-            mass_yield REAL,
-            energy_yield REAL,
-            profit REAL
-        )
-        """
-        self.conn.execute(query)
-        self.conn.commit()
-
-    def log_run(self, biomass, t, d, m_y, e_y, profit):
-        query = "INSERT INTO simulations (biomass_type, temperature, duration, mass_yield, energy_yield, profit) VALUES (?, ?, ?, ?, ?, ?)"
-        self.conn.execute(query, (biomass, t, d, m_y, e_y, profit))
-        self.conn.commit()
-
-    def get_logs(self):
-        return pd.read_sql("SELECT * FROM simulations ORDER BY id DESC LIMIT 20", self.conn)
-
-# ==============================================================================
-# 3. PHYSICS ENGINE
+# 2. PHYSICS ENGINE (CORE)
 # ==============================================================================
 
 @dataclass
-class BiomassData:
-    name: str; hemi: float; cell: float; lig: float; ash: float; moist: float; cp: float; rho: float; k: float
+class Biomass:
+    name: str; hemi: float; cell: float; lig: float; ash: float; moist: float
 
 BIOMASS_DB = {
-    "Wood Chips": BiomassData("Wood Chips", 0.30, 0.45, 0.25, 0.01, 0.15, 1500, 600, 0.12),
-    "Wheat Straw": BiomassData("Wheat Straw", 0.45, 0.35, 0.20, 0.08, 0.10, 1400, 400, 0.09),
-    "Olive Pits": BiomassData("Olive Pits", 0.25, 0.35, 0.40, 0.03, 0.12, 1600, 750, 0.18),
+    "Wood": Biomass("Wood", 0.30, 0.45, 0.25, 0.01, 0.15),
+    "Straw": Biomass("Straw", 0.45, 0.35, 0.20, 0.08, 0.10),
+    "Sewage": Biomass("Sewage", 0.20, 0.30, 0.20, 0.30, 0.20),
 }
 
-class PhysicsEngine:
-    def __init__(self, biomass_name, particle_size_mm):
-        self.bio = BIOMASS_DB[biomass_name]
-        self.radius = particle_size_mm / 2000.0
+class Simulator:
+    def __init__(self, type_name):
+        self.bio = BIOMASS_DB[type_name]
 
-    def solve_kinetics(self, T_C, time_min):
-        T_K = T_C + 273.15
+    def run(self, T, t_min):
+        T_K = T + 273.15
         R = 8.314
-        # Kinetic Params (A, E) for Hemi, Cell, Lig
+        # Arrhenius: A (min^-1), E (J/mol)
         params = [(1e10, 110000), (1e12, 130000), (1e8, 100000)]
-        k = [A * np.exp(-E / (R * T_K)) for A, E in params]
+        k = [A * np.exp(-E/(R*T_K)) for A, E in params]
         
+        # ODE Model
         def model(y, t): return [-k[0]*y[0], -k[1]*y[1], -k[2]*y[2]]
-        
-        t_span = np.linspace(0, time_min, 100)
+        t_span = np.linspace(0, t_min, 50)
         sol = odeint(model, [self.bio.hemi, self.bio.cell, self.bio.lig], t_span)
-        return t_span, sol
-
-    def solve_heat_transfer(self, T_surf_C, time_min, nodes=15):
-        dt = 0.5; steps = int(time_min * 60 / dt); dr = self.radius / (nodes - 1)
-        alpha = self.bio.k / (self.bio.rho * self.bio.cp)
-        T = np.ones(nodes) * 25.0
-        r = np.linspace(0, self.radius, nodes)
-        history_core, history_avg = [], []
         
-        for _ in range(steps):
-            T_new = np.copy(T)
-            for i in range(1, nodes-1):
-                diff = alpha * dt * ((T[i+1]-2*T[i]+T[i-1])/dr**2 + (2/r[i])*(T[i+1]-T[i-1])/(2*dr))
-                T_new[i] = T[i] + diff
-            T_new[0] = T_new[1]; T_new[-1] = T_surf_C
-            T = T_new
-            history_core.append(T[0]); history_avg.append(np.mean(T))
-        return history_core, history_avg
-
-    def calculate_energy(self, mass_in, T_react, moisture_frac):
-        mass_dry = mass_in * (1 - moisture_frac)
-        mass_h2o = mass_in * moisture_frac
-        # Energy Balance (MJ)
-        q_sens_bio = mass_dry * (self.bio.cp/1000) * (T_react - 25)
-        q_sens_h2o = mass_h2o * 4.18 * (100 - 25)
-        q_lat = mass_h2o * 2260
-        q_rxn = mass_dry * 150 # Endothermic estimate
-        q_loss = (q_sens_bio + q_sens_h2o + q_lat + q_rxn) * 0.15
-        total = (q_sens_bio + q_sens_h2o + q_lat + q_rxn + q_loss) / 1000
-        return {
-            "Q_sensible_biomass": q_sens_bio/1000, "Q_sensible_water": q_sens_h2o/1000,
-            "Q_latent": q_lat/1000, "Q_reaction": q_rxn/1000, "Q_loss": q_loss/1000, "Total_MJ": total
-        }
+        # Results
+        final = sol[-1]
+        mass_rem = sum(final) * (1 - self.bio.ash - self.bio.moist)
+        char_mass = mass_rem + self.bio.ash
+        yield_pct = char_mass * 100
+        energy_yield = yield_pct * 1.15
+        
+        return t_span, sol, yield_pct, energy_yield
 
 # ==============================================================================
-# 4. OPTIMIZATION LOGIC
+# 3. AI EXPERT SYSTEM
 # ==============================================================================
 
-class ProcessOptimizer:
+class AIConsultant:
     @staticmethod
-    def get_optimal(biomass_name):
-        # Rule-based logic
-        if "Wood" in biomass_name: return 280, 45
-        elif "Straw" in biomass_name: return 260, 40
-        return 290, 60
+    def analyze(yield_val, energy_val, profit):
+        advice = []
+        score = 0
+        
+        if yield_val < 60:
+            advice.append("⚠️ **Temperature Alert:** Reactor heat is destroying yield. Lower T by 10°C.")
+        elif yield_val > 90:
+            advice.append("ℹ️ **Process Incomplete:** Biomass is barely roasted. Increase Time.")
+            score += 1
+        else:
+            advice.append("✅ **Optimal Zone:** Mass yield is within industrial standards.")
+            score += 3
+
+        if profit < 0:
+            advice.append("💸 **Loss Detected:** Check your OPEX vs. Market Price.")
+        else:
+            advice.append("💰 **Profitable Run:** Good margin maintained.")
+            score += 2
+
+        rating = "⭐⭐⭐ Expert" if score >= 4 else "⭐⭐ Average"
+        return advice, rating
 
 # ==============================================================================
-# 5. MAIN APP
+# 4. MANAGER GAME
+# ==============================================================================
+
+def game_logic():
+    st.markdown("<div class='game-card'><h2>🎮 Factory Manager Challenge</h2></div>", unsafe_allow_html=True)
+    
+    if 'game_score' not in st.session_state:
+        st.session_state.game_score = 0
+        st.session_state.game_money = 10000
+        st.session_state.game_day = 1
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Day", st.session_state.game_day)
+    c2.metric("Budget", f"${st.session_state.game_money}")
+    c3.metric("Score", st.session_state.game_score)
+
+    st.write("---")
+    # Game Inputs
+    target = random.randint(70, 85)
+    st.info(f"📋 **Mission:** Achieve Yield **{target}%** (+/- 2%)")
+    
+    g_temp = st.slider("Set Temp (°C)", 200, 350, 250, key="g_t")
+    g_time = st.slider("Set Time (min)", 20, 100, 40, key="g_d")
+    
+    if st.button("🏭 Run Production"):
+        sim = Simulator("Wood")
+        _, _, y_res, _ = sim.run(g_temp, g_time)
+        diff = abs(y_res - target)
+        
+        if diff <= 2:
+            st.balloons(); reward = 2000; st.success(f"PERFECT! Yield: {y_res:.1f}%")
+        elif diff <= 5:
+            reward = 500; st.warning(f"Close enough. Yield: {y_res:.1f}%")
+        else:
+            reward = -500; st.error(f"Failed! Yield: {y_res:.1f}%")
+            
+        st.session_state.game_money += reward
+        st.session_state.game_score += 10 if reward > 0 else 0
+        st.session_state.game_day += 1
+        st.rerun()
+
+# ==============================================================================
+# 5. MAIN APPLICATION
 # ==============================================================================
 
 def main():
     AppStyle.apply()
-    db = DatabaseManager()
     
-    with st.sidebar:
-        st.title("CHEMISCO PRO")
-        st.divider()
-        st.subheader("1. Feedstock")
-        b_type = st.selectbox("Type", list(BIOMASS_DB.keys()))
-        mass = st.number_input("Batch (kg)", 100.0, 5000.0, 1000.0)
-        moist = st.slider("Moisture (%)", 0, 50, 15)
-        size = st.slider("Size (mm)", 1, 25, 10)
+    menu = st.sidebar.radio("Navigation", ["🧪 Simulator", "🤖 AI Consultant", "🎮 Manager Game"])
+    
+    # --- SIMULATOR TAB ---
+    if menu == "🧪 Simulator":
+        st.title("Chemisco Pro Simulator")
         
-        st.subheader("2. Reactor")
-        temp = st.slider("Temp (°C)", 200, 350, 275)
-        dur = st.slider("Time (min)", 15, 120, 60)
-        
-        st.subheader("3. Economics")
-        price = st.number_input("Price ($/kg)", value=1.5)
-        
-        btn_run = st.button("🚀 START", type="primary")
-        btn_opt = st.button("✨ OPTIMIZE")
+        with st.sidebar:
+            st.header("Parameters")
+            b_type = st.selectbox("Feedstock", list(BIOMASS_DB.keys()))
+            temp = st.slider("Temp (°C)", 200, 350, 275)
+            time_min = st.slider("Time (min)", 10, 120, 60)
+            mass = st.number_input("Mass (kg)", 100, 5000, 1000)
+            price = st.number_input("Char Price ($/kg)", 1.5)
+            run_btn = st.button("🚀 Run Simulation", type="primary")
 
-    if btn_opt:
-        opt_t, opt_d = ProcessOptimizer.get_optimal(b_type)
-        st.success(f"Optimized: {opt_t}°C, {opt_d} min")
-        temp, dur = opt_t, opt_d
+        if run_btn:
+            sim = Simulator(b_type)
+            t, sol, y_mass, y_eng = sim.run(temp, time_min)
+            profit = (mass * (y_mass/100) * price) - (mass * 0.2)
+            product_kg = mass * (y_mass/100)
+            
+            st.session_state.last_run = {"yield": y_mass, "energy": y_eng, "profit": profit}
+            
+            # --- 1. METRICS ---
+            c1, c2, c3 = st.columns(3)
+            c1.markdown(f'<div class="metric-card"><h3>Mass Yield</h3><h1>{y_mass:.1f}%</h1></div>', unsafe_allow_html=True)
+            c2.markdown(f'<div class="metric-card"><h3>Energy Yield</h3><h1>{y_eng:.1f}%</h1></div>', unsafe_allow_html=True)
+            c3.markdown(f'<div class="metric-card"><h3>Est. Profit</h3><h1>${profit:.0f}</h1></div>', unsafe_allow_html=True)
+            
+            # --- 2. BLOCK FLOW DIAGRAM (BFD) - ADDED HERE ---
+            st.markdown("### 🔄 Process Block Flow Diagram")
+            
 
-    if btn_run or btn_opt:
-        with st.spinner("Simulating..."):
-            time.sleep(0.5)
-            engine = PhysicsEngine(b_type, size)
-            
-            # Calculations
-            t, sol = engine.solve_kinetics(temp, dur)
-            heat_core, heat_avg = engine.solve_heat_transfer(temp, dur)
-            energy = engine.calculate_energy(mass, temp, moist/100)
-            
-            # Results
-            final_mass = sum(sol[-1]) * mass * (1 - engine.bio.ash - moist/100)
-            char_mass = final_mass + (mass * engine.bio.ash)
-            y_mass = (char_mass / mass) * 100
-            y_energy = y_mass * 1.15
-            profit = (char_mass * price) - (energy['Total_MJ']/3.6 * 0.12)
-            
-            db.log_run(b_type, temp, dur, y_mass, y_energy, profit)
-
-            # --- DISPLAY ---
-            c1, c2, c3, c4 = st.columns(4)
-            c1.markdown(f'<div class="metric-card"><div class="metric-title">Mass Yield</div><div class="metric-value">{y_mass:.1f}%</div></div>', unsafe_allow_html=True)
-            c2.markdown(f'<div class="metric-card"><div class="metric-title">Energy Yield</div><div class="metric-value">{y_energy:.1f}%</div></div>', unsafe_allow_html=True)
-            c3.markdown(f'<div class="metric-card"><div class="metric-title">Profit</div><div class="metric-value">${profit:.2f}</div></div>', unsafe_allow_html=True)
-            c4.markdown(f'<div class="metric-card"><div class="metric-title">Energy</div><div class="metric-value">{energy["Total_MJ"]:.1f} MJ</div></div>', unsafe_allow_html=True)
+[Image of torrefaction process diagram]
 
             st.markdown(f"""
             <div class="bfd-container">
-                <div class="bfd-box" style="border-left:4px solid #4CAF50;">Input<br>{mass} kg</div>
+                <div class="bfd-box" style="border-left: 4px solid #4CAF50;">
+                    <div class="bfd-label">Input Feed</div>
+                    <div class="bfd-value">{mass} kg</div>
+                </div>
                 <div class="bfd-arrow">➜</div>
-                <div class="bfd-box" style="border-left:4px solid #FFC107;">Reactor<br>{temp}°C</div>
+                <div class="bfd-box" style="border-left: 4px solid #FFC107;">
+                    <div class="bfd-label">Reactor</div>
+                    <div class="bfd-value">{temp}°C</div>
+                </div>
                 <div class="bfd-arrow">➜</div>
-                <div class="bfd-box" style="border-left:4px solid #00ADB5;">Output<br>{char_mass:.1f} kg</div>
-            </div>""", unsafe_allow_html=True)
-
-            tab1, tab2, tab3 = st.tabs(["📊 Kinetics", "🔥 Thermal", "📜 History"])
+                <div class="bfd-box" style="border-left: 4px solid #00ADB5;">
+                    <div class="bfd-label">Biochar Product</div>
+                    <div class="bfd-value">{product_kg:.1f} kg</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
-            with tab1:
-                df = pd.DataFrame(sol, columns=['Hemi', 'Cell', 'Lig']); df['Time'] = t
-                st.plotly_chart(px.line(df, x='Time', y=['Hemi', 'Cell', 'Lig'], title="Decomposition"), use_container_width=True)
-                
-            with tab2:
-                # Waterfall Chart
-                w_df = pd.DataFrame({"Stage": ["Sensible Bio", "Sensible H2O", "Latent", "Reaction", "Loss"], 
-                                     "MJ": [energy['Q_sensible_biomass'], energy['Q_sensible_water'], energy['Q_latent'], energy['Q_reaction'], energy['Q_loss']]})
-                fig_w = go.Figure(go.Waterfall(x=w_df["Stage"], y=w_df["MJ"], connector={"line":{"color":"white"}}))
-                fig_w.update_layout(title="Energy Breakdown", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='white')
-                st.plotly_chart(fig_w, use_container_width=True)
-                
-                # Heat Transfer Plot
-                fig_h = go.Figure()
-                fig_h.add_trace(go.Scatter(y=heat_core[::5], name="Core Temp"))
-                fig_h.add_trace(go.Scatter(y=heat_avg[::5], name="Avg Temp", line=dict(dash='dash')))
-                fig_h.update_layout(title="Particle Heat Transfer (FDM)", yaxis_title="Temp (°C)", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='white')
-                st.plotly_chart(fig_h, use_container_width=True)
+            # --- 3. CHARTS ---
+            st.markdown("### Process Kinetics")
+            df = pd.DataFrame(sol, columns=["Hemi", "Cell", "Lig"]); df["Time"] = t
+            st.line_chart(df, x="Time")
 
-            with tab3:
-                st.dataframe(db.get_logs(), use_container_width=True)
-
-    else:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        col_main, col_img = st.columns([2, 1])
-        with col_main:
-            st.title("Welcome to Chemisco Enterprise")
-            st.markdown("""
-            **System Status:** ✅ Online & Ready
+        else:
+            st.info("👈 Please configure and run the simulation.")
             
-            This platform uses advanced numerical methods (FDM & ODEs) to simulate biomass torrefaction.
-            Select your parameters from the sidebar to begin.
-            """)
-        with col_img:
-            # صورة حقيقية من رابط ثابت لتجنب الأخطاء
-            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Torrefaction_plant.jpg/640px-Torrefaction_plant.jpg", caption="Biomass Torrefaction Plant")
+
+[Image of torrefaction process diagram]
+
+
+    # --- AI TAB ---
+    elif menu == "🤖 AI Consultant":
+        st.title("🤖 Chemisco AI Expert")
+        if 'last_run' in st.session_state:
+            d = st.session_state.last_run
+            advice, rating = AIConsultant.analyze(d['yield'], d['energy'], d['profit'])
+            st.markdown(f"### Rating: {rating}")
+            for msg in advice: st.markdown(f"<div class='ai-msg'>{msg}</div>", unsafe_allow_html=True)
+        else:
+            st.warning("Please run a simulation first.")
+
+    # --- GAME TAB ---
+    elif menu == "🎮 Manager Game":
+        game_logic()
 
 if __name__ == "__main__":
     main()
