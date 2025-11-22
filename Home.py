@@ -216,7 +216,7 @@ def main():
             st.pyplot(fig1)
             
 
-[Image of mass balance pie chart for torrefaction products]
+#[Image of mass balance pie chart for torrefaction products]
  # صورة تمثيلية للمخطط الدائري
 
     with tab2:
@@ -332,3 +332,4 @@ def generate_pdf_report(results):
 
 if __name__ == "__main__":
     main()
+
