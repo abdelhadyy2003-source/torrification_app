@@ -279,7 +279,7 @@ def main():
     st.header("📊 Simulation Results & Analysis")
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Yields & Mass Balance", "Mass Conversion Kinetics", "Gas Composition", "PDF Report", "💰 Torrefaction Tycoon"])
     
-    # --- Tab 1: Yields & Mass Balance (Unchanged) ---
+    # --- Tab 1: Yields & Mass Balance ---
     with tab1:
         st.subheader(f"Product Yields (Based on {initial_mass_kg:.0f} kg Input)")
         col_m1, col_m2, col_m3 = st.columns(3)
@@ -310,12 +310,8 @@ def main():
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
-            # 
 
-[Image of mass balance pie chart for torrefaction products]
-
-
-    # --- Tab 2 & 3 (Unchanged) ---
+    # --- Tab 2 & 3 ---
     with tab2:
         st.subheader("Mass Component Conversion Over Time")
         st.line_chart(results["mass_profile"])
@@ -326,7 +322,7 @@ def main():
         st.bar_chart(results["gas_composition_molar"])
         st.caption("Molar percentages of gaseous products from devolatilization (dry basis).")
         
-    # --- Tab 4 (PDF Report - Unchanged) ---
+    # --- Tab 4 (PDF Report) ---
     with tab4:
         st.subheader("Generate Comprehensive PDF Report")
         st.markdown("Click the button below to generate and download a detailed report of the simulation.")
@@ -404,7 +400,7 @@ def main():
                 st.session_state.batch_count = 0
                 st.rerun()
 
-# --- 6. PDF Report Generation Function (Unchanged) ---
+# --- 6. PDF Report Generation Function ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
