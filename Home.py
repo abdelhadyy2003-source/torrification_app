@@ -34,7 +34,107 @@ SIZE_FACTOR = {
     "Coarse (>5mm)": 0.65
 }
 
-# --- 2. Simulation Function (simulate_torrefaction) ---
+# --- 2. Static UI Components (Refactored for clarity) ---
+
+# Global CSS styles for the whole app and custom components
+GLOBAL_CSS = """
+<style>
+    /* Main Content Styling */
+    .stApp { padding-top: 20px; }
+    
+    /* Custom Banner Style */
+    .main-banner {
+        background-color: #388E3C; /* Darker Green */
+        padding: 30px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 2.5em; }
+    .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.1em; }
+    
+    /* Sidebar Customization */
+    .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { 
+        background-color: #F0F8FF; /* Light Blue/White for contrast */
+    }
+    /* Expander (Input) styling */
+    .st-emotion-cache-p5m8m8 { 
+        border-radius: 10px;
+        border-left: 5px solid #4CAF50; /* Green accent bar */
+        padding: 10px;
+        margin-bottom: 15px;
+        background-color: #FFFFFF;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    /* Metric Styling */
+    [data-testid="stMetricValue"] {
+        font-size: 28px;
+        color: #388E3C; /* Darker Green */
+    }
+
+    /* BFD Styles */
+    .bfd-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 30px 0 60px 0;
+        position: relative;
+    }
+    .bfd-block {
+        padding: 15px 25px;
+        border: 3px solid #4CAF50; 
+        border-radius: 6px;
+        text-align: center;
+        background-color: #E8F5E9; 
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        font-weight: bold;
+        color: #1B5E20; 
+        position: relative;
+        min-width: 180px;
+    }
+    .bfd-block p {
+         margin: 5px 0 0;
+         font-size: 12px;
+         font-weight: normal;
+    }
+    .bfd-stream {
+        width: 70px;
+        height: 3px;
+        background-color: #4CAF50;
+        position: relative;
+    }
+    .bfd-stream::before { 
+        content: '';
+        position: absolute;
+        right: -10px;
+        top: -5px;
+        border-top: 6px solid transparent;
+        border-bottom: 6px solid transparent;
+        border-left: 10px solid #4CAF50;
+    }
+    .side-stream {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 3px;
+        height: 40px;
+        background-color: #FF9800; 
+        bottom: -40px;
+    }
+    .side-stream-label {
+        position: absolute;
+        bottom: -65px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        white-space: nowrap;
+        color: #FF9800;
+    }
+</style>
+"""
+
+# --- 3. Simulation Core Logic ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg):
     """Core torrefaction simulation logic using Arrhenius and particle size correction."""
     temp_K = temp_C + 273.15
@@ -114,70 +214,22 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         }
     }
 
-# --- 3. Streamlit Main App (main) ---
+# --- 4. Main Streamlit App ---
 def main():
-    # Streamlit Config: (Supports dark/light mode based on user's system/browser settings)
     st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
     
-    # Inject Custom CSS for enhanced aesthetics
-    st.markdown("""
-        <style>
-            /* Main Content Styling */
-            .stApp {
-                padding-top: 20px;
-            }
-            /* Custom Banner Style */
-            .main-banner {
-                background-color: #388E3C; /* Darker Green */
-                padding: 30px;
-                border-radius: 12px;
-                text-align: center;
-                margin-bottom: 30px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            }
-            .main-banner h1 {
-                color: #FFFFFF;
-                margin: 0;
-                font-size: 2.5em;
-            }
-            .main-banner p {
-                color: #C8E6C9;
-                margin-top: 5px;
-                font-size: 1.1em;
-            }
-            /* Sidebar Customization */
-            .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { /* Targetting sidebar background */
-                background-color: #F0F8FF; /* Light Blue/White for contrast */
-            }
-            /* Expander (Input) styling */
-            .st-emotion-cache-p5m8m8 { 
-                border-radius: 10px;
-                border-left: 5px solid #4CAF50; /* Green accent bar */
-                padding: 10px;
-                margin-bottom: 15px;
-                background-color: #FFFFFF;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            }
-            /* Metric Styling */
-            [data-testid="stMetricValue"] {
-                font-size: 28px;
-                color: #388E3C; /* Darker Green */
-            }
-        </style>
-        """, unsafe_allow_html=True)
-    
-    # 3.1. Sidebar (Logo and Inputs)
+    # Inject Global CSS
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+
+    # 4.1. Sidebar (Inputs)
     with st.sidebar:
-        # Logo Placeholder (Stylized Banner)
-        st.markdown(
-            """
+        # Logo and Title
+        st.markdown("""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20;'>
                 <h1 style='color: white; margin: 0; font-size: 1.8em;'>CHEMISCO PRO</h1>
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
             </div>
-            """, 
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
         st.header("⚙️ Input Parameters")
         
         # Input Sections
@@ -194,108 +246,33 @@ def main():
             ash_percent = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Assumed Initial Ash Content: **{ash_percent:.1f}%**")
             
-    # 3.2. Main Content (Banner and Flow Sheet)
+    # 4.2. Main Content (Banner and Flow Sheet)
     
-    # Custom Banner implementation
-    st.markdown(
-        """
+    # Main Banner
+    st.markdown("""
         <div class="main-banner">
             <h1>🔥 Advanced Torrefaction Simulator</h1>
             <p>Enhanced Kinetic Model for Process Optimization</p>
         </div>
-        """, 
-        unsafe_allow_html=True
-    )
+        """, unsafe_allow_html=True)
     
-    # Process Flow Sheet (Block Flow Diagram - BFD Style)
+    # Generate BFD HTML dynamically
     st.subheader("Process Flow Block Diagram (BFD)")
-    
-    # Define CSS styles for the BFD (separated for clarity)
-    bfd_style = """
-    <style>
-        .bfd-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 30px 0 60px 0;
-            position: relative;
-        }
-        .bfd-block {
-            padding: 15px 25px;
-            border: 3px solid #4CAF50; /* Green border for blocks */
-            border-radius: 6px;
-            text-align: center;
-            background-color: #E8F5E9; /* Light green background */
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-            font-weight: bold;
-            color: #1B5E20; /* Dark green text */
-            position: relative;
-            min-width: 180px;
-        }
-        .bfd-stream {
-            width: 70px;
-            height: 3px;
-            background-color: #4CAF50;
-            position: relative;
-        }
-        .bfd-stream::before { /* Arrowhead for main streams */
-            content: '';
-            position: absolute;
-            right: -10px;
-            top: -5px;
-            border-top: 6px solid transparent;
-            border-bottom: 6px solid transparent;
-            border-left: 10px solid #4CAF50;
-        }
-        .side-stream {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 3px;
-            height: 40px;
-            background-color: #FF9800; /* Orange for side streams */
-            bottom: -40px;
-        }
-        .side-stream-label {
-            position: absolute;
-            bottom: -65px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 11px;
-            white-space: nowrap;
-            color: #FF9800;
-        }
-        /* Custom styles for input details in BFD */
-        .bfd-block p {
-             margin: 5px 0 0;
-             font-size: 12px;
-             font-weight: normal;
-        }
-    </style>
-    """
-    st.markdown(bfd_style, unsafe_allow_html=True)
-
-    # HTML structure for the BFD (with embedded variables)
     bfd_html = f"""
     <div class="bfd-container">
-        
         <div class="bfd-block">
             FEED PREPARATION
             <p style="color: #1565C0;">Initial Mass: {initial_mass_kg:.0f} kg</p>
             <p style="color: #0277BD;">Moisture: {moisture_content:.1f}%</p>
         </div>
-
         <div class="bfd-stream"></div>
-
         <div class="bfd-block">
             DRYING & PREHEATING
             <p>100 °C - 200 °C</p>
             <div class="side-stream"></div>
             <div class="side-stream-label">Water Vapor</div>
         </div>
-
         <div class="bfd-stream"></div>
-
         <div class="bfd-block" style="border-color: #D32F2F; background-color: #FFCDD2; color: #B71C1C;">
             TORREFACTION REACTOR
             <p style="color: #B71C1C;">Temp: {temperature} °C</p>
@@ -303,15 +280,14 @@ def main():
             <div class="side-stream" style="background-color: #FFC107;"></div>
             <div class="side-stream-label" style="color: #FFC107;">Volatile Gases</div>
         </div>
-
         <div class="bfd-stream"></div>
-
         <div class="bfd-block" style="border-color: #388E3C; background-color: #C8E6C9; color: #1B5E20;">
             COOLING & PRODUCT
             <p>Torrefied Biochar</p>
         </div>
     </div>
-    <div style="height: 40px;"></div> """
+    <div style="height: 40px;"></div>
+    """
     st.markdown(bfd_html, unsafe_allow_html=True)
     
     # --- Run Simulation ---
@@ -359,11 +335,13 @@ def main():
             st.pyplot(fig1)
             
 
+[Image of mass balance pie chart for torrefaction products]
+ 
+
     with tab2:
         st.subheader("Mass Component Conversion Over Time")
         st.line_chart(results["mass_profile"])
         st.caption("The curves show how Moisture and Volatiles fractions decrease as the Biochar fraction forms over time.")
-        
 
     with tab3:
         st.subheader("Non-Condensable Dry Gas Composition")
@@ -383,13 +361,11 @@ def main():
                 mime="application/pdf"
             )
 
-# --- 4. PDF Report Generation Function (generate_pdf_report) ---
+# --- 5. PDF Report Generation Function ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer, 
-        pagesize=letter,
-        title="Torrefaction Report",
+        buffer, pagesize=letter, title="Torrefaction Report",
         leftMargin=inch, rightMargin=inch, topMargin=inch, bottomMargin=inch
     )
     styles = getSampleStyleSheet()
