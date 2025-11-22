@@ -333,10 +333,6 @@ def main():
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
-            # 
-
-[Image of mass balance pie chart for torrefaction products]
- <-- تم إزالة أو تعليق هذا السطر
 
     with tab2:
         st.subheader("Mass Component Conversion Over Time")
@@ -386,7 +382,8 @@ def generate_pdf_report(results):
         ["Temperature", f"{p['temperature']} °C"],
         ["Duration", f"{p['duration']} min"],
         ["Particle Size", p["size"]],
-        ["Effective Devol. Rate ($k_{devol,eff}$)", f"{results['k_devol_eff']:.3f} min⁻¹"],
+        # Note: Using LaTeX notation for better formatting in PDF
+        [f"Effective Devol. Rate ($k_{{devol,eff}}$)", f"{results['k_devol_eff']:.3f} min⁻¹"],
     ]
     param_table = Table(param_data, colWidths=[2.5*inch, 3*inch], 
                         style=[('GRID', (0,0), (-1,-1), 1, colors.black)])
