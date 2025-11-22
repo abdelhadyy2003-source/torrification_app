@@ -40,13 +40,11 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     temp_K = temp_C + 273.15
     data = EMPIRICAL_DATA.get(biomass)
     
-    # 1. Calculate effective devolatilization rate
     k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS * temp_K))
     k_devol_eff = k_devol_arrhenius * SIZE_FACTOR.get(size)
     k_drying = data["k_drying_base"]
     ash_content = data["Ash"]
 
-    # 2. ODE Model (mass fractions)
     def model(y, t, k1, k2):
         moisture, volatiles = y
         d_moisture = -k1 * moisture if moisture > 0.001 else 0
@@ -61,16 +59,13 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     sol = odeint(model, y0, t, args=(k_drying, k_devol_eff))
     sol[sol < 0] = 0
 
-    # 3. Calculate final results (Fractions and Mass in kg)
     final_moisture = sol[-1, 0]
     final_volatiles_remaining = sol[-1, 1]
     
-    # Fractions
     final_biochar_fraction = (1 - final_moisture - final_volatiles_remaining - ash_content)
     final_volatiles_lost_fraction = initial_volatiles_fraction - final_volatiles_remaining
     moisture_lost_fraction = initial_moisture_fraction - final_moisture
     
-    # Yields (%)
     yields_percent = pd.DataFrame({
         "Yield (%)": [
             (final_biochar_fraction + ash_content) * 100,
@@ -81,12 +76,10 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         index=["Biochar (Solid) & Ash", "Non-Condensable Gases", "Moisture Loss (Water Vapor)", "Initial Ash Content"]
     )
     
-    # Yields (Mass in kg)
     yields_mass = yields_percent.copy()
     yields_mass["Mass (kg)"] = yields_percent["Yield (%)"] * initial_mass_kg / 100
     yields_mass.drop(columns=["Yield (%)"], inplace=True)
 
-    # Gas Composition
     gas_fraction = final_volatiles_lost_fraction * data["Gas_Factor"]
     
     gas_comp_mass = {
@@ -101,7 +94,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         orient="index", columns=["Molar % in Dry Gas"]
     ).fillna(0)
 
-    # Mass Profile
     mass_profile = pd.DataFrame({
         "Time (min)": t,
         "Moisture Fraction": sol[:, 0],
@@ -127,14 +119,61 @@ def main():
     # Streamlit Config: (Supports dark/light mode based on user's system/browser settings)
     st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
     
+    # Inject Custom CSS for enhanced aesthetics
+    st.markdown("""
+        <style>
+            /* Main Content Styling */
+            .stApp {
+                padding-top: 20px;
+            }
+            /* Custom Banner Style */
+            .main-banner {
+                background-color: #388E3C; /* Darker Green */
+                padding: 30px;
+                border-radius: 12px;
+                text-align: center;
+                margin-bottom: 30px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            }
+            .main-banner h1 {
+                color: #FFFFFF;
+                margin: 0;
+                font-size: 2.5em;
+            }
+            .main-banner p {
+                color: #C8E6C9;
+                margin-top: 5px;
+                font-size: 1.1em;
+            }
+            /* Sidebar Customization */
+            .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { /* Targetting sidebar background */
+                background-color: #F0F8FF; /* Light Blue/White for contrast */
+            }
+            /* Expander (Input) styling */
+            .st-emotion-cache-p5m8m8 { 
+                border-radius: 10px;
+                border-left: 5px solid #4CAF50; /* Green accent bar */
+                padding: 10px;
+                margin-bottom: 15px;
+                background-color: #FFFFFF;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+            /* Metric Styling */
+            [data-testid="stMetricValue"] {
+                font-size: 28px;
+                color: #388E3C; /* Darker Green */
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    
     # 3.1. Sidebar (Logo and Inputs)
     with st.sidebar:
         # Logo Placeholder (Stylized Banner)
         st.markdown(
             """
-            <div style='text-align: center; padding: 10px; border-radius: 5px; background-color: #4CAF50;'>
-                <h1 style='color: white; margin: 0;'>CHEMISCO PRO</h1>
-                <p style='color: white; margin: 0;'>Torrefaction Analytics</p>
+            <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20;'>
+                <h1 style='color: white; margin: 0; font-size: 1.8em;'>CHEMISCO PRO</h1>
+                <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
             </div>
             """, 
             unsafe_allow_html=True
@@ -142,27 +181,27 @@ def main():
         st.header("⚙️ Input Parameters")
         
         # Input Sections
-        with st.expander("Biomass Properties", expanded=True):
-            initial_mass_kg = st.number_input("Initial Biomass Mass (kg)", min_value=1.0, value=100.0, step=10.0)
+        with st.expander("🌲 Biomass Properties", expanded=True):
+            initial_mass_kg = st.number_input("Initial Biomass Mass (kg)", min_value=1.0, value=100.0, step=10.0, help="Initial mass of the feedstock entering the process.")
             biomass_type = st.selectbox("Biomass Type", list(EMPIRICAL_DATA.keys()))
-            moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0)
+            moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0, help="Moisture percentage on a wet basis.")
             particle_size = st.selectbox("Particle Size", list(SIZE_FACTOR.keys()))
         
-        with st.expander("Process Conditions", expanded=True):
-            temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5)
-            duration = st.slider("Process Duration (min)", 10, 120, 45, step=5)
+        with st.expander("🌡️ Process Conditions", expanded=True):
+            temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5, help="Target operating temperature in the reactor.")
+            duration = st.slider("Process Duration (min)", 10, 120, 45, step=5, help="Time spent in the torrefaction zone.")
             
             ash_percent = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Assumed Initial Ash Content: **{ash_percent:.1f}%**")
             
     # 3.2. Main Content (Banner and Flow Sheet)
     
-    # Banner
+    # Custom Banner implementation
     st.markdown(
         """
-        <div style='background-color: #4CAF50; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;'>
-            <h1 style='color: white; margin: 0;'>🔥 Advanced Torrefaction Simulator</h1>
-            <p style='color: white; margin: 0;'>Enhanced Kinetic Model for Process Optimization</p>
+        <div class="main-banner">
+            <h1>🔥 Advanced Torrefaction Simulator</h1>
+            <p>Enhanced Kinetic Model for Process Optimization</p>
         </div>
         """, 
         unsafe_allow_html=True
@@ -171,7 +210,7 @@ def main():
     # Process Flow Sheet (Block Flow Diagram - BFD Style)
     st.subheader("Process Flow Block Diagram (BFD)")
     
-    # Define CSS styles for the BFD
+    # Define CSS styles for the BFD (separated for clarity)
     bfd_style = """
     <style>
         .bfd-container {
@@ -226,24 +265,31 @@ def main():
             white-space: nowrap;
             color: #FF9800;
         }
+        /* Custom styles for input details in BFD */
+        .bfd-block p {
+             margin: 5px 0 0;
+             font-size: 12px;
+             font-weight: normal;
+        }
     </style>
     """
     st.markdown(bfd_style, unsafe_allow_html=True)
 
-    # HTML structure for the BFD
+    # HTML structure for the BFD (with embedded variables)
     bfd_html = f"""
     <div class="bfd-container">
         
         <div class="bfd-block">
             FEED PREPARATION
-            <p style="font-size: 12px; margin: 5px 0 0;">Raw Biomass (M={moisture_content}%)</p>
+            <p style="color: #1565C0;">Initial Mass: {initial_mass_kg:.0f} kg</p>
+            <p style="color: #0277BD;">Moisture: {moisture_content:.1f}%</p>
         </div>
 
         <div class="bfd-stream"></div>
 
         <div class="bfd-block">
             DRYING & PREHEATING
-            <p style="font-size: 12px; margin: 5px 0 0;">100-200 °C</p>
+            <p>100 °C - 200 °C</p>
             <div class="side-stream"></div>
             <div class="side-stream-label">Water Vapor</div>
         </div>
@@ -252,7 +298,8 @@ def main():
 
         <div class="bfd-block" style="border-color: #D32F2F; background-color: #FFCDD2; color: #B71C1C;">
             TORREFACTION REACTOR
-            <p style="font-size: 12px; margin: 5px 0 0;">{temperature} °C / {duration} min</p>
+            <p style="color: #B71C1C;">Temp: {temperature} °C</p>
+            <p style="color: #B71C1C;">Duration: {duration} min</p>
             <div class="side-stream" style="background-color: #FFC107;"></div>
             <div class="side-stream-label" style="color: #FFC107;">Volatile Gases</div>
         </div>
@@ -261,7 +308,7 @@ def main():
 
         <div class="bfd-block" style="border-color: #388E3C; background-color: #C8E6C9; color: #1B5E20;">
             COOLING & PRODUCT
-            <p style="font-size: 12px; margin: 5px 0 0;">Torrefied Biochar</p>
+            <p>Torrefied Biochar</p>
         </div>
     </div>
     <div style="height: 40px;"></div> """
@@ -310,6 +357,129 @@ def main():
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
+            
 
     with tab2:
         st.subheader("Mass Component Conversion Over Time")
+        st.line_chart(results["mass_profile"])
+        st.caption("The curves show how Moisture and Volatiles fractions decrease as the Biochar fraction forms over time.")
+        
+
+    with tab3:
+        st.subheader("Non-Condensable Dry Gas Composition")
+        st.bar_chart(results["gas_composition_molar"])
+        st.caption("Molar percentages of gaseous products from devolatilization (dry basis).")
+
+    with tab4:
+        st.subheader("Generate Comprehensive PDF Report")
+        st.markdown("Click the button below to generate and download a detailed report of the simulation.")
+        
+        if st.button("⬇️ Download PDF Report"):
+            pdf_buffer = generate_pdf_report(results)
+            st.download_button(
+                label="Download Report",
+                data=pdf_buffer,
+                file_name=f"Torrefaction_Report_{biomass_type}_{temperature}C.pdf",
+                mime="application/pdf"
+            )
+
+# --- 4. PDF Report Generation Function (generate_pdf_report) ---
+def generate_pdf_report(results):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter,
+        title="Torrefaction Report",
+        leftMargin=inch, rightMargin=inch, topMargin=inch, bottomMargin=inch
+    )
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Header & Banner
+    elements.append(Paragraph("<font size=16 color='#4CAF50'>CHEMISCO PRO TORREFACTION REPORT</font>", styles["Title"]))
+    elements.append(Paragraph(f"Report Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", styles["Italic"]))
+    elements.append(Spacer(1, 0.25*inch))
+    
+    # 1. Parameters Table
+    elements.append(Paragraph("1. Simulation Parameters & Kinetics", styles["h2"]))
+    p = results["parameters"]
+    param_data = [
+        ["Parameter", "Value"],
+        ["Initial Biomass Mass", f"{p['initial_mass']:.0f} kg"],
+        ["Moisture Content", f"{p['moisture']}%"],
+        ["Temperature", f"{p['temperature']} °C"],
+        ["Duration", f"{p['duration']} min"],
+        ["Particle Size", p["size"]],
+        ["Effective Devol. Rate ($k_{devol,eff}$)", f"{results['k_devol_eff']:.3f} min⁻¹"],
+    ]
+    param_table = Table(param_data, colWidths=[2.5*inch, 3*inch], 
+                        style=[('GRID', (0,0), (-1,-1), 1, colors.black)])
+    elements.append(param_table)
+    elements.append(Spacer(1, 0.25*inch))
+    
+    # 2. Yields Tables
+    elements.append(Paragraph("2. Product Yields", styles["h2"]))
+    
+    # Mass Yields Table
+    elements.append(Paragraph("2.1. Mass Yields (kg)", styles["h3"]))
+    mass_data = [["Component", "Mass (kg)"]] + \
+                 [[idx, f"{val[0]:.2f}"] for idx, val in results["yields_mass"].iterrows()]
+    mass_table = Table(mass_data, colWidths=[3.5*inch, 2*inch], style=[('GRID', (0,0), (-1,-1), 1, colors.black)])
+    elements.append(mass_table)
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Percentage Yields Table
+    elements.append(Paragraph("2.2. Percentage Yields (%)", styles["h3"]))
+    percent_data = [["Component", "Yield (%)"]] + \
+                 [[idx, f"{val[0]:.2f}"] for idx, val in results["yields_percent"].iterrows()]
+    percent_table = Table(percent_data, colWidths=[3.5*inch, 2*inch], style=[('GRID', (0,0), (-1,-1), 1, colors.black)])
+    elements.append(percent_table)
+    elements.append(Spacer(1, 0.5*inch))
+    
+    # 3. Charts
+    elements.append(Paragraph("3. Results Visualization", styles["h2"]))
+    
+    # Chart 1: Mass Conversion Plot 
+    fig3, ax3 = plt.subplots(figsize=(6, 4))
+    results["mass_profile"].plot(ax=ax3)
+    plt.title("Mass Component Conversion Over Time")
+    plt.xlabel("Time (min)")
+    plt.ylabel("Mass Fraction")
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    imgdata3 = BytesIO()
+    fig3.savefig(imgdata3, format='png', dpi=300, bbox_inches='tight')
+    imgdata3.seek(0)
+    elements.append(ReportImage(imgdata3, width=5.5*inch, height=3.7*inch))
+    elements.append(Spacer(1, 0.25*inch))
+    
+    # Chart 2: Mass balance pie chart
+    fig1, ax1 = plt.subplots(figsize=(5, 5))
+    filtered_yields = results["yields_percent"].iloc[[0, 1, 2]]
+    ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90)
+    ax1.axis('equal')
+    plt.title("Mass Balance Distribution (%)")
+    imgdata1 = BytesIO()
+    fig1.savefig(imgdata1, format='png', dpi=300)
+    imgdata1.seek(0)
+    elements.append(ReportImage(imgdata1, width=3*inch, height=3*inch))
+    elements.append(Spacer(1, 0.25*inch))
+    
+    # Chart 3: Gas composition bar chart
+    fig2, ax2 = plt.subplots(figsize=(5, 4))
+    results["gas_composition_molar"].plot(kind='bar', ax=ax2, legend=False)
+    plt.title("Dry Gas Composition (Molar %)")
+    plt.ylabel("Molar %")
+    plt.xticks(rotation=0)
+    imgdata2 = BytesIO()
+    fig2.savefig(imgdata2, format='png', dpi=300)
+    imgdata2.seek(0)
+    elements.append(ReportImage(imgdata2, width=4*inch, height=3.2*inch))
+    
+    plt.close('all')
+    
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+if __name__ == "__main__":
+    main()
