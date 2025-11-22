@@ -18,8 +18,6 @@ SPECIFIC_HEAT_BIOCHAR = 1.0 # kJ/(kg.K)
 SPECIFIC_HEAT_WATER = 4.18  # kJ/(kg.K)
 TORREFACTION_TEMP_REF = 250 + 273.15 # K
 ENTHALPY_WATER_VAP = 2500 # kJ/kg (Latent Heat of Vaporization)
-REACTOR_HEAT_LOSS_FACTOR = 0.15 
-REACTOR_WALL_TEMP = 300 + 273.15 # K
 
 # KINETIC PARAMETERS (Parallel First-Order Reactions)
 KINETICS = {
@@ -43,8 +41,26 @@ DRYING_RATE_CONST = 0.05
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 BASE_FC_FACTOR = 0.20 
 
+# --- Utility Function for Logo ---
+LOGO_PATH = "chemisco_logo.png" # افتراض وجود ملف اللوجو بهذا الاسم
+
+def _get_image_base64(image_path):
+    try:
+        # Check if the file exists locally
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as image_file:
+                # Return the base64 string
+                return base64.b64encode(image_file.read()).decode()
+        # Fallback for Streamlit Cloud environments
+        return None
+    except Exception:
+        return None
+
+LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
+
+
 # --- B. ADVANCED PROFESSIONAL DARK MODE CSS ---
-GLOBAL_CSS = """
+GLOBAL_CSS = f"""
 <style>
     /* ------------------- DARK MODE BASE STYLING ------------------- */
     .stApp { 
@@ -84,75 +100,70 @@ GLOBAL_CSS = """
         color: #FFC107 !important; /* Gold Delta */
     }
     
-    /* Sidebar Styling */
-    .sidebar-header-box {
+    /* Sidebar Styling - Modified Header */
+    .sidebar-header-box {{
         background: linear-gradient(135deg, #004D40, #00897B); /* Dark Teal Gradient */
-        padding: 30px;
+        padding: 25px;
         border-radius: 20px;
         margin-top: 25px;
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
         border: 2px solid #FFC107;
-    }
-    .sidebar-header-box h1 { color: #FFFFFF; font-size: 3.5em; letter-spacing: 4px; }
-    .sidebar-header-box h3 { color: #FFC107; font-size: 1.6em; } 
+    }}
+    .sidebar-header-box h1 {{ color: #FFFFFF; font-size: 2.5em; letter-spacing: 4px; margin-bottom: 5px; }} /* تم تصغير الخط */
+    .sidebar-header-box p {{ color: #C8E6C9; margin: 0; font-size: 1.0em; font-weight: 500;}}
     
     /* Tabs Styling (High Contrast) */
-    div[data-testid="stTabs"] button {
+    div[data-testid="stTabs"] button {{
         color: #00BCD4 !important; /* Cyan tab text */
         background-color: #1E1E1E !important; 
         font-weight: bold !important;
         border-bottom: 4px solid #4CAF50 !important; /* Green underline */
         padding: 12px 18px;
         font-size: 1.1em;
-    }
-    div[data-testid="stTabs"] button[aria-selected="true"] {
+    }}
+    div[data-testid="stTabs"] button[aria-selected="true"] {{
         color: #FFFFFF !important; 
-    }
+    }}
     
     /* General Containers */
-    .st-emotion-cache-1c7v0s, .st-emotion-cache-1fv9t6m, .st-emotion-cache-q8b7t8 { 
+    .st-emotion-cache-1c7v0s, .st-emotion-cache-1fv9t6m, .st-emotion-cache-q8b7t8 {{ 
         background-color: #1E1E1E; /* Dark Container Background */
         border: 1px solid #333333;
         border-radius: 15px;
         padding: 20px;
-    }
+    }}
 
     /* BFD Styling */
-    .bfd-block { 
+    .bfd-block {{ 
         padding: 25px 40px; 
         background: #282828; 
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); 
         color: #E0E0E0; 
         border-radius: 15px;
-    }
-    .bfd-stream { background-color: #FFC107; height: 6px; } 
+    }}
 
     /* Custom Info Box */
-    .custom-info-box {
-        background-color: #1A3440; /* Dark Blue-Teal for info */
+    .custom-info-box {{
+        background-color: #1A3440; 
         padding: 15px;
         border-radius: 10px;
         border-left: 5px solid #00BCD4;
         color: #E0E0E0;
-    }
+    }}
     
     /* Custom Success Box */
-    .custom-success-box {
-        background-color: #1A3D24; /* Dark Green for success */
+    .custom-success-box {{
+        background-color: #1A3D24; 
         padding: 15px;
         border-radius: 10px;
         border-left: 5px solid #4CAF50;
         color: #E0E0E0;
-    }
+    }}
 </style>
 """
-# (Over 100 lines for constants and CSS styling)
-# ...
 
 # --- C. CORE SIMULATION AND KINETICS ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"): 
-    # (Unchanged kinetic and mass balance logic from previous version)
-    # ... (Around 150 lines of code for the simulation logic)
     temp_K = temp_C + 273.15
     comp = BIOMASS_COMPOSITION.get(biomass)
     R_GAS_LOCAL = R_GAS 
@@ -239,7 +250,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     
     avg_devol_rate = (k_h_eff + k_c_eff + k_l_eff) / 3
 
-    # New: Return mass profile for kinetic chart
     df_mass_profile = pd.DataFrame({
         'Time (min)': t,
         'Hemicellulose': sol[:, 1] * initial_mass_kg,
@@ -261,43 +271,54 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         "df_mass_profile": df_mass_profile
     }
 
-# --- D. THERMAL MODELING UNIT ---
-def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min, moisture):
-    # (Around 150 lines of detailed thermal and energy calculations)
+# --- D. SENSITIVITY ANALYSIS (FIXED) ---
+@st.cache_data
+def run_sensitivity_analysis(biomass, moisture, size, initial_mass_kg, reactor_type):
+    T_range = np.linspace(220, 320, 10) 
+    D_range = np.linspace(30, 90, 10) 
     
-    # 1. Input parameters
-    T_ambient = 25.0 # °C
+    results_T = []
+    for T in T_range:
+        res = simulate_torrefaction(biomass, moisture, T, 60, size, initial_mass_kg, reactor_type) 
+        results_T.append((T, res["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]))
+
+    results_D = []
+    for D in D_range:
+        res = simulate_torrefaction(biomass, moisture, 275, D, size, initial_mass_kg, reactor_type) 
+        results_D.append((D, res["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]))
+        
+    return pd.DataFrame(results_T, columns=["Temperature (°C)", "Yield (%)"]), \
+           pd.DataFrame(results_D, columns=["Duration (min)", "Yield (%)"])
+
+# --- E. THERMAL MODELING UNIT ---
+def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min, moisture):
+    T_ambient = 25.0 
     T_reactor = temp_C 
     
     # 2. Sensible Heat (Raising temperature from T_ambient to T_reactor)
     delta_T = T_reactor - T_ambient
     mass_dry_biomass = initial_mass_kg * (1 - moisture / 100)
     
-    # Q_biomass (heating dry mass)
     Q_sensible_biomass = mass_dry_biomass * SPECIFIC_HEAT_BIOMASS * delta_T # kJ
     
-    # Q_water (heating initial moisture)
     mass_water = initial_mass_kg * (moisture / 100)
     Q_sensible_water = mass_water * SPECIFIC_HEAT_WATER * delta_T # kJ
     
     # 3. Latent Heat (Evaporating water)
     Q_latent_vaporization = mass_water * ENTHALPY_WATER_VAP # kJ
     
-    # 4. Reaction Heat (Assumed net endothermic for torrefaction)
-    Q_reaction_kJ_kg = -150 # kJ/kg (Typical value for torrefaction)
+    # 4. Reaction Heat 
+    Q_reaction_kJ_kg = -150 # kJ/kg (Assumed net endothermic)
     Q_reaction = mass_dry_biomass * Q_reaction_kJ_kg # kJ
     
-    # 5. Heat Loss (Over the duration)
-    # Simplified heat loss model: proportional to surface area (assumed constant) and delta T
-    # Assume a standard reactor surface area/volume ratio
-    reactor_volume_m3 = initial_mass_kg / (BIOMASS_COMPOSITION[biomass_type]["Density"] * 1.5) # Estimate 
-    reactor_surface_area_m2 = 6 * (reactor_volume_m3**(2/3)) # Simplified cube
+    # 5. Heat Loss (Simplified model)
+    reactor_volume_m3 = initial_mass_kg / (BIOMASS_COMPOSITION[biomass_type]["Density"] * 1.5)
+    reactor_surface_area_m2 = 6 * (reactor_volume_m3**(2/3))
     
     U_overall = 0.5 # kW/(m2.K)
     delta_T_K = temp_C - 25.0
     duration_s = duration_min * 60
     
-    # Q_loss_kJ = U_overall * Area * delta_T * time (Convert kW to kJ/s)
     Q_loss = U_overall * 1000 * reactor_surface_area_m2 * delta_T_K * duration_s # J
     Q_loss_kJ = Q_loss / 1000 
     
@@ -305,11 +326,9 @@ def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min,
     Q_total_required_kJ = Q_sensible_biomass + Q_sensible_water + Q_latent_vaporization + abs(Q_reaction) + Q_loss_kJ
     
     # 7. Energy provided by product gas (assumed 50% used)
-    # Use gas yield from simulation (must call simulation first in main app)
-    # We will use a placeholder HHV for gas (12 MJ/kg)
     Q_gas_potential_MJ = (initial_mass_kg * BIOMASS_COMPOSITION[biomass_type]["Gas_Factor"]) * 12 
     Q_gas_potential_kJ = Q_gas_potential_MJ * 1000
-    Q_gas_utilized_kJ = Q_gas_potential_kJ * 0.50 # Assume 50% efficiency for self-heating
+    Q_gas_utilized_kJ = Q_gas_potential_kJ * 0.50 
     
     Q_net_external_requirement_kJ = Q_total_required_kJ - Q_gas_utilized_kJ
     
@@ -327,36 +346,26 @@ def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min,
         "Gas_Self_Heating_kJ": Q_gas_utilized_kJ
     }
 
-# --- E. OPTIMIZATION UNIT ---
+# --- F. OPTIMIZATION UNIT ---
 def optimization_function(params, biomass, moisture, size, initial_mass_kg):
-    # Goal: Maximize Energy Yield - 0.5 * (1/Mass Yield) - Cost Factor
-    # Parameters: [Temperature, Duration]
-    
     T, D = params
     
-    # Constraints check (Must be realistic)
     if not (220 <= T <= 320 and 30 <= D <= 120):
-        return 1e10 # Return a very high cost/low optimization score
+        return 1e10 
         
     results = simulate_torrefaction(biomass, moisture, T, D, size, initial_mass_kg)
     
     energy_yield = results['energy_yield_percent'] / 100
     mass_yield = results['yields_percent'].loc["Biochar (Solid Product)", "Yield (%)"] / 100
     
-    # Cost factor (proportional to high temperature and long duration)
     cost_factor = (T / 320) + (D / 120) 
     
-    # Objective: Maximize (Energy Yield * Mass Yield) - Cost Factor
     objective = (energy_yield * mass_yield) - 0.2 * cost_factor
     
-    # Since 'minimize' finds the minimum, we must return the negative of the objective
     return -objective
 
 def run_optimization(biomass, moisture, size, initial_mass_kg):
-    # Initial guess for [Temperature, Duration]
     initial_guess = [275, 60]
-    
-    # Constraints for T and D
     bnds = ((220, 320), (30, 120))
     
     result = minimize(
@@ -375,17 +384,62 @@ def run_optimization(biomass, moisture, size, initial_mass_kg):
         return opt_T, opt_D, opt_value
     else:
         return None, None, None
-# (Around 100 lines for optimization unit)
-# ...
 
-# --- F. MAIN STREAMLIT APPLICATION ---
+# --- G. MOCK AI RESPONSE (for Tab 5) ---
+def mock_ai_response(prompt, results, annual_net_profit, payback_period_years):
+    p = results["parameters"]
+    prompt_lower = prompt.lower()
+    
+    summary = f"""
+    ## 🎯 ملخص تنفيذي (محدث)
+
+    **المردود الكتلي:** {results['yields_percent'].loc["Biochar (Solid Product)", "Yield (%)"]:.1f}\\%
+    **كفاءة الطاقة:** {results['energy_yield_percent']:.1f}\\%
+    **صافي الربح السنوي:** ${annual_net_profit:,.0f}
+    """ 
+    
+    if "thermal load" in prompt_lower or "حرارة" in prompt_lower:
+        thermal_results = calculate_thermal_loads(p["biomass"], p["initial_mass"], p["temperature"], p["duration"], p["moisture"])
+        return f"""
+        ## 🔥 تحليل الحمل الحراري (Thermal Load Analysis)
+        
+        * **الحرارة الكامنة للتبخير:** {thermal_results['Q_latent_vaporization']/1000:.1f} MJ
+        * **صافي الطاقة الخارجية المطلوبة:** {thermal_results['Q_net_external_kJ']/1000:.1f} MJ/Batch.
+        
+        **توصية:** لتقليل التكلفة، يجب تخفيض محتوى الرطوبة الابتدائي.
+        """
+    elif "payback" in prompt_lower or "استرداد" in prompt_lower or "roi" in prompt_lower:
+        return f"""
+        ## 💰 تحليل الجدوى الاقتصادية (Payback Analysis)
+        
+        * **الربح السنوي الصافي:** ${annual_net_profit:,.0f}
+        * **فترة استرداد رأس المال:** **{payback_period_years:.1f} سنة**.
+        
+        **ملاحظة:** يرجى مراجعة التكاليف الرأسمالية (CAPEX) لضمان دقة هذا الرقم.
+        """
+    elif "optimal" in prompt_lower or "تحسين" in prompt_lower:
+         if 'opt_T' in st.session_state:
+             return f"""
+             ## ✨ نتائج التحسين (Optimization Results)
+             
+             * **الحرارة المثلى:** **{st.session_state['opt_T']:.1f}°C**
+             * **المدة المثلى:** **{st.session_state['opt_D']:.1f} min**
+             
+             لتحقيق أعلى ربحية ممكنة ضمن نطاق الشروط، يوصى باستخدام هذه الإعدادات.
+             """
+         else:
+            return "الرجاء تشغيل زر 'Run Optimization' في الشريط الجانبي أولاً للحصول على النتائج المثلى."
+    
+    return summary
+
+
+# --- H. MAIN STREAMLIT APPLICATION ---
 def main():
     st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
-    # Initialize session state (Over 50 lines for initialization)
+    # Initialize session state 
     if "messages" not in st.session_state:
-        # Dummy result structure for initial AI message
         st.session_state["messages"] = [{"role": "assistant", "content": "Welcome to Chemisco. Run the simulation first to get an executive summary."}]
     if 'target_yield' not in st.session_state:
         st.session_state['target_yield'] = 75
@@ -399,15 +453,16 @@ def main():
         
     # --- Sidebar (Inputs) ---
     with st.sidebar:
-        # Header (Styled by CSS)
-        st.markdown(f"""
+        # Header with Logo (Modified)
+        header_html = f"""
             <div class="sidebar-header-box">
+                {'<img src="data:image/png;base64,' + LOGO_BASE64_STRING + '" style="max-width: 80px; margin-bottom: 10px;">' if LOGO_BASE64_STRING else ''}
                 <h1>CHEMISCO</h1>
                 <p>Advanced Process Simulation</p>
                 <hr style='margin: 10px 0; border-color: #00897B;'>
-                <h3>د. عمرو الرفاعي</h3>
             </div>
-            """, unsafe_allow_html=True)
+            """
+        st.markdown(header_html, unsafe_allow_html=True)
         
         st.header("⚙️ Simulation Inputs")
         
@@ -444,21 +499,37 @@ def main():
             else:
                 st.error("Optimization failed to converge.")
 
-        
     # Input validation
     if moisture_content / 100 + BIOMASS_COMPOSITION[biomass_type]["Ash"] > 1:
         st.error("**Input Error:** Moisture and Ash content exceed 100%. Adjust inputs.")
         return 
         
-    # Run Simulation
+    # Run Simulation & Thermal Calculations
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
     thermal_results = calculate_thermal_loads(biomass_type, initial_mass_kg, temperature, duration, moisture_content)
     
+    # Economic Calculations for KPIs
+    profit_delta = ((results['yields_mass'].loc['Biochar (Solid Product)', 'Mass (kg)'] * st.session_state.price_biochar_per_kg) - (initial_mass_kg / 1000) * st.session_state.cost_biomass_per_ton)
+    hourly_capex = st.session_state.capex / (5 * st.session_state.operating_days * (60/duration) * (duration/60)) if duration > 0 else 0 
+    net_hourly_profit = (profit_delta * (60/duration)) - st.session_state.cost_energy_per_hour - hourly_capex 
+    
+    # Annual Economics for Tabs
+    batch_per_day = 60 / duration if duration > 0 else 0
+    annual_batches = st.session_state.operating_days * batch_per_day
+    annual_feedstock_input_ton = (annual_batches * initial_mass_kg) / 1000
+    annual_biochar_output_kg = annual_batches * results['yields_mass'].loc["Biochar (Solid Product)", "Mass (kg)"]
+    annual_feedstock_cost = annual_feedstock_input_ton * st.session_state.cost_biomass_per_ton
+    annual_operational_cost = st.session_state.operating_days * 24 * st.session_state.cost_energy_per_hour 
+    total_annual_opex = annual_feedstock_cost + annual_operational_cost
+    annual_revenue = annual_biochar_output_kg * st.session_state.price_biochar_per_kg
+    annual_net_profit = annual_revenue - total_annual_opex
+    payback_period_years = st.session_state.capex / annual_net_profit if annual_net_profit > 0 else 999 
+
     # --- Main Content ---
     st.title("CHEMISCO: Integrated Process Simulation Dashboard 🌌")
     st.subheader("Advanced Kinetic, Thermal, and Economic Analysis (Dark Mode)")
     
-    # 1. Block Flow Diagram (BFD) - Enhanced
+    # 1. Block Flow Diagram (BFD)
     st.markdown("---")
     st.subheader("Process Flow and Status")
     bfd_html = f"""
@@ -482,14 +553,6 @@ def main():
 
     # 2. Results Dashboard (KPIs)
     st.header("🔑 Key Performance Indicators (KPIs)")
-    
-    # Calculation for KPIs
-    profit_delta = ((results['yields_mass'].loc['Biochar (Solid Product)', 'Mass (kg)'] * st.session_state.price_biochar_per_kg) - (initial_mass_kg / 1000) * st.session_state.cost_biomass_per_ton)
-    
-    # CAPEX Amortization (Simplified over 5 years, 300 days/yr)
-    hourly_capex = st.session_state.capex / (5 * st.session_state.operating_days * (60/duration) * (duration/60)) if duration > 0 else 0 
-    net_hourly_profit = (profit_delta * (60/duration)) - st.session_state.cost_energy_per_hour - hourly_capex 
-    
     col_kpi_1, col_kpi_2, col_kpi_3, col_kpi_4 = st.columns(4)
     
     col_kpi_1.metric("⚖️ Mass Yield", 
@@ -511,7 +574,6 @@ def main():
     st.markdown("---")
 
     # 3. Detailed Tabs
-    # (Adding 'Project Economics' and 'Process Dynamics' tabs)
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Mass & Quality", 
         "Process Dynamics", 
@@ -528,7 +590,6 @@ def main():
         
         with col_t1:
             st.markdown("##### Overall Mass Distribution")
-            # FIX: Ensure column name is 'Component' (Solution from previous iteration)
             df_global = results["yields_percent"].iloc[[0, 1, 2, 3]].reset_index()
             df_global.rename(columns={'index': 'Component'}, inplace=True) 
             
@@ -554,7 +615,7 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-    # --- Tab 2: Process Dynamics (New) ---
+    # --- Tab 2: Process Dynamics ---
     with tab2:
         st.subheader("Kinetic Devolatilization and Mass Loss Profile")
         col_d1, col_d2 = st.columns(2)
@@ -580,7 +641,7 @@ def main():
                 "Lignin": [KINETICS["Lignin"][0], KINETICS["Lignin"][1]]
             }, index=["Pre-exponential Factor A (min^-1)", "Activation Energy Ea (J/mol)"]).T.style.format("{:.2e}"))
             
-            # Sensitivity Plot (from previous tab)
+            # Sensitivity Plot
             df_T, df_D = run_sensitivity_analysis(biomass_type, moisture_content, particle_size, initial_mass_kg, reactor_type)
             fig_sens = go.Figure()
             fig_sens.add_trace(go.Scatter(x=df_T["Temperature (°C)"], y=df_T["Yield (%)"], name='Temp. Sensitivity', mode='lines+markers', line=dict(color='#4CAF50')))
@@ -590,7 +651,7 @@ def main():
             st.plotly_chart(fig_sens, use_container_width=True)
 
 
-    # --- Tab 3: Thermal & Energy (New) ---
+    # --- Tab 3: Thermal & Energy ---
     with tab3:
         st.subheader("Detailed Thermal Load Analysis")
         
@@ -621,28 +682,10 @@ def main():
                                   paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'))
         st.plotly_chart(fig_thermal, use_container_width=True)
             
-    # --- Tab 4: Project Economics (New) ---
+    # --- Tab 4: Project Economics ---
     with tab4:
         st.subheader("Integrated Project Economics and CAPEX Analysis")
 
-        # Economic Calculations
-        batch_per_day = 60 / duration if duration > 0 else 0
-        annual_batches = st.session_state.operating_days * batch_per_day
-        annual_feedstock_input_ton = (annual_batches * initial_mass_kg) / 1000
-        annual_biochar_output_kg = annual_batches * results['yields_mass'].loc["Biochar (Solid Product)", "Mass (kg)"]
-        
-        # Costs
-        annual_feedstock_cost = annual_feedstock_input_ton * st.session_state.cost_biomass_per_ton
-        annual_operational_cost = st.session_state.operating_days * 24 * st.session_state.cost_energy_per_hour # Assuming 24h operation
-        total_annual_opex = annual_feedstock_cost + annual_operational_cost
-        
-        # Revenue
-        annual_revenue = annual_biochar_output_kg * st.session_state.price_biochar_per_kg
-        
-        # Profitability Metrics
-        annual_net_profit = annual_revenue - total_annual_opex
-        payback_period_years = st.session_state.capex / annual_net_profit if annual_net_profit > 0 else "N/A"
-        
         col_p1, col_p2, col_p3 = st.columns(3)
         col_p1.metric("Total Annual Revenue", f"${annual_revenue:.0f}", delta="Annual Biochar Sales")
         col_p2.metric("Total Annual OPEX", f"${total_annual_opex:.0f}", delta="Feedstock + Operational")
@@ -668,21 +711,15 @@ def main():
         fig_gantt.update_layout(title="Project Schedule Overview", paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'))
         st.plotly_chart(fig_gantt, use_container_width=True)
 
-    # --- Tab 5: AI Expert Analysis (Detailed response logic is expanded) ---
+    # --- Tab 5: AI Expert Analysis ---
     with tab5:
         st.header("🤖 AI Expert: Strategic Analysis")
         st.markdown("<div class='custom-info-box'>الذكاء الاصطناعي يقدم تحليلاً متعمقاً. اسأل عن: **Thermal Load**, **Payback Period**, أو **Optimal Conditions**.</div>", unsafe_allow_html=True)
 
-        # AI Chat logic (expanded to handle new topics)
-        if "messages" not in st.session_state or len(st.session_state["messages"]) < 1:
-             st.session_state["messages"].append({"role": "assistant", "content": "Welcome to Chemisco. Run the simulation first to get an executive summary."})
-             
-        # Display chat messages (omitted for brevity, assume full display logic)
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
         
-        # Chat input handling (expanded mock_ai_response to check for new keywords)
         if prompt := st.chat_input("Ask a question to the Expert..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             
@@ -692,66 +729,57 @@ def main():
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing data and generating strategic report..."):
                     time.sleep(2) 
-                    
-                    p = results["parameters"]
-                    prompt_lower = prompt.lower()
-                    
-                    # --- AI RESPONSE EXPANSION ---
-                    ai_response = f"""
-                    ## 🎯 ملخص تنفيذي (محدث)
-                    
-                    **المردود الكتلي:** {results['yields_percent'].loc["Biochar (Solid Product)", "Yield (%)"]:.1f}\\%
-                    **صافي الربح السنوي:** ${annual_net_profit:,.0f}
-                    """ # Default summary
-                    
-                    if "thermal load" in prompt_lower or "حرارة" in prompt_lower:
-                        ai_response = f"""
-                        ## 🔥 تحليل الحمل الحراري (Thermal Load Analysis)
-                        
-                        أكبر متطلب للطاقة هو **الحرارة الكامنة للتبخير (Latent Heat)** للمياه الابتدائية: **{thermal_results['Q_latent_vaporization']/1000:.1f} MJ**.
-                        * **صافي الطاقة الخارجية المطلوبة:** **{thermal_results['Q_net_external_kJ']/1000:.1f} MJ/Batch**.
-                        * **مساهمة غازات العملية:** يوفر الغاز الناتج **{thermal_results['Gas_Self_Heating_kJ']/1000:.1f} MJ** (50% من إجمالي طاقته) لتسخين العملية ذاتياً.
-                        
-                        **توصية:** لتقليل التكلفة، يجب تخفيض محتوى الرطوبة الابتدائي للكتلة الحيوية.
-                        """
-                    elif "payback" in prompt_lower or "استرداد" in prompt_lower or "roi" in prompt_lower:
-                        ai_response = f"""
-                        ## 💰 تحليل الجدوى الاقتصادية (Payback Analysis)
-                        
-                        * **الربح السنوي الصافي:** ${annual_net_profit:,.0f}
-                        * **فترة استرداد رأس المال (Payback Period):** **{payback_period_years:.1f} سنة**.
-                        
-                        **ملاحظة:** إذا كانت فترة الاسترداد تتجاوز 5 سنوات، يجب إعادة تقييم التكاليف الرأسمالية (CAPEX) أو السعي لزيادة سعر المنتج.
-                        """
-                    elif "optimal" in prompt_lower or "تحسين" in prompt_lower:
-                         if 'opt_T' in st.session_state:
-                             ai_response = f"""
-                             ## ✨ نتائج التحسين (Optimization Results)
-                             
-                             * **الحرارة المثلى:** **{st.session_state['opt_T']:.1f}°C**
-                             * **المدة المثلى:** **{st.session_state['opt_D']:.1f} min**
-                             * **قيمة الهدف القصوى:** **{st.session_state['opt_val']:.4f}** (مزيج من المردود و كفاءة الطاقة).
-                             
-                             لتحقيق أعلى ربحية ممكنة ضمن نطاق الشروط، يوصى باستخدام هذه الإعدادات.
-                             """
-                         else:
-                            ai_response = "الرجاء تشغيل زر 'Run Optimization' في الشريط الجانبي أولاً للحصول على النتائج المثلى."
-                    # ... (Other AI responses like Pyrolysis, Kinetics, etc.)
+                    ai_response = mock_ai_response(prompt, results, annual_net_profit, payback_period_years)
                     
                 st.markdown(ai_response)
                 st.session_state.messages.append({"role": "assistant", "content": ai_response})
 
-
-    # --- Tab 6: Game Mode (Simplified) ---
+    # --- Tab 6: Game Mode ---
     with tab6:
-        # (Game mode logic - unchanged for brevity)
-        st.header("🎮 Plant Manager Challenge")
-        st.markdown("<div class='custom-success-box'>Fulfill the Client Order!</div>", unsafe_allow_html=True)
-        # ... (Game metrics and logic)
-        
-        # Omitted for brevity: Full Game mode logic (around 100 lines)
+        game_mode = st.checkbox("Activate Plant Manager Challenge", value=False)
+        if game_mode:
+            st.header("🎮 Plant Manager Challenge")
+            st.markdown("""
+            <div style="background-color: #3B3020; padding: 20px; border-radius: 10px; border-left: 6px solid #FFC107;">
+                <h3 style="color: #FFC107; margin-top:0;">Fulfill the Client Order!</h3>
+                <p style='color: #F5F5F5;'>Adjust Temperature and Duration in the sidebar to match the specifications below.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col_g1, col_g2, col_g3 = st.columns([1.5, 2, 1])
+            
+            if col_g3.button("🔄 New Client Order", key="new_order_btn_game"):
+                st.session_state.target_yield = random.randint(60, 85)
+                st.session_state.target_ash = round(random.uniform(ash_percent_init + 1.0, ash_percent_init + 5.0), 1)
+                st.session_state.has_won = False
+                st.experimental_rerun()
+            
+            with col_g1:
+                st.markdown(f"**🎯 Target Yield:** `{st.session_state.target_yield}%`")
+                st.markdown(f"**🎯 Max Ash:** `{st.session_state.target_ash}%`")
+                
+            with col_g2:
+                curr_yield = results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]
+                curr_ash = results["final_ash_percent"]
+                diff_yield = abs(curr_yield - st.session_state.target_yield)
+                diff_ash = abs(curr_ash - st.session_state.target_ash)
+                
+                score = max(0, 100 - (diff_yield * 10 + diff_ash * 20))
+                st.metric("🏆 Your Efficiency Score", f"{score:.1f} / 100")
+                
+                if score >= 90 and curr_ash <= st.session_state.target_ash:
+                    st.success("🎉 **PERFECT MATCH! Order fulfilled successfully.**")
+                    if not st.session_state.has_won:
+                        st.session_state.has_won = True
+                        st.balloons() 
+                elif score >= 70 and curr_ash <= st.session_state.target_ash:
+                    st.warning("⚠️ Acceptable, but try to optimize further.")
+                else:
+                    st.error("❌ Specification mismatch. Adjust conditions!")
+        else:
+            st.info("Activate the 'Plant Manager Challenge' to test your optimization skills!")
+
 
 # --- Execution Entry Point ---
 if __name__ == "__main__":
     main()
-# (Total lines of code: ~1500 after filling in all omitted sections and detailed AI responses)
