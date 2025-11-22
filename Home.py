@@ -89,7 +89,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     # Gas Composition
     gas_fraction = final_volatiles_lost_fraction * data["Gas_Factor"]
     
-    # We use this dictionary to estimate molar percentages later
     gas_comp_mass = {
         "CO2": 0.45 * gas_fraction * initial_mass_kg,
         "CO": 0.35 * gas_fraction * initial_mass_kg,
@@ -169,100 +168,104 @@ def main():
         unsafe_allow_html=True
     )
     
-    # Process Flow Sheet (Professional, Step-by-Step Schematic)
-    st.subheader("Process Flow Sheet Schematic")
+    # Process Flow Sheet (Block Flow Diagram - BFD Style)
+    st.subheader("Process Flow Block Diagram (BFD)")
     
-    # Define CSS styles for the stages
-    flow_style = """
+    # Define CSS styles for the BFD
+    bfd_style = """
     <style>
-        .flow-container {
+        .bfd-container {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            margin-bottom: 20px;
-            padding: 10px 0;
-            overflow-x: auto;
-        }
-        .flow-stage {
-            flex: 1;
-            min-width: 150px;
-            padding: 15px 10px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s;
+            margin: 30px 0 60px 0;
             position: relative;
         }
-        .flow-stage:hover {
-            transform: translateY(-5px);
+        .bfd-block {
+            padding: 15px 25px;
+            border: 3px solid #4CAF50; /* Green border for blocks */
+            border-radius: 6px;
+            text-align: center;
+            background-color: #E8F5E9; /* Light green background */
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            font-weight: bold;
+            color: #1B5E20; /* Dark green text */
+            position: relative;
+            min-width: 180px;
         }
-        .arrow {
-            font-size: 30px;
-            margin: 0 10px;
-            color: #4CAF50;
+        .bfd-stream {
+            width: 70px;
+            height: 3px;
+            background-color: #4CAF50;
+            position: relative;
         }
-        .output-arrow {
-            font-size: 20px;
-            color: #FF9800;
-        }
-        .output-box {
+        .bfd-stream::before { /* Arrowhead for main streams */
+            content: '';
             position: absolute;
-            bottom: -50px;
+            right: -10px;
+            top: -5px;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-left: 10px solid #4CAF50;
+        }
+        .side-stream {
+            position: absolute;
             left: 50%;
             transform: translateX(-50%);
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            white-space: nowrap;
+            width: 3px;
+            height: 40px;
+            background-color: #FF9800; /* Orange for side streams */
+            bottom: -40px;
         }
-        /* Stage specific colors - Use light colors for better Dark Mode compatibility */
-        .stage-input { background-color: #BBDEFB; color: #1565C0; }
-        .stage-drying { background-color: #FFF9C4; color: #FFD600; }
-        .stage-reactor { background-color: #FFCDD2; color: #D32F2F; }
-        .stage-product { background-color: #C8E6C9; color: #388E3C; }
+        .side-stream-label {
+            position: absolute;
+            bottom: -65px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            white-space: nowrap;
+            color: #FF9800;
+        }
     </style>
     """
-    st.markdown(flow_style, unsafe_allow_html=True)
+    st.markdown(bfd_style, unsafe_allow_html=True)
 
-    # HTML structure for the flow sheet
-    flow_sheet_html = f"""
-    <div class="flow-container">
-        <div class="flow-stage stage-input">
-            <strong>1. Input Preparation</strong>
-            <p style="font-size: 14px; margin: 5px 0 0;">Raw Biomass ({initial_mass_kg} kg)</p>
+    # HTML structure for the BFD
+    bfd_html = f"""
+    <div class="bfd-container">
+        
+        <div class="bfd-block">
+            FEED PREPARATION
+            <p style="font-size: 12px; margin: 5px 0 0;">Raw Biomass (M={moisture_content}%)</p>
         </div>
 
-        <div class="arrow">➡️</div>
+        <div class="bfd-stream"></div>
 
-        <div class="flow-stage stage-drying">
-            <strong>2. Drying & Preheating</strong>
-            <p style="font-size: 14px; margin: 5px 0 0;">100°C - 200°C</p>
-            <span class="output-arrow">⬇️</span>
-            <div class="output-box" style="background-color: #B3E5FC; color: #0277BD; border: 1px solid #0277BD;">
-                Water Vapor
-            </div>
+        <div class="bfd-block">
+            DRYING & PREHEATING
+            <p style="font-size: 12px; margin: 5px 0 0;">100-200 °C</p>
+            <div class="side-stream"></div>
+            <div class="side-stream-label">Water Vapor</div>
         </div>
 
-        <div class="arrow">➡️</div>
+        <div class="bfd-stream"></div>
 
-        <div class="flow-stage stage-reactor">
-            <strong>3. Torrefaction Reactor</strong>
-            <p style="font-size: 14px; margin: 5px 0 0;">{temperature}°C for {duration} min</p>
-            <span class="output-arrow">⬇️</span>
-            <div class="output-box" style="background-color: #FFC107; color: #E65100; border: 1px solid #E65100;">
-                Volatile Gases (CO, CO₂, etc.)
-            </div>
+        <div class="bfd-block" style="border-color: #D32F2F; background-color: #FFCDD2; color: #B71C1C;">
+            TORREFACTION REACTOR
+            <p style="font-size: 12px; margin: 5px 0 0;">{temperature} °C / {duration} min</p>
+            <div class="side-stream" style="background-color: #FFC107;"></div>
+            <div class="side-stream-label" style="color: #FFC107;">Volatile Gases</div>
         </div>
 
-        <div class="arrow">➡️</div>
+        <div class="bfd-stream"></div>
 
-        <div class="flow-stage stage-product">
-            <strong>4. Final Product</strong>
-            <p style="font-size: 14px; margin: 5px 0 0;">Torrefied Biochar</p>
+        <div class="bfd-block" style="border-color: #388E3C; background-color: #C8E6C9; color: #1B5E20;">
+            COOLING & PRODUCT
+            <p style="font-size: 12px; margin: 5px 0 0;">Torrefied Biochar</p>
         </div>
     </div>
-    <div style="height: 60px;"></div> """
-    st.markdown(flow_sheet_html, unsafe_allow_html=True)
+    <div style="height: 40px;"></div> """
+    st.markdown(bfd_html, unsafe_allow_html=True)
     
     # --- Run Simulation ---
     if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
@@ -307,13 +310,12 @@ def main():
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
-             # تمثيل مرئي للميزان الكتلي
+            
 
     with tab2:
         st.subheader("Mass Component Conversion Over Time")
         st.line_chart(results["mass_profile"])
         st.caption("The curves show how Moisture and Volatiles fractions decrease as the Biochar fraction forms over time.")
-         # رسم بياني يوضح تطور مكونات الكتلة
 
     with tab3:
         st.subheader("Non-Condensable Dry Gas Composition")
@@ -356,7 +358,6 @@ def generate_pdf_report(results):
     param_data = [
         ["Parameter", "Value"],
         ["Initial Biomass Mass", f"{p['initial_mass']:.0f} kg"],
-        ["Biomass Type", p["biomass"]],
         ["Moisture Content", f"{p['moisture']}%"],
         ["Temperature", f"{p['temperature']} °C"],
         ["Duration", f"{p['duration']} min"],
