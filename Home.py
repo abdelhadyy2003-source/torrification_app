@@ -16,12 +16,10 @@ R_GAS = 8.314             # J/(mol.K)
 SPECIFIC_HEAT_BIOMASS = 1.3 # kJ/(kg.K) (Average)
 SPECIFIC_HEAT_BIOCHAR = 1.0 # kJ/(kg.K)
 SPECIFIC_HEAT_WATER = 4.18  # kJ/(kg.K)
-TORREFACTION_TEMP_REF = 250 + 273.15 # K
 ENTHALPY_WATER_VAP = 2500 # kJ/kg (Latent Heat of Vaporization)
 
 # KINETIC PARAMETERS (Parallel First-Order Reactions)
 KINETICS = {
-    # Component: [A (min^-1), Ea (J/mol)]
     "Hemicellulose": [1.5e10, 110000],
     "Cellulose":     [1.0e12, 130000],
     "Lignin":        [2.0e9, 100000]
@@ -33,7 +31,6 @@ BIOMASS_COMPOSITION = {
     "Municipal Waste": {"Hemicellulose": 0.30, "Cellulose": 0.40, "Lignin": 0.30, "Ash": 0.15, "Gas_Factor": 0.60, "Density": 300}
 }
 
-# ENERGY VALUES (MJ/kg)
 HHV_INITIAL = { "Wood": 18.0, "Agricultural Waste": 16.5, "Municipal Waste": 15.0 }
 HHV_ENRICHMENT_FACTOR = 1.3 
 
@@ -42,14 +39,14 @@ SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65
 BASE_FC_FACTOR = 0.20 
 
 # --- Utility Function for Logo ---
-LOGO_PATH = "chemisco_logo.png" # افتراض وجود ملف اللوجو بهذا الاسم
+LOGO_PATH = "chemisco_logo.png"
 
+@st.cache_data(show_spinner=False)
 def _get_image_base64(image_path):
     try:
         # Check if the file exists locally
         if os.path.exists(image_path):
             with open(image_path, "rb") as image_file:
-                # Return the base64 string
                 return base64.b64encode(image_file.read()).decode()
         # Fallback for Streamlit Cloud environments
         return None
@@ -59,48 +56,48 @@ def _get_image_base64(image_path):
 LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
 
 
-# --- B. ADVANCED PROFESSIONAL DARK MODE CSS ---
+# --- B. ADVANCED PROFESSIONAL DARK MODE CSS (FIXED) ---
 GLOBAL_CSS = f"""
 <style>
     /* ------------------- DARK MODE BASE STYLING ------------------- */
-    .stApp { 
+    .stApp {{ 
         padding-top: 10px; 
         background-color: #121212; /* Deeper Dark Background */
         color: #E0E0E0; 
-    }
+    }}
     
     /* Global Text and Headers */
-    h1, h2, h3, p, label, .stMarkdown, .stText, .st-emotion-cache-1v0x1p5 { 
+    h1, h2, h3, p, label, .stMarkdown, .stText, .st-emotion-cache-1v0x1p5 {{ 
         color: #E0E0E0 !important; 
         font-family: 'Tahoma', sans-serif; 
-    }
+    }}
     
     /* Metrics Style - High Contrast Dark */
-    [data-testid="stMetric"] {
+    [data-testid="stMetric"] {{
         background-color: #1E1E1E; /* Very Dark Container */
         padding: 20px 25px;
         border-radius: 15px;
         border-left: 6px solid #00BCD4; /* Cyan Accent */
         box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
-    }
-    [data-testid="stMetricValue"] { 
+    }}
+    [data-testid="stMetricValue"] {{ 
         font-size: 40px; 
         color: #FFFFFF; 
         font-weight: 900; 
-    }
-    [data-testid="stMetricLabel"] { 
+    }}
+    [data-testid="stMetricLabel"] {{ 
         font-size: 16px; 
         color: #4CAF50; /* Green Label */
         font-weight: 700;
         text-transform: uppercase;
-    }
-    [data-testid="stMetricDelta"] { 
+    }}
+    [data-testid="stMetricDelta"] {{ 
         font-size: 18px; 
         font-weight: bold;
         color: #FFC107 !important; /* Gold Delta */
-    }
+    }}
     
-    /* Sidebar Styling - Modified Header */
+    /* Sidebar Styling - Name size is reduced */
     .sidebar-header-box {{
         background: linear-gradient(135deg, #004D40, #00897B); /* Dark Teal Gradient */
         padding: 25px;
@@ -109,15 +106,15 @@ GLOBAL_CSS = f"""
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
         border: 2px solid #FFC107;
     }}
-    .sidebar-header-box h1 {{ color: #FFFFFF; font-size: 2.5em; letter-spacing: 4px; margin-bottom: 5px; }} /* تم تصغير الخط */
+    .sidebar-header-box h1 {{ color: #FFFFFF; font-size: 2.5em; letter-spacing: 4px; margin-bottom: 5px; }}
     .sidebar-header-box p {{ color: #C8E6C9; margin: 0; font-size: 1.0em; font-weight: 500;}}
     
     /* Tabs Styling (High Contrast) */
     div[data-testid="stTabs"] button {{
-        color: #00BCD4 !important; /* Cyan tab text */
+        color: #00BCD4 !important; 
         background-color: #1E1E1E !important; 
         font-weight: bold !important;
-        border-bottom: 4px solid #4CAF50 !important; /* Green underline */
+        border-bottom: 4px solid #4CAF50 !important; 
         padding: 12px 18px;
         font-size: 1.1em;
     }}
@@ -127,7 +124,7 @@ GLOBAL_CSS = f"""
     
     /* General Containers */
     .st-emotion-cache-1c7v0s, .st-emotion-cache-1fv9t6m, .st-emotion-cache-q8b7t8 {{ 
-        background-color: #1E1E1E; /* Dark Container Background */
+        background-color: #1E1E1E; 
         border: 1px solid #333333;
         border-radius: 15px;
         padding: 20px;
@@ -168,7 +165,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     comp = BIOMASS_COMPOSITION.get(biomass)
     R_GAS_LOCAL = R_GAS 
     
-    # Initial Fractions & Masses
     initial_moisture_frac = moisture / 100
     initial_ash_frac = comp["Ash"]
     daf_frac = 1.0 - initial_moisture_frac - initial_ash_frac
@@ -178,7 +174,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     m_l_init = comp["Lignin"] * daf_frac
     initial_mass_fixed_carbon_daf = daf_frac * BASE_FC_FACTOR 
     
-    # Rate Constants
     k_drying = DRYING_RATE_CONST * SIZE_FACTOR.get(size)
     size_factor_val = SIZE_FACTOR.get(size)
     
@@ -186,7 +181,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     k_c_eff = KINETICS["Cellulose"][0] * np.exp(-KINETICS["Cellulose"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
     k_l_eff = KINETICS["Lignin"][0] * np.exp(-KINETICS["Lignin"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
 
-    # ODE System
     def model(y, t, k_dry, kh, kc, kl):
         m_moist, m_h, m_c, m_l = y
         d_moist = -k_dry * m_moist if m_moist > 0.001 else 0 
@@ -210,7 +204,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     lost_l_frac = m_l_init - final_l_remaining
     total_volatiles_lost_frac = lost_h_frac + lost_c_frac + lost_l_frac
 
-    # Final Mass Balance
     mass_ash_kg = initial_mass_kg * initial_ash_frac
     mass_fixed_carbon_kg = initial_mass_kg * initial_mass_fixed_carbon_daf
     mass_remaining_components = (final_h_remaining + final_c_remaining + final_l_remaining) * initial_mass_kg
@@ -222,10 +215,8 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     mass_non_condensable_gas_kg = total_volatiles_lost_frac * initial_mass_kg * comp["Gas_Factor"] 
     mass_bio_oil_kg = total_volatiles_lost_frac * initial_mass_kg * (1 - comp["Gas_Factor"]) 
 
-    # Final Ash Concentration
     final_ash_percent = (mass_ash_kg / mass_biochar_total) * 100
 
-    # Output Data Structure
     yields_percent = pd.DataFrame({
         "Yield (%)": [final_solid_yield_percent, (mass_bio_oil_kg / initial_mass_kg) * 100, (mass_non_condensable_gas_kg / initial_mass_kg) * 100, (mass_moisture_loss_kg / initial_mass_kg) * 100]},
         index=["Biochar (Solid Product)", "Bio-Oil (Condensable)", "Non-Condensable Gases", "Moisture Loss (Water Vapor)"]
@@ -238,7 +229,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         "Mass (kg)": [mass_fixed_carbon_kg, mass_remaining_components, mass_ash_kg]
     }, index=["Fixed Carbon", "Volatile Matter Remaining", "Ash"])
 
-    # Energy & Sustainability Metrics
     initial_hhv_mj_kg = HHV_INITIAL.get(biomass, 17.0) 
     biochar_hhv_mj_kg = initial_hhv_mj_kg * HHV_ENRICHMENT_FACTOR
     
@@ -247,8 +237,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     energy_yield_percent = (final_biochar_energy_mj / initial_energy_mj) * 100
     
     carbon_efficiency = final_solid_yield_percent * (biochar_hhv_mj_kg / initial_hhv_mj_kg) / 100 
-    
-    avg_devol_rate = (k_h_eff + k_c_eff + k_l_eff) / 3
 
     df_mass_profile = pd.DataFrame({
         'Time (min)': t,
@@ -262,7 +250,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         "yields_percent": yields_percent, "yields_mass": yields_mass, "solid_composition": solid_composition,
         "final_ash_percent": final_ash_percent, "initial_hhv": initial_hhv_mj_kg,
         "biochar_hhv": biochar_hhv_mj_kg, "energy_yield_percent": energy_yield_percent,
-        "carbon_efficiency": carbon_efficiency, "avg_devol_rate": avg_devol_rate,
+        "carbon_efficiency": carbon_efficiency, 
         "parameters": {
             "biomass": biomass, "moisture": moisture, "temperature": temp_C, 
             "duration": duration_min, "size": size, "initial_mass": initial_mass_kg,
@@ -295,7 +283,6 @@ def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min,
     T_ambient = 25.0 
     T_reactor = temp_C 
     
-    # 2. Sensible Heat (Raising temperature from T_ambient to T_reactor)
     delta_T = T_reactor - T_ambient
     mass_dry_biomass = initial_mass_kg * (1 - moisture / 100)
     
@@ -304,14 +291,11 @@ def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min,
     mass_water = initial_mass_kg * (moisture / 100)
     Q_sensible_water = mass_water * SPECIFIC_HEAT_WATER * delta_T # kJ
     
-    # 3. Latent Heat (Evaporating water)
     Q_latent_vaporization = mass_water * ENTHALPY_WATER_VAP # kJ
     
-    # 4. Reaction Heat 
     Q_reaction_kJ_kg = -150 # kJ/kg (Assumed net endothermic)
     Q_reaction = mass_dry_biomass * Q_reaction_kJ_kg # kJ
     
-    # 5. Heat Loss (Simplified model)
     reactor_volume_m3 = initial_mass_kg / (BIOMASS_COMPOSITION[biomass_type]["Density"] * 1.5)
     reactor_surface_area_m2 = 6 * (reactor_volume_m3**(2/3))
     
@@ -322,17 +306,14 @@ def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min,
     Q_loss = U_overall * 1000 * reactor_surface_area_m2 * delta_T_K * duration_s # J
     Q_loss_kJ = Q_loss / 1000 
     
-    # 6. Total Required Heat Load
     Q_total_required_kJ = Q_sensible_biomass + Q_sensible_water + Q_latent_vaporization + abs(Q_reaction) + Q_loss_kJ
     
-    # 7. Energy provided by product gas (assumed 50% used)
     Q_gas_potential_MJ = (initial_mass_kg * BIOMASS_COMPOSITION[biomass_type]["Gas_Factor"]) * 12 
     Q_gas_potential_kJ = Q_gas_potential_MJ * 1000
     Q_gas_utilized_kJ = Q_gas_potential_kJ * 0.50 
     
     Q_net_external_requirement_kJ = Q_total_required_kJ - Q_gas_utilized_kJ
     
-    # Cost calculation
     energy_required_kWh = Q_net_external_requirement_kJ / 3600
     
     return {
@@ -453,7 +434,7 @@ def main():
         
     # --- Sidebar (Inputs) ---
     with st.sidebar:
-        # Header with Logo (Modified)
+        # Header with Logo (Modified to remove Doctor's name and reduce size)
         header_html = f"""
             <div class="sidebar-header-box">
                 {'<img src="data:image/png;base64,' + LOGO_BASE64_STRING + '" style="max-width: 80px; margin-bottom: 10px;">' if LOGO_BASE64_STRING else ''}
@@ -658,7 +639,7 @@ def main():
         col_e1, col_e2, col_e3 = st.columns(3)
         col_e1.metric("Heat Loss (Total)", f"{thermal_results['Q_loss_kJ']/1000:.1f} MJ", delta="15% of total input")
         col_e2.metric("Latent Heat (Drying)", f"{thermal_results['Q_latent_vaporization']/1000:.1f} MJ", delta="Largest Load")
-        col_e3.metric("Net External Energy Req.", f"{thermal_results['Q_net_external_kJ']/1000:.1f} MJ", delta=f"{thermal_results['Energy_kWh']:.2f} kWh")
+        col_e3.metric("Net External Energy Req.", f"{thermal_results['Q_net_external_kJ']/1000:.1f} MJ/Batch", delta=f"{thermal_results['Energy_kWh']:.1f} kWh")
 
         st.markdown("##### Energy Balance Breakdown (kJ/Batch)")
         df_thermal = pd.DataFrame({
