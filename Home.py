@@ -30,15 +30,13 @@ LOGO_PATH = "chemisco_logo.png"
 def _get_image_base64(image_path):
     """Encodes an image to Base64 string for safe embedding in HTML/Markdown."""
     try:
-        # We need to make sure the image exists before trying to open it
         if os.path.exists(image_path):
             with open(image_path, "rb") as image_file:
-                # We need to ensure the image is a PNG for correct data type
+                # Assuming the logo is PNG
                 return base64.b64encode(image_file.read()).decode()
         else:
             return None
     except Exception as e:
-        # General error fallback
         return None
 
 # Attempt to get the Base64 string once at the start
@@ -212,8 +210,8 @@ def generate_pdf_report(results):
     normal_style = styles["Normal"]
     
     # -- 1. Header with Logo (for PDF) --
-    elements.append(Paragraph("CHEMISCO PRO TORREFACTION REPORT", title_style))
-    elements.append(Paragraph("Project presented to: Dr. Amr El-Rifai", styles["Heading3"]))
+    elements.append(Paragraph("CHEMISCO TORREFACTION REPORT", title_style))
+    elements.append(Paragraph("Project presented to: د. عمرو الرفاعي", styles["Heading3"])) # Doctor name corrected
     
     # Use the file path for reportlab, wrapped in try/except for safety
     try:
@@ -356,7 +354,8 @@ def generate_pdf_report(results):
 
 # --- 5. Main Streamlit App ---
 def main():
-    st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
+    # Removed 'Pro'
+    st.set_page_config(page_title="Chemisco", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
     # --- Sidebar ---
@@ -364,6 +363,7 @@ def main():
         # LOGO DISPLAY: Use Base64 if available, otherwise show warning text
         if LOGO_BASE64_STRING:
             # Display using Base64 in an HTML container
+            # This embedding uses 'image/png' which confirms the format requested by the user.
             st.markdown(f"""
                 <div class="sidebar-logo-container">
                     <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 80%; display: block; margin: 0 auto;">
@@ -371,17 +371,16 @@ def main():
             """, unsafe_allow_html=True)
         else:
             # Fallback text in case of error (This prevents the crash)
-            st.markdown("## Chemisco Pro")
-            st.warning("⚠️ Logo file not found. Check deployment path and filename.")
+            st.markdown("## Chemisco") # Removed 'Pro'
+            st.warning("⚠️ Logo file not found. Check deployment path and filename (chemisco_logo.png).")
 
-        st.markdown("""
+        st.markdown(f"""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
-                <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO PRO</h1>
+                <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO</h1>
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
                 <hr style='margin: 10px 0; border-color: #4CAF50;'>
                 <p style='color: #C8E6C9; font-size: 0.85em;'>Project presented to:</p>
-                <h3 style='color: #FFF176; margin: 0;'>Dr. Amr El-Rifai</h3>
-            </div>
+                <h3 style='color: #FFF176; margin: 0;'>د. عمرو الرفاعي</h3> </div>
             """, unsafe_allow_html=True)
         
         st.header("⚙️ Input Parameters")
@@ -423,22 +422,18 @@ def main():
                 <div class="main-banner-logo-container">
                     <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 100%; height: auto; border-radius: 8px;">
                 </div>
-                <h1>CHEMISCO PRO</h1>
-                <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
-            </div>
+                <h1>CHEMISCO</h1> <p>Advanced Torrefaction Simulator</p>
+                <div class="dedication">Project presented to د. عمرو الرفاعي</div> </div>
             """, unsafe_allow_html=True)
     else:
         # Fallback if image fails to load (to prevent black screen)
         st.markdown("""
             <div class="main-banner">
-                <h1>CHEMISCO PRO</h1>
-                <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
-            </div>
+                <h1>CHEMISCO</h1> <p>Advanced Torrefaction Simulator</p>
+                <div class="dedication">Project presented to د. عمرو الرفاعي</div> </div>
             """, unsafe_allow_html=True)
     
-    # BFD (FIXED SYNTAX ERROR HERE)
+    # BFD
     st.subheader("Process Flow Block Diagram (BFD)")
     bfd_html = f"""
     <div class="bfd-container">
@@ -529,6 +524,7 @@ def main():
 
     # --- Display Results ---
     st.header("📊 Simulation Results & Analysis")
+    # Removed 'Professional' from Cost Analysis Tab Title (though it was an addition)
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "💰 Cost Analysis", "PDF Report"])
     
     with tab1:
@@ -715,7 +711,7 @@ def main():
             st.download_button(
                 label="Download Report",
                 data=pdf_buffer,
-                file_name=f"Torrefaction_Report_Professional.pdf",
+                file_name=f"Torrefaction_Report_Chemisco.pdf", # Renamed file
                 mime="application/pdf"
             )
 
