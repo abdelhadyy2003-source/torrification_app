@@ -11,7 +11,7 @@ from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 import matplotlib.pyplot as plt
-import random  # الضرورية للعبة
+import random
 
 # --- 1. Chemical and Empirical Constants ---
 R_GAS = 8.314
@@ -37,14 +37,8 @@ GLOBAL_CSS = """
     .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 2.5em; }
     .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.1em; }
     .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { background-color: #F0F8FF; }
-    .st-emotion-cache-p5m8m8 { 
-        border-radius: 10px;
-        border-left: 5px solid #4CAF50; 
-        padding: 10px;
-        margin-bottom: 15px;
-        background-color: #FFFFFF;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
+    
+    /* Metrics Style */
     [data-testid="stMetricValue"] { font-size: 28px; color: #388E3C; }
     
     /* BFD Styles */
@@ -289,22 +283,32 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         st.header("⚙️ Input Parameters")
+        
+        # Group 1: Material
         with st.expander("🌲 Biomass Properties", expanded=True):
             initial_mass_kg = st.number_input("Initial Biomass Mass (kg)", min_value=1.0, value=100.0, step=10.0)
             biomass_type = st.selectbox("Biomass Type", list(EMPIRICAL_DATA.keys()))
             moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0)
             particle_size = st.selectbox("Particle Size", list(SIZE_FACTOR.keys()))
+            
+        # Group 2: Process
         with st.expander("🌡️ Process Conditions", expanded=True):
             temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5)
             duration = st.slider("Process Duration (min)", 10, 120, 45, step=5)
             ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
+            
+        # Group 3: Cost Management (NEW)
+        with st.expander("💰 Cost Management", expanded=False):
+            st.caption("Economic Feasibility Parameters")
+            cost_biomass_per_ton = st.number_input("Biomass Feedstock Cost ($/ton)", min_value=0.0, value=30.0, step=5.0)
+            cost_energy_per_hour = st.number_input("Operational/Energy Cost ($/hour)", min_value=0.0, value=5.0, step=0.5, help="Total cost of electricity + labor per hour of operation")
+            price_biochar_per_kg = st.number_input("Biochar Selling Price ($/kg)", min_value=0.0, value=1.20, step=0.1)
         
-        # --- Game Mode Toggle ---
+        # Game Mode Toggle
         st.markdown("---")
         st.subheader("🎮 Gamification")
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
-        # -------------------------
 
     # Main Banner
     st.markdown("""
@@ -358,7 +362,6 @@ def main():
     # --- GAME LOGIC SECTION ---
     if game_mode:
         st.markdown("---")
-        # NEW: Green Styled Alert
         st.markdown("""
         <div style="background-color: #E8F5E9; padding: 20px; border-radius: 10px; border-left: 6px solid #2E7D32; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <h3 style="color: #1B5E20; margin-top:0;">🏭 Plant Manager Challenge</h3>
@@ -366,7 +369,6 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Initialize Session State for the Target
         if 'target_yield' not in st.session_state:
             st.session_state.target_yield = random.randint(60, 85)
             st.session_state.target_ash = round(random.uniform(ash_percent_init + 1.0, ash_percent_init + 5.0), 1)
@@ -380,12 +382,9 @@ def main():
         with col_g2:
             curr_yield = results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]
             curr_ash = results["final_ash_percent"]
-            
             diff_yield = abs(curr_yield - st.session_state.target_yield)
             diff_ash = abs(curr_ash - st.session_state.target_ash)
-            
             score = max(0, 100 - (diff_yield * 2 + diff_ash * 5))
-            
             st.metric("🏆 Your Efficiency Score", f"{score:.1f} / 100")
             
             if score >= 90:
@@ -410,7 +409,7 @@ def main():
 
     # --- Display Results ---
     st.header("📊 Simulation Results & Analysis")
-    tab1, tab2, tab3, tab4 = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "PDF Report"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Yields & Ash", "Kinetics", "Gas Analysis", "💰 Cost Analysis", "PDF Report"])
     
     with tab1:
         st.subheader(f"Product Yields & Ash Enrichment")
@@ -430,110 +429,107 @@ def main():
         
         col_t1, col_t2 = st.columns(2)
         
-        # Plotly Charts
         with col_t1:
             st.markdown("##### Final Biochar Composition")
-            st.caption("Solid Product Breakdown")
-            
             df_solid = results["solid_composition"].reset_index()
             df_solid.columns = ["Component", "Mass (kg)"]
-            
             fig1 = px.pie(df_solid, values='Mass (kg)', names='Component', hole=0.5,
                           color='Component',
-                          color_discrete_map={
-                              "Fixed Carbon": "#6A1B9A", "Remaining Volatiles": "#AB47BC", "Ash": "#BDBDBD"
-                          })
-            fig1.update_layout(
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-                margin=dict(t=20, b=50, l=10, r=10),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            fig1.update_traces(textposition='inside', textinfo='percent+label')
+                          color_discrete_map={"Fixed Carbon": "#6A1B9A", "Remaining Volatiles": "#AB47BC", "Ash": "#BDBDBD"})
+            fig1.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
             st.plotly_chart(fig1, use_container_width=True)
 
         with col_t2:
             st.markdown("##### Global Mass Balance")
-            st.caption("Initial Input vs. Final Output")
-            
             filtered_yields = results["yields_percent"].iloc[[0, 1, 2]].reset_index()
             filtered_yields.columns = ["Component", "Yield (%)"]
-            
             fig2 = px.pie(filtered_yields, values='Yield (%)', names='Component', hole=0.5,
                           color='Component',
-                          color_discrete_map={
-                              "Biochar (Solid Product)": "#388E3C", "Non-Condensable Gases": "#7CB342", "Moisture Loss (Water Vapor)": "#C5E1A5"
-                          })
-            fig2.update_layout(
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-                margin=dict(t=20, b=50, l=10, r=10),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            fig2.update_traces(textposition='inside', textinfo='percent')
+                          color_discrete_map={"Biochar (Solid Product)": "#388E3C", "Non-Condensable Gases": "#7CB342", "Moisture Loss (Water Vapor)": "#C5E1A5"})
+            fig2.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
             st.plotly_chart(fig2, use_container_width=True)
 
     with tab2:
-        st.subheader("Ash Concentration & Mass Depletion Kinetics")
-        
+        st.subheader("Mass Depletion Kinetics")
         fig_dual = go.Figure()
-        
-        # Line 1: Total Mass
-        fig_dual.add_trace(go.Scatter(
-            x=results["mass_profile"].index,
-            y=results["mass_profile"]["Total Mass Yield (%)"],
-            name="Total Mass %",
-            line=dict(color="#4CAF50", width=3), 
-            yaxis="y1"
-        ))
-
-        # Line 2: Ash Concentration
-        fig_dual.add_trace(go.Scatter(
-            x=results["mass_profile"].index,
-            y=results["mass_profile"]["Ash Concentration in Solid (%)"],
-            name="Ash Concentration %",
-            line=dict(color="#D32F2F", width=3, dash='dot'),
-            yaxis="y2"
-        ))
-
+        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Total Mass Yield (%)"], name="Total Mass %", line=dict(color="#4CAF50", width=3), yaxis="y1"))
+        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Ash Concentration in Solid (%)"], name="Ash Concentration %", line=dict(color="#D32F2F", width=3, dash='dot'), yaxis="y2"))
         fig_dual.update_layout(
-            title="Dynamic Ash Enrichment Logic",
-            xaxis=dict(title="Time (min)", showgrid=False),
-            yaxis=dict(
-                title=dict(text="Total Mass Remaining (%)", font=dict(color="#4CAF50")),
-                tickfont=dict(color="#4CAF50"),
-                showgrid=True,
-                gridwidth=1,
-                gridcolor='rgba(255,255,255,0.1)'
-            ),
-            yaxis2=dict(
-                title=dict(text="Ash Concentration (%)", font=dict(color="#D32F2F")),
-                tickfont=dict(color="#D32F2F"),
-                overlaying="y",
-                side="right",
-                showgrid=False
-            ),
-            legend=dict(x=0.1, y=1.1, orientation="h"),
-            hovermode="x unified",
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            height=450
+            xaxis=dict(title="Time (min)"),
+            yaxis=dict(title="Total Mass Remaining (%)", title_font=dict(color="#4CAF50"), tickfont=dict(color="#4CAF50")),
+            yaxis2=dict(title="Ash Concentration (%)", title_font=dict(color="#D32F2F"), tickfont=dict(color="#D32F2F"), overlaying="y", side="right"),
+            legend=dict(x=0.1, y=1.1, orientation="h"), height=450
         )
         st.plotly_chart(fig_dual, use_container_width=True)
-        st.info("""
-        **Logic Explanation:** The green line drops as moisture and volatiles leave the biomass.
-        Since Ash is inert (does not react), its *concentration* (Red Dotted Line) must mathematically increase as the total mass decreases.
-        """)
 
     with tab3:
         st.subheader("Gas Composition")
         st.bar_chart(results["gas_composition_molar"])
 
+    # --- [NEW] COST ANALYSIS TAB ---
     with tab4:
+        st.subheader("💰 Economic Feasibility Analysis")
+        
+        # 1. Calculations
+        # Input Cost
+        cost_feedstock_total = (initial_mass_kg / 1000) * cost_biomass_per_ton
+        
+        # Process Cost
+        hours = duration / 60
+        cost_operations_total = hours * cost_energy_per_hour
+        
+        total_cost = cost_feedstock_total + cost_operations_total
+        
+        # Revenue
+        biochar_produced_kg = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
+        revenue_total = biochar_produced_kg * price_biochar_per_kg
+        
+        # Profit
+        net_profit = revenue_total - total_cost
+        roi = (net_profit / total_cost) * 100 if total_cost > 0 else 0
+        
+        # 2. Metrics Display
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        col_c1.metric("📉 Total Cost", f"${total_cost:.2f}")
+        col_c2.metric("📈 Total Revenue", f"${revenue_total:.2f}")
+        col_c3.metric("💵 Net Profit", f"${net_profit:.2f}", delta_color="normal" if net_profit > 0 else "inverse")
+        col_c4.metric("📊 ROI", f"{roi:.1f}%", delta_color="normal" if roi > 0 else "inverse")
+        
+        st.markdown("---")
+        
+        # 3. Waterfall Chart (Cash Flow)
+        fig_waterfall = go.Figure(go.Waterfall(
+            name = "20", orientation = "v",
+            measure = ["relative", "relative", "relative", "total"],
+            x = ["Gross Revenue", "Feedstock Cost", "Operational Cost", "Net Profit"],
+            textposition = "outside",
+            text = [f"+{revenue_total:.1f}", f"-{cost_feedstock_total:.1f}", f"-{cost_operations_total:.1f}", f"{net_profit:.1f}"],
+            y = [revenue_total, -cost_feedstock_total, -cost_operations_total, net_profit],
+            connector = {"line":{"color":"rgb(63, 63, 63)"}},
+            decreasing = {"marker":{"color":"#EF5350"}},
+            increasing = {"marker":{"color":"#66BB6A"}},
+            totals = {"marker":{"color":"#42A5F5"}}
+        ))
+
+        fig_waterfall.update_layout(
+            title = "Cash Flow Waterfall Chart (USD)",
+            showlegend = False,
+            height=400,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+
+        st.plotly_chart(fig_waterfall, use_container_width=True)
+        
+        st.info(f"""
+        **Analysis:**
+        Producing **{biochar_produced_kg:.1f} kg** of biochar from **{initial_mass_kg} kg** biomass.
+        Break-even selling price: **${(total_cost/biochar_produced_kg):.2f} / kg**.
+        """)
+    # --------------------------------
+
+    with tab5:
         st.subheader("Download Professional Report")
-        st.markdown("Generate a high-quality PDF report including all tables and charts properly formatted.")
         if st.button("⬇️ Download PDF Report"):
             pdf_buffer = generate_pdf_report(results)
             st.download_button(
