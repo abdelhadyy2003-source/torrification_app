@@ -1,190 +1,310 @@
-
-
-
 import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportImage, Table
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
+from reportlab.lib.units import inch
+from reportlab.lib import colors
 
-# Constants
-R = 8.314  # Universal gas constant (J/mol·K)
+# --- 1. الثوابت الكيميائية الحرارية ---
+R_GAS = 8.314  # ثابت الغازات العام (J/mol·K)
 
-def main():
-    st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide")
-    
-    st.title("Chemisco Pro Torrefaction Simulator")
-    st.markdown("Professional simulation of biomass torrefaction processes")
-    
-    with st.sidebar:
-        st.header("Input Parameters")
-        biomass_type = st.selectbox("Biomass Type", ["Wood", "Agricultural Waste", "Municipal Waste"])
-        moisture_content = st.slider("Moisture Content (%)", 0.0, 50.0, 10.0)
-        temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 250)
-        duration = st.slider("Process Duration (min)", 10, 120, 30)
-        particle_size = st.selectbox("Particle Size", ["Fine (<1mm)", "Medium (1-5mm)", "Coarse (>5mm)"])
-    
-    # Model calculations
-    results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size)
-    
-    # Display results
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Product Yields")
-        st.dataframe(results["yields"].style.format("{:.2f}"), use_container_width=True)
-        
-        st.subheader("Mass Balance")
-        fig1, ax1 = plt.subplots()
-        ax1.pie(results["yields"].values.flatten(), labels=results["yields"].index, autopct='%1.1f%%')
-        st.pyplot(fig1)
-    
-    with col2:
-        st.subheader("Temperature Profile")
-        st.line_chart(results["temp_profile"])
-        
-        st.subheader("Gas Composition")
-        st.bar_chart(results["gas_composition"])
-    
-    # Report generation
-    if st.button("Generate PDF Report"):
-        pdf_buffer = generate_pdf_report(results, biomass_type, moisture_content, temperature, duration, particle_size)
-        st.download_button(
-            label="Download Report",
-            data=pdf_buffer,
-            file_name="torrefaction_report.pdf",
-            mime="application/pdf"
-        )
+EMPIRICAL_DATA = {
+    "Wood": {
+        "A": 2.5e10, "Ea": 135000, "k_drying_base": 0.05, 
+        "Ash": 0.02, "Gas_Factor": 0.35
+    },
+    "Agricultural Waste": {
+        "A": 5.0e11, "Ea": 150000, "k_drying_base": 0.07, 
+        "Ash": 0.08, "Gas_Factor": 0.45
+    },
+    "Municipal Waste": {
+        "A": 1.0e12, "Ea": 165000, "k_drying_base": 0.10, 
+        "Ash": 0.15, "Gas_Factor": 0.55
+    }
+}
 
+SIZE_FACTOR = {
+    "Fine (<1mm)": 1.0,
+    "Medium (1-5mm)": 0.85,
+    "Coarse (>5mm)": 0.65
+}
+
+# --- 2. دالة المحاكاة (بدون تغيير في المنطق الأساسي) ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size):
-    """Core torrefaction simulation logic"""
+    """منطق محاكاة التفحيم الاحترافي."""
     temp_K = temp_C + 273.15
+    data = EMPIRICAL_DATA.get(biomass)
     
-    # Empirical coefficients based on biomass type
-    if biomass == "Wood":
-        k_drying = 0.05
-        k_devol = 0.03
-        ash_content = 0.02
-    elif biomass == "Agricultural Waste":
-        k_drying = 0.07
-        k_devol = 0.04
-        ash_content = 0.08
-    else:  # Municipal Waste
-        k_drying = 0.10
-        k_devol = 0.06
-        ash_content = 0.15
-    
-    # Time points for simulation
-    t = np.linspace(0, duration_min, 100)
-    
-    # Solve drying and devolatilization ODEs
+    k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS * temp_K))
+    size_correction = SIZE_FACTOR.get(size)
+    k_devol_eff = k_devol_arrhenius * size_correction
+    k_drying = data["k_drying_base"]
+    ash_content = data["Ash"]
+
     def model(y, t, k1, k2):
         moisture, volatiles = y
-        dydt = [-k1 * moisture, -k2 * volatiles]
-        return dydt
+        d_moisture = -k1 * moisture if moisture > 0.001 else 0
+        d_volatiles = -k2 * volatiles
+        return [d_moisture, d_volatiles]
     
-    y0 = [moisture/100, 1 - moisture/100 - ash_content]
-    sol = odeint(model, y0, t, args=(k_drying, k_devol))
+    t = np.linspace(0, duration_min, 100)
+    y0 = [moisture / 100, 1 - moisture / 100 - ash_content]
     
-    # Calculate yields
+    if y0[1] < 0:
+        y0[1] = 0
+        st.error("خطأ: مجموع الرطوبة والرماد يتجاوز 100%. يرجى التحقق من المدخلات.")
+        
+    sol = odeint(model, y0, t, args=(k_drying, k_devol_eff))
+    
     final_moisture = sol[-1, 0]
-    final_volatiles = sol[-1, 1]
-    biochar_yield = 1 - final_moisture - final_volatiles - ash_content
+    final_volatiles_remaining = sol[-1, 1]
     
-    # Estimate gas composition (empirical relationships)
-    gas_comp = {
-        "CO": 0.4 * final_volatiles,
-        "CO2": 0.3 * final_volatiles,
-        "CH4": 0.2 * final_volatiles,
-        "H2": 0.1 * final_volatiles
-    }
-    
-    # Prepare results
-    yields = pd.DataFrame({
-        "Yield (%)": [
-            (1 - final_moisture) * 100,  # Moisture loss
-            final_volatiles * 100,       # Volatiles
-            biochar_yield * 100,         # Biochar
-            ash_content * 100            # Ash
-        ]},
-        index=["Moisture Loss", "Volatiles", "Biochar", "Ash"]
-    )
-    
-    temp_profile = pd.DataFrame({
+    # حساب تحول الكتلة بمرور الزمن
+    mass_profile = pd.DataFrame({
         "Time (min)": t,
-        "Temperature (°C)": temp_C * np.ones_like(t)
+        "Moisture Fraction": sol[:, 0],
+        "Volatiles Fraction": sol[:, 1],
+        "Biochar Fraction": 1 - sol[:, 0] - sol[:, 1] - ash_content,
     }).set_index("Time (min)")
     
-    gas_composition = pd.DataFrame.from_dict(gas_comp, orient="index", columns=["Composition (%)"])
+    # حساب العوائد النهائية
+    final_biochar_yield = (1 - final_moisture - final_volatiles_remaining - ash_content)
+    final_volatiles_lost = y0[1] - final_volatiles_remaining
+    moisture_lost = (moisture/100 - final_moisture)
     
+    gas_fraction = final_volatiles_lost * data["Gas_Factor"]
+    
+    gas_comp = {
+        "CO2": 0.45 * gas_fraction,
+        "CO": 0.35 * gas_fraction,
+        "CH4": 0.15 * gas_fraction,
+        "H2": 0.05 * gas_fraction
+    }
+    
+    yields = pd.DataFrame({
+        "Yield (%)": [
+            (final_biochar_yield + ash_content) * 100,
+            final_volatiles_lost * 100,
+            moisture_lost * 100,
+            ash_content * 100
+        ]},
+        index=["Biochar (Solid) & Ash", "Non-Condensable Gases", "Moisture Loss (Water Vapor)", "Initial Ash Content"]
+    )
+    
+    gas_composition = pd.DataFrame.from_dict(
+        {k: v * 100 / final_volatiles_lost for k, v in gas_comp.items() if final_volatiles_lost > 0.001}, 
+        orient="index", columns=["Molar % in Dry Gas"]
+    ).fillna(0)
+
     return {
         "yields": yields,
-        "temp_profile": temp_profile,
+        "temp_profile": pd.DataFrame({"Temperature (°C)": temp_C * np.ones_like(t)}, index=t),
         "gas_composition": gas_composition,
+        "mass_profile": mass_profile, # إضافة التحول بمرور الزمن
+        "k_devol_eff": k_devol_eff,
         "parameters": {
-            "biomass": biomass,
-            "moisture": moisture,
-            "temperature": temp_C,
-            "duration": duration_min,
-            "size": size
+            "biomass": biomass, "moisture": moisture, "temperature": temp_C, 
+            "duration": duration_min, "size": size
         }
     }
 
-def generate_pdf_report(results, biomass, moisture, temp, duration, size):
-    """Generate PDF report of simulation results"""
+# --- 3. دالة واجهة المستخدم الرئيسية (main) ---
+def main():
+    st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide")
+    
+    # 3.1. الشعار والبانر
+    
+    # الشعار في الشريط الجانبي (Placeholder)
+    with st.sidebar:
+        # يمكنك استبدال هذه بـ st.image("path/to/logo.png")
+        st.markdown(
+            """
+            <div style='text-align: center; padding: 10px; background-color: #0E1117; border-radius: 5px;'>
+                <h1 style='color: #4CAF50;'>CHEMISCO PRO</h1>
+                <p style='color: #F0F2F6;'>Torrefaction Analytics</p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+        st.header("⚙️ معلمات التشغيل")
+        
+        # تجميع المدخلات في Sidebar
+        with st.expander("مدخلات الكتلة الحيوية", expanded=True):
+            biomass_type = st.selectbox("نوع الكتلة الحيوية", list(EMPIRICAL_DATA.keys()))
+            moisture_content = st.slider("محتوى الرطوبة الأولي (%)", 0.0, 50.0, 10.0, step=1.0)
+            particle_size = st.selectbox("حجم الجسيمات", list(SIZE_FACTOR.keys()))
+        
+        with st.expander("معلمات العملية", expanded=True):
+            temperature = st.slider("درجة حرارة التفحيم (°C)", 200, 350, 275, step=5)
+            duration = st.slider("مدة العملية (دقيقة)", 10, 120, 45, step=5)
+            
+            ash_percent = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
+            st.info(f"الرماد المفترض: **{ash_percent:.1f}%**")
+            
+    # البانر (العنوان الرئيسي)
+    st.markdown(
+        """
+        <div style='background-color: #4CAF50; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;'>
+            <h1 style='color: white; margin: 0;'>🔥 محاكي التفحيم المتقدم</h1>
+            <p style='color: white; margin: 0;'>نموذج حركي مُعزز لأفضل نتائج تحليلية</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    # --- تشغيل المحاكاة ---
+    results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size)
+    
+    # --- عرض النتائج الاحترافية في Tabs ---
+    st.header("📊 مخرجات المحاكاة والتحليل")
+    tab1, tab2, tab3, tab4 = st.tabs(["نتائج العائد (Yields)", "تحول الكتلة (Mass Conversion)", "تركيبة الغاز", "تقرير PDF"])
+    
+    with tab1:
+        st.subheader("إجمالي نواتج العملية")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        
+        # عرض المقاييس (Metrics)
+        biochar_yield_metric = results["yields"].loc["Biochar (Solid) & Ash", "Yield (%)"]
+        col_m1.metric("⚖️ كسر المنتج الصلب (Biochar + Ash)", f"{biochar_yield_metric:.2f} %", delta=f"{results['k_devol_eff']:.3f} min⁻¹ (Rate)")
+        
+        gas_yield_metric = results["yields"].loc["Non-Condensable Gases", "Yield (%)"]
+        col_m2.metric("💨 كسر الغازات", f"{gas_yield_metric:.2f} %")
+        
+        moisture_loss_metric = results["yields"].loc["Moisture Loss (Water Vapor)", "Yield (%)"]
+        col_m3.metric("💧 بخار الماء المفقود", f"{moisture_loss_metric:.2f} %")
+
+        st.markdown("---")
+        
+        # جدول ورسم بياني للعائد
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            st.subheader("جدول توزيع الكتلة")
+            st.dataframe(results["yields"].style.format("{:.2f}"), use_container_width=True)
+        
+        with col_t2:
+            st.subheader("مخطط الميزان الكتلي")
+            fig1, ax1 = plt.subplots(figsize=(6, 6))
+            filtered_yields = results["yields"].iloc[[0, 1, 2]] # لا نعرض الرماد بشكل منفصل في المخطط الدائري
+            ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
+            ax1.axis('equal')
+            st.pyplot(fig1)
+            
+
+[Image of mass balance pie chart for torrefaction products]
+
+
+    with tab2:
+        st.subheader("تتبع تحول مكونات الكتلة الحيوية عبر الزمن")
+        st.line_chart(results["mass_profile"])
+        st.caption("المنحنى يوضح كيف تتناقص كسور الرطوبة والمواد المتطايرة لتشكيل كسر الفحم الحيوي.")
+        
+
+    with tab3:
+        st.subheader("تركيبة الغازات غير القابلة للتكثف (على أساس جاف)")
+        st.bar_chart(results["gas_composition"])
+        st.caption("النسب المئوية المولارية للغازات الناتجة عن التحلل الحراري للمواد المتطايرة.")
+
+    with tab4:
+        st.subheader("إنشاء تقرير PDF شامل")
+        st.markdown("يحتوي التقرير على جميع المدخلات والجداول والرسوم البيانية للمحاكاة.")
+        
+        if st.button("⬇️ تنزيل تقرير PDF"):
+            pdf_buffer = generate_pdf_report(results)
+            st.download_button(
+                label="تنزيل التقرير",
+                data=pdf_buffer,
+                file_name=f"Torrefaction_Report_{biomass_type}_{temperature}C.pdf",
+                mime="application/pdf"
+            )
+
+# --- 4. دالة إنشاء تقرير PDF مُحسَّنة ---
+def generate_pdf_report(results):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter,
+        title="Torrefaction Report",
+        leftMargin=inch, rightMargin=inch, topMargin=inch, bottomMargin=inch
+    )
     styles = getSampleStyleSheet()
     elements = []
     
-    # Header
-    elements.append(Paragraph("Chemisco Pro Torrefaction Report", styles["Title"]))
-    elements.append(Spacer(1, 12))
+    # Header & Banner (Placeholder for Logo)
+    elements.append(Paragraph("<font size=16 color='#4CAF50'>CHEMISCO PRO TORREFACTION REPORT</font>", styles["Title"]))
+    elements.append(Paragraph(f"تاريخ التقرير: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", styles["Italic"]))
+    elements.append(Spacer(1, 0.25*inch))
     
-    # Parameters
-    elements.append(Paragraph("Simulation Parameters:", styles["Heading2"]))
-    param_text = f"""
-    Biomass Type: {biomass}<br/>
-    Moisture Content: {moisture}%<br/>
-    Temperature: {temp}°C<br/>
-    Duration: {duration} minutes<br/>
-    Particle Size: {size}
-    """
-    elements.append(Paragraph(param_text, styles["Normal"]))
-    elements.append(Spacer(1, 12))
+    # 1. Parameters Table
+    elements.append(Paragraph("1. Simulation Parameters & Kinetics", styles["h2"]))
+    p = results["parameters"]
+    param_data = [
+        ["Parameter", "Value"],
+        ["Biomass Type", p["biomass"]],
+        ["Moisture Content", f"{p['moisture']}%"],
+        ["Temperature", f"{p['temperature']} °C"],
+        ["Duration", f"{p['duration']} min"],
+        ["Particle Size", p["size"]],
+        ["Effective Devol. Rate ($k_{devol,eff}$)", f"{results['k_devol_eff']:.3f} min⁻¹"],
+    ]
+    param_table = Table(param_data, colWidths=[2.5*inch, 3*inch], 
+                        style=[('GRID', (0,0), (-1,-1), 1, colors.black)])
+    elements.append(param_table)
+    elements.append(Spacer(1, 0.25*inch))
     
-    # Yields table
-    elements.append(Paragraph("Product Yields:", styles["Heading2"]))
-    yield_data = [["Component", "Yield (%)"]] + [[idx, f"{val[0]:.2f}"] 
-                 for idx, val in results["yields"].iterrows()]
-    yield_table = Table(yield_data)
+    # 2. Yields Table
+    elements.append(Paragraph("2. Product Yields (Mass Balance)", styles["h2"]))
+    yield_data = [["Component", "Yield (%)"]] + \
+                 [[idx, f"{val[0]:.2f}"] for idx, val in results["yields"].iterrows()]
+    yield_table = Table(yield_data, colWidths=[3.5*inch, 2*inch],
+                        style=[('GRID', (0,0), (-1,-1), 1, colors.black)])
     elements.append(yield_table)
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 0.5*inch))
     
-    # Charts
-    elements.append(Paragraph("Results Visualization:", styles["Heading2"]))
+    # 3. Charts
+    elements.append(Paragraph("3. Results Visualization", styles["h2"]))
+    
+    # Mass Conversion Plot (New)
+    fig3, ax3 = plt.subplots(figsize=(6, 4))
+    results["mass_profile"].plot(ax=ax3)
+    plt.title("Mass Component Conversion Over Time")
+    plt.xlabel("Time (min)")
+    plt.ylabel("Mass Fraction")
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    imgdata3 = BytesIO()
+    fig3.savefig(imgdata3, format='png', dpi=300, bbox_inches='tight')
+    imgdata3.seek(0)
+    elements.append(ReportImage(imgdata3, width=5.5*inch, height=3.7*inch))
+    elements.append(Spacer(1, 0.25*inch))
     
     # Mass balance pie chart
-    fig1, ax1 = plt.subplots()
-    ax1.pie(results["yields"].values.flatten(), labels=results["yields"].index, autopct='%1.1f%%')
-    plt.title("Mass Balance")
-    imgdata = BytesIO()
-    plt.savefig(imgdata, format='png')
-    imgdata.seek(0)
-    elements.append(Image(imgdata, width=400, height=300))
+    fig1, ax1 = plt.subplots(figsize=(5, 5))
+    filtered_yields = results["yields"].iloc[[0, 1, 2]]
+    ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90)
+    ax1.axis('equal')
+    plt.title("Mass Balance Distribution")
+    imgdata1 = BytesIO()
+    fig1.savefig(imgdata1, format='png', dpi=300)
+    imgdata1.seek(0)
+    elements.append(ReportImage(imgdata1, width=3*inch, height=3*inch))
+    elements.append(Spacer(1, 0.25*inch))
     
     # Gas composition bar chart
-    fig2, ax2 = plt.subplots()
-    results["gas_composition"].plot(kind='bar', ax=ax2)
-    plt.title("Gas Composition")
-    plt.ylabel("Percentage")
+    fig2, ax2 = plt.subplots(figsize=(5, 4))
+    results["gas_composition"].plot(kind='bar', ax=ax2, legend=False)
+    plt.title("Dry Gas Composition (Molar %)")
+    plt.ylabel("Molar %")
+    plt.xticks(rotation=0)
     imgdata2 = BytesIO()
-    plt.savefig(imgdata2, format='png')
+    fig2.savefig(imgdata2, format='png', dpi=300)
     imgdata2.seek(0)
-    elements.append(Image(imgdata2, width=400, height=300))
+    elements.append(ReportImage(imgdata2, width=4*inch, height=3.2*inch))
+    
+    plt.close('all')
     
     doc.build(elements)
     buffer.seek(0)
@@ -192,5 +312,3 @@ def generate_pdf_report(results, biomass, moisture, temp, duration, size):
 
 if __name__ == "__main__":
     main()
-
-
