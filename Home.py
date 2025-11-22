@@ -13,6 +13,22 @@ from reportlab.lib import colors
 import matplotlib.pyplot as plt
 import random
 
+# --- Base64 Utility for Robust Image Embedding ---
+import base64
+from io import BytesIO
+
+def _get_image_base64(image_path):
+    """Encodes an image to Base64 string for safe embedding in HTML/Markdown."""
+    try:
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    except FileNotFoundError:
+        # Fallback in case the file is not found (e.g. during cloud deployment)
+        return None
+    except Exception as e:
+        # General error fallback
+        return None
+
 # --- 1. Chemical and Empirical Constants ---
 R_GAS = 8.314
 EMPIRICAL_DATA = {
@@ -22,7 +38,7 @@ EMPIRICAL_DATA = {
 }
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 
-# --- 2. Global CSS for Aesthetic and BFD (No need for Base64 classes) ---
+# --- 2. Global CSS for Aesthetic and BFD ---
 GLOBAL_CSS = """
 <style>
     .stApp { padding-top: 20px; }
@@ -56,6 +72,13 @@ GLOBAL_CSS = """
     .bfd-stream::before { content: ''; position: absolute; right: -10px; top: -5px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 10px solid #4CAF50; }
     .side-stream { position: absolute; left: 50%; transform: translateX(-50%); width: 3px; height: 40px; background-color: #FF9800; bottom: -40px; }
     .side-stream-label { position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; color: #FF9800; }
+    
+    /* Custom classes for logo sizing in main banner */
+    .main-banner-logo-container {
+        display: block;
+        margin: 0 auto 10px auto;
+        width: 150px; /* Specific width for the main banner */
+    }
 </style>
 """
 
@@ -173,13 +196,14 @@ def generate_pdf_report(results):
     
     # -- 1. Header with Logo (for PDF) --
     try:
-        # Load the logo for PDF
+        # reportlab uses file path, so we use a try block
         img_path = "chemisco_logo.png" 
         logo_pdf = ReportImage(img_path, width=1.5*inch, height=1.5*inch)
         logo_pdf.hAlign = 'CENTER'
         elements.append(logo_pdf)
     except FileNotFoundError:
-        elements.append(Paragraph("CHEMISCO", title_style)) # Fallback text
+        # Fallback text for PDF if logo fails
+        elements.append(Paragraph("CHEMISCO", title_style)) 
         
     elements.append(Paragraph("CHEMISCO REPORT", title_style))
     elements.append(Paragraph("Project presented to: Dr. Amr El-Rifai", styles["Heading3"]))
@@ -302,20 +326,26 @@ def generate_pdf_report(results):
     buffer.seek(0)
     return buffer
 
-# --- 5. Main Streamlit App (Simplified Logo Display) ---
+# --- 5. Main Streamlit App ---
 def main():
     st.set_page_config(page_title="Chemisco", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
     LOGO_PATH = "chemisco_logo.png"
+    logo_base64 = _get_image_base64(LOGO_PATH) # Get Base64 for HTML embedding
 
     # --- Sidebar ---
     with st.sidebar:
-        # 1. SIMPLE AND ROBUST LOGO DISPLAY (Sidebar)
-        try:
-            st.image(LOGO_PATH, use_column_width=True) 
-        except FileNotFoundError:
-            st.info("Logo not found. Please ensure 'chemisco_logo.png' is in the same folder.")
+        # Use st.image for sidebar, but with a try/except block to prevent crash
+        if logo_base64:
+            # If Base64 conversion worked (i.e. file was found locally), display it.
+            # We use st.markdown with Base64 for sidebar too for max stability.
+            st.markdown(f'<img src="data:image/png;base64,{logo_base64}" class="sidebar-logo" style="width: 80%; display: block; margin: 0 auto 15px auto; padding: 5px; background-color: white; border-radius: 8px;">', unsafe_allow_html=True)
+        else:
+            # Fallback text in case of error (This prevents the crash)
+            st.markdown("## Chemisco Logo")
+            st.warning("⚠️ Logo file not found. Check deployment path.")
+
 
         st.markdown("""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
@@ -358,28 +388,30 @@ def main():
         st.subheader("🎮 Gamification")
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
 
-    # --- Main Banner (Using st.columns and st.image for robust display) ---
-    col_logo, col_text = st.columns([1, 4])
-    
-    with col_logo:
-        # 2. SIMPLE AND ROBUST LOGO DISPLAY (Main Banner)
-        try:
-            st.image(LOGO_PATH, width=150)
-        except FileNotFoundError:
-            st.write(" ") # Space placeholder if logo fails
-
-    with col_text:
+    # --- Main Banner (with Base64 Image Embedding) ---
+    if logo_base64:
         st.markdown(f"""
-            <div style="background-color: #388E3C; padding: 15px 15px 15px 0; border-radius: 12px; margin-left: -50px; text-align: left;">
-                <h1 style="color: #FFFFFF; margin: 0; font-size: 2.5em; font-weight: 800; letter-spacing: 2px;">CHEMISCO</h1>
-                <p style="color: #C8E6C9; margin-top: 5px; font-size: 1em;">Advanced Torrefaction Process Simulator</p>
-                <div style="color: #FFEB3B; font-weight: bold; font-size: 0.9em; margin-top: 10px;">Project presented to Dr. Amr El-Rifai</div>
+            <div class="main-banner">
+                <div class="main-banner-logo-container">
+                    <img src="data:image/png;base64,{logo_base64}" style="width: 100%; height: auto; border-radius: 8px;">
+                </div>
+                <h1>CHEMISCO</h1>
+                <p>Advanced Torrefaction Process Simulator</p>
+                <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        # Fallback if image fails to load (to prevent black screen)
+        st.markdown("""
+            <div class="main-banner">
+                <h1>CHEMISCO</h1>
+                <p>Advanced Torrefaction Process Simulator</p>
+                <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
             </div>
             """, unsafe_allow_html=True)
     
     # BFD
     st.subheader("Process Flow Block Diagram (BFD)")
-    # ... (BFD HTML remains the same)
     bfd_html = f"""
     <div class="bfd-container">
         <div class="bfd-block">
