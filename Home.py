@@ -384,9 +384,21 @@ def mock_ai_response(prompt, results):
         3. **Current Results:** Your current yield is {results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]:.1f}% with {results['final_ash_percent']:.1f}% ash. For optimization, the solid mass yield is the most crucial metric to maximize."""
     
     if "ash" in prompt.lower() or "ash concentration" in prompt.lower() or "inerts" in prompt.lower():
+        
+        # --- FIX: Calculate the complex value OUTSIDE the f-string ---
+        initial_ash_percentage = EMPIRICAL_DATA[p['biomass']]["Ash"] * 100
+        
+        if initial_ash_percentage > 0:
+            enrichment_factor = results['final_ash_percent'] / initial_ash_percentage
+        else:
+            # Handle case where initial ash is zero or near zero to avoid ZeroDivisionError
+            enrichment_factor = 1.0 if results['final_ash_percent'] < 0.01 else 999.0 # If final ash is high, factor is huge
+
+        # --- END OF FIX ---
+        
         return f"""Ash concentration increases because the inert ash remains while other components (moisture and volatiles) are removed. 
         Current Ash Concentration: **{results['final_ash_percent']:.2f}%**. 
-        This is an **enrichment factor** of {(results['final_ash_percent'] / (p['initial_mass'] * EMPIRICAL_DATA[p['biomass']]["Ash"] * 100 / (results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"])):.2f} compared to the initial biomass. Lowering the initial ash content in the feedstock is the only way to reduce this value, as ash is not consumed during torrefaction."""
+        This is an **enrichment factor** of {enrichment_factor:.2f} compared to the initial biomass. Lowering the initial ash content in the feedstock is the only way to reduce this value, as ash is not consumed during torrefaction."""
 
     if "reactor" in prompt.lower() or "type" in prompt.lower():
         return f"""You are currently simulating a **{p['reactor']}**. The choice of reactor affects heat transfer and mixing. **Fluidized Bed Reactors** provide excellent heat transfer but have high operating costs, while **Rotary Drum Reactors** are often preferred for continuous, large-scale production."""
