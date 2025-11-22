@@ -13,6 +13,7 @@ from reportlab.lib import colors
 import matplotlib.pyplot as plt # Essential for PDF generation
 import base64
 import os # Import os for path checking
+import random # Import random for the game logic
 
 # --- 1. Chemical and Empirical Constants (UNCHANGED) ---
 R_GAS = 8.314
@@ -97,7 +98,7 @@ GLOBAL_CSS = """
 """
 
 # --- 3. Simulation Core Logic (UNCHANGED) ---
-def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"): # Added reactor_type to parameters dict for PDF
+def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"): 
     temp_K = temp_C + 273.15
     data = EMPIRICAL_DATA.get(biomass)
     R_GAS_LOCAL = R_GAS 
@@ -402,6 +403,13 @@ def main():
             ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
             
+        # Group 3: Cost Management (Optional in sidebar)
+        with st.expander("💰 Cost Management", expanded=False):
+            st.caption("Economic Feasibility Parameters (Used in Cost Analysis Tab)")
+            cost_biomass_per_ton = st.number_input("Biomass Feedstock Cost ($/ton)", min_value=0.0, value=30.0, step=5.0)
+            cost_energy_per_hour = st.number_input("Operational/Energy Cost ($/hour)", min_value=0.0, value=5.0, step=0.5, help="Total cost of electricity + labor per hour of operation")
+            price_biochar_per_kg = st.number_input("Biochar Selling Price ($/kg)", min_value=0.0, value=1.20, step=0.1)
+            
         # Game Mode Toggle
         st.markdown("---")
         st.subheader("🎮 Gamification")
@@ -430,8 +438,9 @@ def main():
             </div>
             """, unsafe_allow_html=True)
     
-    # BFD
-    st.subheader("Process Flow Block Diagram (BFD)")     bfd_html = f"""
+    # BFD (FIXED SYNTAX ERROR HERE)
+    st.subheader("Process Flow Block Diagram (BFD)")
+    bfd_html = f"""
     <div class="bfd-container">
         <div class="bfd-block">
             FEED PREPARATION
@@ -502,7 +511,6 @@ def main():
             if score >= 90:
                 st.success("🌟 PERFECT MATCH! Order fulfilled successfully.")
                 if not st.session_state.has_won:
-                    # Removed st.balloons() as it needs import random (which is not available in the provided code)
                     st.session_state.has_won = True
             elif score >= 70:
                 st.warning("⚠️ Acceptable, but try to optimize further.")
@@ -515,14 +523,13 @@ def main():
                 del st.session_state['target_yield']
                 del st.session_state['target_ash']
                 st.session_state.has_won = False
-                # Need to rerun the app to reset the game state (requires 'import random' and re-running the app)
                 st.experimental_rerun()
         st.markdown("---")
     # --------------------------
 
     # --- Display Results ---
     st.header("📊 Simulation Results & Analysis")
-    tab1, tab2, tab3, tab4 = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "PDF Report"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "💰 Cost Analysis", "PDF Report"])
     
     with tab1:
         st.subheader(f"Product Yields & Ash Enrichment")
@@ -659,6 +666,47 @@ def main():
         st.bar_chart(results["gas_composition_molar"])
 
     with tab4:
+        st.subheader("💰 Economic Feasibility Analysis")
+        cost_feedstock_total = (initial_mass_kg / 1000) * cost_biomass_per_ton
+        hours = duration / 60
+        cost_operations_total = hours * cost_energy_per_hour
+        total_cost = cost_feedstock_total + cost_operations_total
+        biochar_produced_kg = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
+        revenue_total = biochar_produced_kg * price_biochar_per_kg
+        net_profit = revenue_total - total_cost
+        roi = (net_profit / total_cost) * 100 if total_cost > 0 else 0
+        
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        col_c1.metric("📉 Total Cost", f"${total_cost:.2f}")
+        col_c2.metric("📈 Total Revenue", f"${revenue_total:.2f}")
+        col_c3.metric("💵 Net Profit", f"${net_profit:.2f}", delta=f"${abs(net_profit):.2f}", delta_color="normal" if net_profit > 0 else "inverse")
+        col_c4.metric("📊 ROI", f"{roi:.1f}%", delta=f"{abs(roi):.1f}%", delta_color="normal" if roi > 0 else "inverse")
+        
+        st.markdown("---")
+        
+        # Waterfall Chart 
+        fig_waterfall = go.Figure(go.Waterfall(
+            name = "Cash Flow", orientation = "v",
+            measure = ["relative", "relative", "relative", "total"],
+            x = ["Gross Revenue", "Feedstock Cost", "Operational Cost", "Net Profit"],
+            textposition = "outside",
+            text = [f"${revenue_total:.1f}", f"${-cost_feedstock_total:.1f}", f"${-cost_operations_total:.1f}", f"${net_profit:.1f}"],
+            y = [revenue_total, -cost_feedstock_total, -cost_operations_total, net_profit],
+            connector = {"line":{"color":"rgb(63, 63, 63)"}},
+            decreasing = {"marker":{"color":"#EF5350"}},
+            increasing = {"marker":{"color":"#66BB6A"}},
+            totals = {"marker":{"color":"#42A5F5"}}
+        ))
+        fig_waterfall.update_layout(title = "Cash Flow Waterfall Chart (USD)", showlegend = False, height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_waterfall, use_container_width=True)
+        
+        st.info(f"""
+        **Analysis:**
+        Producing **{biochar_produced_kg:.1f} kg** of biochar from **{initial_mass_kg} kg** biomass.
+        Break-even selling price: **${(total_cost/biochar_produced_kg):.2f} / kg**.
+        """)
+
+    with tab5:
         st.subheader("Download Professional Report")
         st.markdown("Generate a high-quality PDF report including all tables and charts properly formatted.")
         
@@ -672,5 +720,4 @@ def main():
             )
 
 if __name__ == "__main__":
-    import random # Added this import for the game logic
     main()
