@@ -34,9 +34,9 @@ GLOBAL_CSS = """
         margin-bottom: 30px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
     }
-    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 2.5em; }
-    .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.1em; }
-    .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { background-color: #F0F8FF; }
+    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 3em; font-weight: 800; letter-spacing: 2px;}
+    .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.2em; }
+    .dedication { color: #FFEB3B; font-weight: bold; font-size: 1.1em; margin-top: 10px; }
     
     /* Metrics Style */
     [data-testid="stMetricValue"] { font-size: 28px; color: #388E3C; }
@@ -53,7 +53,7 @@ GLOBAL_CSS = """
 """
 
 # --- 3. Simulation Core Logic ---
-def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg):
+def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type):
     temp_K = temp_C + 273.15
     data = EMPIRICAL_DATA.get(biomass)
     k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS * temp_K))
@@ -130,7 +130,8 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         "k_devol_eff": k_devol_eff,
         "parameters": {
             "biomass": biomass, "moisture": moisture, "temperature": temp_C, 
-            "duration": duration_min, "size": size, "initial_mass": initial_mass_kg
+            "duration": duration_min, "size": size, "initial_mass": initial_mass_kg,
+            "reactor": reactor_type # NEW PARAMETER
         }
     }
 
@@ -149,22 +150,23 @@ def generate_pdf_report(results):
     normal_style = styles["Normal"]
     
     # -- 1. Header --
-    elements.append(Paragraph("CHEMISCO PRO TORREFACTION REPORT", title_style))
+    elements.append(Paragraph("CHEMISCO REPORT", title_style))
+    elements.append(Paragraph("Project presented to: Dr. Amr El-Rifai", styles["Heading3"]))
     elements.append(Paragraph(f"Report Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", normal_style))
     elements.append(Spacer(1, 0.2*inch))
     
     # -- 2. Parameters Table --
-    elements.append(Paragraph("1. Simulation Parameters & Kinetics", heading_style))
+    elements.append(Paragraph("1. Simulation Parameters & Config", heading_style))
     p = results["parameters"]
     param_data = [
         ["Parameter", "Value"],
         ["Biomass Type", p['biomass']],
+        ["Reactor Type", p['reactor']], # NEW IN REPORT
         ["Initial Mass", f"{p['initial_mass']} kg"],
         ["Moisture Content", f"{p['moisture']}%"],
         ["Temperature", f"{p['temperature']} °C"],
         ["Duration", f"{p['duration']} min"],
-        ["Particle Size", p["size"]],
-        ["Eff. Devol Rate", f"{results['k_devol_eff']:.4f} min-1"]
+        ["Particle Size", p["size"]]
     ]
     
     t_param = Table(param_data, colWidths=[3*inch, 3*inch])
@@ -271,17 +273,21 @@ def generate_pdf_report(results):
 
 # --- 5. Main Streamlit App ---
 def main():
-    st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Chemisco", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
     # Sidebar
     with st.sidebar:
         st.markdown("""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20;'>
-                <h1 style='color: white; margin: 0; font-size: 1.8em;'>CHEMISCO PRO</h1>
+                <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO</h1>
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
+                <hr style='margin: 10px 0; border-color: #4CAF50;'>
+                <p style='color: #C8E6C9; font-size: 0.85em;'>Project presented to:</p>
+                <h3 style='color: #FFF176; margin: 0;'>Dr. Amr El-Rifai</h3>
             </div>
             """, unsafe_allow_html=True)
+        
         st.header("⚙️ Input Parameters")
         
         # Group 1: Material
@@ -291,14 +297,18 @@ def main():
             moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0)
             particle_size = st.selectbox("Particle Size", list(SIZE_FACTOR.keys()))
             
-        # Group 2: Process
+        # Group 2: Process (UPDATED WITH REACTOR TYPE)
         with st.expander("🌡️ Process Conditions", expanded=True):
+            # NEW INPUT: Reactor Type
+            reactor_type = st.selectbox("Reactor Type", 
+                ["Rotary Drum Reactor", "Fluidized Bed Reactor", "Auger/Screw Reactor", "Fixed Bed Reactor"])
+            
             temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5)
             duration = st.slider("Process Duration (min)", 10, 120, 45, step=5)
             ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
             
-        # Group 3: Cost Management (NEW)
+        # Group 3: Cost Management
         with st.expander("💰 Cost Management", expanded=False):
             st.caption("Economic Feasibility Parameters")
             cost_biomass_per_ton = st.number_input("Biomass Feedstock Cost ($/ton)", min_value=0.0, value=30.0, step=5.0)
@@ -310,11 +320,12 @@ def main():
         st.subheader("🎮 Gamification")
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
 
-    # Main Banner
+    # Main Banner (UPDATED)
     st.markdown("""
         <div class="main-banner">
-            <h1>🔥 Advanced Torrefaction Simulator</h1>
-            <p>Enhanced Kinetic Model for Process Optimization</p>
+            <h1>CHEMISCO</h1>
+            <p>Advanced Torrefaction Process Simulator</p>
+            <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -324,28 +335,27 @@ def main():
     <div class="bfd-container">
         <div class="bfd-block">
             FEED PREPARATION
-            <p style="color: #1565C0;">Initial Mass: {initial_mass_kg:.0f} kg</p>
-            <p style="color: #0277BD;">Moisture: {moisture_content:.1f}%</p>
+            <p style="color: #1565C0;">Mass: {initial_mass_kg:.0f} kg</p>
+            <p style="color: #0277BD;">Moist: {moisture_content:.1f}%</p>
         </div>
         <div class="bfd-stream"></div>
         <div class="bfd-block">
-            DRYING & PREHEATING
-            <p>100 °C - 200 °C</p>
+            DRYING
+            <p>100-200 °C</p>
             <div class="side-stream"></div>
             <div class="side-stream-label">Water Vapor</div>
         </div>
         <div class="bfd-stream"></div>
         <div class="bfd-block" style="border-color: #D32F2F; background-color: #FFCDD2; color: #B71C1C;">
-            TORREFACTION REACTOR
-            <p style="color: #B71C1C;">Temp: {temperature} °C</p>
-            <p style="color: #B71C1C;">Duration: {duration} min</p>
+            {reactor_type.upper()}
+            <p style="color: #B71C1C;">{temperature} °C | {duration} min</p>
             <div class="side-stream" style="background-color: #FFC107;"></div>
             <div class="side-stream-label" style="color: #FFC107;">Volatile Gases</div>
         </div>
         <div class="bfd-stream"></div>
         <div class="bfd-block" style="border-color: #388E3C; background-color: #C8E6C9; color: #1B5E20;">
-            COOLING & PRODUCT
-            <p>Torrefied Biochar</p>
+            PRODUCT COOLING
+            <p>Biochar</p>
         </div>
     </div>
     <div style="height: 40px;"></div>
@@ -356,8 +366,8 @@ def main():
         st.error("**Input Error:** Initial Moisture and Ash content exceed 100%.")
         return 
         
-    # Run Simulation
-    results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg)
+    # Run Simulation (Passing Reactor Type)
+    results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
     
     # --- GAME LOGIC SECTION ---
     if game_mode:
@@ -466,29 +476,17 @@ def main():
         st.subheader("Gas Composition")
         st.bar_chart(results["gas_composition_molar"])
 
-    # --- [NEW] COST ANALYSIS TAB ---
     with tab4:
         st.subheader("💰 Economic Feasibility Analysis")
-        
-        # 1. Calculations
-        # Input Cost
         cost_feedstock_total = (initial_mass_kg / 1000) * cost_biomass_per_ton
-        
-        # Process Cost
         hours = duration / 60
         cost_operations_total = hours * cost_energy_per_hour
-        
         total_cost = cost_feedstock_total + cost_operations_total
-        
-        # Revenue
         biochar_produced_kg = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
         revenue_total = biochar_produced_kg * price_biochar_per_kg
-        
-        # Profit
         net_profit = revenue_total - total_cost
         roi = (net_profit / total_cost) * 100 if total_cost > 0 else 0
         
-        # 2. Metrics Display
         col_c1, col_c2, col_c3, col_c4 = st.columns(4)
         col_c1.metric("📉 Total Cost", f"${total_cost:.2f}")
         col_c2.metric("📈 Total Revenue", f"${revenue_total:.2f}")
@@ -497,7 +495,6 @@ def main():
         
         st.markdown("---")
         
-        # 3. Waterfall Chart (Cash Flow)
         fig_waterfall = go.Figure(go.Waterfall(
             name = "20", orientation = "v",
             measure = ["relative", "relative", "relative", "total"],
@@ -510,34 +507,4 @@ def main():
             increasing = {"marker":{"color":"#66BB6A"}},
             totals = {"marker":{"color":"#42A5F5"}}
         ))
-
-        fig_waterfall.update_layout(
-            title = "Cash Flow Waterfall Chart (USD)",
-            showlegend = False,
-            height=400,
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-
-        st.plotly_chart(fig_waterfall, use_container_width=True)
-        
-        st.info(f"""
-        **Analysis:**
-        Producing **{biochar_produced_kg:.1f} kg** of biochar from **{initial_mass_kg} kg** biomass.
-        Break-even selling price: **${(total_cost/biochar_produced_kg):.2f} / kg**.
-        """)
-    # --------------------------------
-
-    with tab5:
-        st.subheader("Download Professional Report")
-        if st.button("⬇️ Download PDF Report"):
-            pdf_buffer = generate_pdf_report(results)
-            st.download_button(
-                label="Download Report",
-                data=pdf_buffer,
-                file_name=f"Torrefaction_Report_Professional.pdf",
-                mime="application/pdf"
-            )
-
-if __name__ == "__main__":
-    main()
+        fig
