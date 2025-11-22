@@ -88,6 +88,8 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
 
     # Gas Composition
     gas_fraction = final_volatiles_lost_fraction * data["Gas_Factor"]
+    
+    # We use this dictionary to estimate molar percentages later
     gas_comp_mass = {
         "CO2": 0.45 * gas_fraction * initial_mass_kg,
         "CO": 0.35 * gas_fraction * initial_mass_kg,
@@ -123,12 +125,12 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
 
 # --- 3. Streamlit Main App (main) ---
 def main():
-    # Streamlit Config: (Streamlit automatically supports dark/light mode based on user's system settings)
+    # Streamlit Config: (Supports dark/light mode based on user's system/browser settings)
     st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
     
     # 3.1. Sidebar (Logo and Inputs)
     with st.sidebar:
-        # Logo Placeholder (Can be replaced by st.image("path/to/logo.png"))
+        # Logo Placeholder (Stylized Banner)
         st.markdown(
             """
             <div style='text-align: center; padding: 10px; border-radius: 5px; background-color: #4CAF50;'>
@@ -213,7 +215,7 @@ def main():
             font-size: 12px;
             white-space: nowrap;
         }
-        /* Stage specific colors */
+        /* Stage specific colors - Use light colors for better Dark Mode compatibility */
         .stage-input { background-color: #BBDEFB; color: #1565C0; }
         .stage-drying { background-color: #FFF9C4; color: #FFD600; }
         .stage-reactor { background-color: #FFCDD2; color: #D32F2F; }
@@ -227,7 +229,7 @@ def main():
     <div class="flow-container">
         <div class="flow-stage stage-input">
             <strong>1. Input Preparation</strong>
-            <p style="font-size: 14px; margin: 5px 0 0;">Raw Biomass (Wet)</p>
+            <p style="font-size: 14px; margin: 5px 0 0;">Raw Biomass ({initial_mass_kg} kg)</p>
         </div>
 
         <div class="arrow">➡️</div>
@@ -262,7 +264,6 @@ def main():
     <div style="height: 60px;"></div> """
     st.markdown(flow_sheet_html, unsafe_allow_html=True)
     
-    # ------------------ (End of new Flow Sheet Code) ------------------
     # --- Run Simulation ---
     if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
         st.error("**Input Error:** Initial Moisture and Ash content exceed 100%. Please adjust the parameters.")
@@ -306,11 +307,13 @@ def main():
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
+             # تمثيل مرئي للميزان الكتلي
 
     with tab2:
         st.subheader("Mass Component Conversion Over Time")
         st.line_chart(results["mass_profile"])
         st.caption("The curves show how Moisture and Volatiles fractions decrease as the Biochar fraction forms over time.")
+         # رسم بياني يوضح تطور مكونات الكتلة
 
     with tab3:
         st.subheader("Non-Condensable Dry Gas Composition")
@@ -352,7 +355,7 @@ def generate_pdf_report(results):
     p = results["parameters"]
     param_data = [
         ["Parameter", "Value"],
-        ["Initial Biomass Mass", f"{p['initial_mass']:.0f} kg"], # New parameter
+        ["Initial Biomass Mass", f"{p['initial_mass']:.0f} kg"],
         ["Biomass Type", p["biomass"]],
         ["Moisture Content", f"{p['moisture']}%"],
         ["Temperature", f"{p['temperature']} °C"],
@@ -431,4 +434,3 @@ def generate_pdf_report(results):
 
 if __name__ == "__main__":
     main()
-
