@@ -333,10 +333,10 @@ def main():
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
-            
+            # 
 
 [Image of mass balance pie chart for torrefaction products]
- 
+ <-- تم إزالة أو تعليق هذا السطر
 
     with tab2:
         st.subheader("Mass Component Conversion Over Time")
