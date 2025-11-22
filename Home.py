@@ -1,450 +1,798 @@
-# -*- coding: utf-8 -*-
-"""
-CHEMISCO ENTERPRISE EDITION v4.0
---------------------------------
-A monolithic structure for advanced Torrefaction simulation.
-Includes: Auth, SQLite DB, Finite Difference Heat Transfer, ML Prediction, PDF Reporting.
-"""
-
 import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import sqlite3
-import hashlib
-import time
-import datetime
+from scipy.integrate import odeint
+from scipy.optimize import minimize
 from io import BytesIO
 import base64
-from scipy.integrate import odeint
-from sklearn.linear_model import LinearRegression
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
+import os 
+import random 
+import time 
 
-# ==============================================================================
-# PART 1: ADVANCED STYLING & ASSETS (التصميم والواجهة)
-# ==============================================================================
+# --- A. GLOBAL CONSTANTS AND KINETICS ---
+R_GAS = 8.314             # J/(mol.K)
+SPECIFIC_HEAT_BIOMASS = 1.3 # kJ/(kg.K) (Average)
+SPECIFIC_HEAT_BIOCHAR = 1.0 # kJ/(kg.K)
+SPECIFIC_HEAT_WATER = 4.18  # kJ/(kg.K)
+ENTHALPY_WATER_VAP = 2500 # kJ/kg (Latent Heat of Vaporization)
 
-st.set_page_config(page_title="Chemisco Enterprise", layout="wide", page_icon="🏭")
+# KINETIC PARAMETERS (Parallel First-Order Reactions)
+KINETICS = {
+    "Hemicellulose": [1.5e10, 110000],
+    "Cellulose":     [1.0e12, 130000],
+    "Lignin":        [2.0e9, 100000]
+}
 
-ENTERPRISE_CSS = """
-<style>
-    /* Dark Enterprise Theme */
-    :root {
-        --primary: #00ADB5;
-        --secondary: #393E46;
-        --bg: #222831;
-        --text: #EEEEEE;
-        --accent: #FF2E63;
-    }
-    .stApp { background-color: var(--bg); color: var(--text); }
-    
-    /* Login Screen Styling */
-    .login-container {
-        border: 1px solid var(--secondary);
-        padding: 40px;
-        border-radius: 10px;
-        background: #2D343E;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-    
-    /* Advanced Metrics */
-    .metric-box {
-        background: linear-gradient(145deg, #2D343E, #222831);
-        border-radius: 15px;
-        padding: 20px;
-        border-left: 5px solid var(--primary);
-        box-shadow: 5px 5px 10px #1a1e25, -5px -5px 10px #2a323d;
-        transition: transform 0.3s;
-    }
-    .metric-box:hover { transform: translateY(-5px); }
-    
-    /* Tables */
-    div[data-testid="stDataFrame"] { border: 1px solid var(--secondary); border-radius: 5px; }
-    
-    /* Custom Sidebar */
-    [data-testid="stSidebar"] { background-color: #1A1D24; border-right: 1px solid #333; }
-</style>
-"""
-st.markdown(ENTERPRISE_CSS, unsafe_allow_html=True)
+BIOMASS_COMPOSITION = {
+    "Wood": {"Hemicellulose": 0.35, "Cellulose": 0.45, "Lignin": 0.20, "Ash": 0.02, "Gas_Factor": 0.40, "Density": 550},
+    "Agricultural Waste": {"Hemicellulose": 0.45, "Cellulose": 0.35, "Lignin": 0.20, "Ash": 0.08, "Gas_Factor": 0.50, "Density": 400},
+    "Municipal Waste": {"Hemicellulose": 0.30, "Cellulose": 0.40, "Lignin": 0.30, "Ash": 0.15, "Gas_Factor": 0.60, "Density": 300}
+}
 
-# ==============================================================================
-# PART 2: DATABASE & AUTHENTICATION LAYER (قاعدة البيانات والأمان)
-# ==============================================================================
+HHV_INITIAL = { "Wood": 18.0, "Agricultural Waste": 16.5, "Municipal Waste": 15.0 }
+HHV_ENRICHMENT_FACTOR = 1.3 
 
-class DatabaseManager:
-    """Handles all SQLite interactions for Users and Simulation History."""
-    def __init__(self, db_name="chemisco_enterprise.db"):
-        self.conn = sqlite3.connect(db_name, check_same_thread=False)
-        self.create_tables()
+DRYING_RATE_CONST = 0.05 
+SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
+BASE_FC_FACTOR = 0.20 
 
-    def create_tables(self):
-        c = self.conn.cursor()
-        # Users Table
-        c.execute('''CREATE TABLE IF NOT EXISTS users 
-                     (username TEXT PRIMARY KEY, password_hash TEXT, role TEXT)''')
-        # Simulation History Table
-        c.execute('''CREATE TABLE IF NOT EXISTS history 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                      user TEXT, timestamp DATETIME, 
-                      biomass TEXT, temp REAL, duration REAL, 
-                      yield REAL, energy_yield REAL)''')
-        self.conn.commit()
+# --- Utility Function for Logo ---
+LOGO_PATH = "chemisco_logo.png"
 
-    def add_user(self, username, password, role="engineer"):
-        if self.get_user(username): return False
-        pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-        self.conn.cursor().execute("INSERT INTO users VALUES (?, ?, ?)", (username, pwd_hash, role))
-        self.conn.commit()
-        return True
-
-    def verify_user(self, username, password):
-        user = self.get_user(username)
-        if user:
-            pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-            if pwd_hash == user[1]: return user
+@st.cache_data(show_spinner=False)
+def _get_image_base64(image_path):
+    try:
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
+        return None
+    except Exception:
         return None
 
-    def get_user(self, username):
-        c = self.conn.cursor()
-        c.execute("SELECT * FROM users WHERE username=?", (username,))
-        return c.fetchone()
+LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
 
-    def log_simulation(self, user, data):
-        c = self.conn.cursor()
-        c.execute("INSERT INTO history (user, timestamp, biomass, temp, duration, yield, energy_yield) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (user, datetime.datetime.now(), data['biomass'], data['temp'], data['duration'], data['yield'], data['energy']))
-        self.conn.commit()
+
+# --- B. ADVANCED PROFESSIONAL DARK MODE CSS ---
+GLOBAL_CSS = f"""
+<style>
+    /* ------------------- DARK MODE BASE STYLING ------------------- */
+    .stApp {{ 
+        padding-top: 10px; 
+        background-color: #121212; 
+        color: #E0E0E0; 
+    }}
     
-    def get_history(self, user):
-        return pd.read_sql_query(f"SELECT * FROM history WHERE user='{user}' ORDER BY id DESC", self.conn)
-
-# Initialize DB
-db = DatabaseManager()
-# Create default admin if not exists
-db.add_user("admin", "admin123", "admin")
-
-# ==============================================================================
-# PART 3: ADVANCED PHYSICS ENGINE (FDM HEAT TRANSFER) (الفيزياء المعقدة)
-# ==============================================================================
-
-@dataclass
-class PhysicsConfig:
-    """Stores physical constants to keep code clean."""
-    rho_biomass: float = 600.0  # kg/m3
-    cp_biomass: float = 1500.0  # J/kg.K
-    k_biomass: float = 0.15     # W/m.K (Thermal Conductivity)
-    h_conv: float = 150.0       # W/m2.K (Convection Coeff)
-    radius: float = 0.01        # m (Particle Radius 1cm)
-
-class FiniteDifferenceSolver:
-    """
-    Simulates heat transfer inside a spherical biomass particle using 
-    Finite Difference Method (FDM) - Crank-Nicolson Scheme.
-    This adds significant complexity and realism.
-    """
-    def __init__(self, config: PhysicsConfig, nodes=20):
-        self.cfg = config
-        self.N = nodes
-        self.dr = self.cfg.radius / (self.N - 1)
-        self.r = np.linspace(0, self.cfg.radius, self.N)
-
-    def solve_heat_profile(self, T_surf, duration_sec, dt=1.0):
-        """Calculates temperature distribution from core to surface over time."""
-        steps = int(duration_sec / dt)
-        T = np.ones(self.N) * 25.0 # Initial temp 25C
-        
-        # Thermal Diffusivity (alpha)
-        alpha = self.cfg.k_biomass / (self.cfg.rho_biomass * self.cfg.cp_biomass)
-        lambda_val = alpha * dt / (self.dr ** 2)
-        
-        history = []
-        
-        # Iterative Solver (Explicit for demonstration simplicity, but verbose)
-        for t in range(steps):
-            T_new = np.copy(T)
-            # Internal Nodes (1 to N-2)
-            for i in range(1, self.N - 1):
-                # Spherical Laplacian discretization
-                term1 = T[i+1] - 2*T[i] + T[i-1]
-                term2 = (2/self.r[i]) * (self.dr/2) * (T[i+1] - T[i-1]) # Approximate
-                T_new[i] = T[i] + lambda_val * (term1 + term2) # Not strictly correct for sphere but serves the complexity
-            
-            # Boundary Condition (Center: Symmetry)
-            T_new[0] = T_new[1]
-            
-            # Boundary Condition (Surface: Convection)
-            # -k(dT/dr) = h(T_surf - T_node)
-            T_new[-1] = T_new[-1] + (self.cfg.h_conv * (self.cfg.radius**2) / (self.cfg.rho_biomass * self.cfg.cp_biomass * (self.cfg.radius**3)/3)) * (T_surf - T_new[-1]) * dt # Lumped capacitance approximation for surface skin
-            
-            T = T_new
-            if t % 10 == 0: # Save every 10th step
-                history.append(T.copy())
-                
-        return np.array(history)
-
-# ==============================================================================
-# PART 4: KINETIC MODEL (التفاعل الكيميائي)
-# ==============================================================================
-
-class KineticEngine:
-    """Handles the degradation chemistry."""
-    def __init__(self, biomass_type):
-        self.params = self._get_params(biomass_type)
-
-    def _get_params(self, b_type):
-        # Database of components
-        db = {
-            "Wood": [0.35, 0.45, 0.20],
-            "Straw": [0.45, 0.35, 0.20],
-            "Algae": [0.20, 0.10, 0.10] # Remainder is protein/lipids
-        }
-        return db.get(b_type, [0.33, 0.33, 0.33])
-
-    def reactions(self, y, t, T_K):
-        # Arrhenius parameters
-        A = [1e10, 1e12, 1e8]
-        E = [110000, 140000, 90000]
-        R = 8.314
-        
-        k = [a * np.exp(-e / (R * T_K)) for a, e in zip(A, E)]
-        
-        m_h, m_c, m_l = y
-        dm_h = -k[0] * m_h
-        dm_c = -k[1] * m_c
-        dm_l = -k[2] * m_l
-        
-        return [dm_h, dm_c, dm_l]
-
-    def run(self, temp_c, duration_min):
-        T_K = temp_c + 273.15
-        t = np.linspace(0, duration_min * 60, 100) # seconds
-        y0 = self.params
-        
-        # Solving ODE
-        sol = odeint(self.reactions, y0, t, args=(T_K,))
-        return t, sol
-
-# ==============================================================================
-# PART 5: AI & MACHINE LEARNING (الذكاء الاصطناعي)
-# ==============================================================================
-
-class AIPredictor:
-    """Mock ML Model to predict Industrial scaling factors."""
-    def __init__(self):
-        # Training a dummy model on initialization
-        self.model = LinearRegression()
-        # Synthetic Data: [Temp, Duration, Moisture] -> [Industrial_Yield_Efficiency]
-        X = np.array([[250, 30, 10], [300, 60, 20], [220, 45, 15], [280, 90, 5]])
-        y = np.array([0.95, 0.85, 0.98, 0.88]) # Efficiency drops with severity
-        self.model.fit(X, y)
+    /* Global Text and Headers */
+    h1, h2, h3, p, label, .stMarkdown, .stText, .st-emotion-cache-1v0x1p5 {{ 
+        color: #E0E0E0 !important; 
+        font-family: 'Tahoma', sans-serif; 
+    }}
     
-    def predict_efficiency(self, temp, duration, moisture):
-        pred = self.model.predict([[temp, duration, moisture]])
-        return min(max(pred[0], 0.7), 1.0) # Clip between 70% and 100%
+    /* Metrics Style - High Contrast Dark (Enhanced for better visual hierarchy) */
+    [data-testid="stMetric"] {{
+        background-color: #1E1E1E; 
+        padding: 20px 25px;
+        border-radius: 15px;
+        border-left: 6px solid #FFC107; /* Gold Accent for main KPIs */
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+        transition: transform 0.2s; /* Hover effect */
+    }}
+    [data-testid="stMetric"]:hover {{
+        transform: translateY(-3px);
+    }}
+    [data-testid="stMetricValue"] {{ 
+        font-size: 40px; 
+        color: #FFFFFF; 
+        font-weight: 900; 
+    }}
+    [data-testid="stMetricLabel"] {{ 
+        font-size: 16px; 
+        color: #4CAF50; /* Green Label */
+        font-weight: 700;
+        text-transform: uppercase;
+    }}
+    [data-testid="stMetricDelta"] {{ 
+        font-size: 18px; 
+        font-weight: bold;
+        color: #00BCD4 !important; /* Cyan Delta */
+    }}
+    
+    /* Sidebar Styling */
+    .sidebar-header-box {{
+        background: linear-gradient(135deg, #004D40, #00897B); 
+        padding: 25px;
+        border-radius: 20px;
+        margin-top: 25px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
+        border: 2px solid #FFC107;
+    }}
+    .sidebar-header-box h1 {{ color: #FFFFFF; font-size: 2.5em; letter-spacing: 4px; margin-bottom: 5px; }}
+    .sidebar-header-box p {{ color: #C8E6C9; margin: 0; font-size: 1.0em; font-weight: 500;}}
+    
+    /* Tabs Styling (High Contrast) */
+    div[data-testid="stTabs"] button {{
+        color: #00BCD4 !important; 
+        background-color: #1E1E1E !important; 
+        font-weight: bold !important;
+        border-bottom: 4px solid #00BCD4 !important; /* Changed accent to Cyan */
+        padding: 12px 18px;
+        font-size: 1.1em;
+    }}
+    div[data-testid="stTabs"] button[aria-selected="true"] {{
+        color: #FFFFFF !important; 
+        border-bottom: 4px solid #FFC107 !important; /* Selected tab accent Gold */
+    }}
+    
+    /* General Containers */
+    .st-emotion-cache-1c7v0s, .st-emotion-cache-1fv9t6m, .st-emotion-cache-q8b7t8 {{ 
+        background-color: #1E1E1E; 
+        border: 1px solid #333333;
+        border-radius: 15px;
+        padding: 20px;
+    }}
 
-# ==============================================================================
-# PART 6: REPORTING MODULE (نظام التقارير)
-# ==============================================================================
+    /* BFD Styling */
+    .bfd-block {{ 
+        padding: 25px 40px; 
+        background: #282828; 
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); 
+        color: #E0E0E0; 
+        border-radius: 15px;
+        text-align: center;
+    }}
+    /* Enhanced Info/Success Boxes */
+    .custom-info-box {{
+        background-color: #1A3440; 
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 5px solid #00BCD4;
+        color: #E0E0E0;
+        font-weight: bold;
+    }}
+    .custom-success-box {{
+        background-color: #1A3D24; 
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 5px solid #4CAF50;
+        color: #E0E0E0;
+        font-weight: bold;
+    }}
+</style>
+"""
 
-class ReportGenerator:
-    """Generates an HTML/PDF simulation report."""
-    def generate_html(self, user, data, results):
-        html = f"""
-        <div style="font-family: sans-serif; padding: 20px; border: 2px solid #333;">
-            <h1 style="color: #00ADB5;">Chemisco Simulation Report</h1>
-            <hr>
-            <p><strong>Engineer:</strong> {user}</p>
-            <p><strong>Date:</strong> {datetime.datetime.now()}</p>
-            <h3>Parameters</h3>
-            <ul>
-                <li>Feedstock: {data['biomass']}</li>
-                <li>Temperature: {data['temp']} °C</li>
-                <li>Duration: {data['duration']} min</li>
-            </ul>
-            <h3>Results</h3>
-            <table border="1" width="100%">
-                <tr><th>Metric</th><th>Value</th></tr>
-                <tr><td>Mass Yield</td><td>{results['yield']:.2f}%</td></tr>
-                <tr><td>Energy Yield</td><td>{results['energy']:.2f}%</td></tr>
-                <tr><td>Industrial Efficiency (AI)</td><td>{results['ai_eff']:.2f}</td></tr>
-            </table>
-            <br>
-            <p style="font-size: 10px;">Generated by Chemisco Enterprise System.</p>
-        </div>
+# --- C. CORE SIMULATION AND KINETICS ---
+def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"): 
+    temp_K = temp_C + 273.15
+    comp = BIOMASS_COMPOSITION.get(biomass)
+    R_GAS_LOCAL = R_GAS 
+    
+    initial_moisture_frac = moisture / 100
+    initial_ash_frac = comp["Ash"]
+    daf_frac = 1.0 - initial_moisture_frac - initial_ash_frac
+    
+    m_h_init = comp["Hemicellulose"] * daf_frac
+    m_c_init = comp["Cellulose"] * daf_frac
+    m_l_init = comp["Lignin"] * daf_frac
+    initial_mass_fixed_carbon_daf = daf_frac * BASE_FC_FACTOR 
+    
+    k_drying = DRYING_RATE_CONST * SIZE_FACTOR.get(size)
+    size_factor_val = SIZE_FACTOR.get(size)
+    
+    k_h_eff = KINETICS["Hemicellulose"][0] * np.exp(-KINETICS["Hemicellulose"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
+    k_c_eff = KINETICS["Cellulose"][0] * np.exp(-KINETICS["Cellulose"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
+    k_l_eff = KINETICS["Lignin"][0] * np.exp(-KINETICS["Lignin"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
+
+    def model(y, t, k_dry, kh, kc, kl):
+        m_moist, m_h, m_c, m_l = y
+        d_moist = -k_dry * m_moist if m_moist > 0.001 else 0 
+        d_h = -kh * m_h
+        d_c = -kc * m_c
+        d_l = -kl * m_l
+        return [d_moist, d_h, d_c, d_l]
+    
+    t = np.linspace(0, duration_min, 100)
+    y0 = [initial_moisture_frac, m_h_init, m_c_init, m_l_init]
+    
+    sol = odeint(model, y0, t, args=(k_drying, k_h_eff, k_c_eff, k_l_eff))
+    sol[sol < 0] = 0
+    
+    final_h_remaining = sol[:, 1][-1]
+    final_c_remaining = sol[:, 2][-1]
+    final_l_remaining = sol[:, 3][-1]
+    
+    lost_h_frac = m_h_init - final_h_remaining
+    lost_c_frac = m_c_init - final_c_remaining
+    lost_l_frac = m_l_init - final_l_remaining
+    total_volatiles_lost_frac = lost_h_frac + lost_c_frac + lost_l_frac
+
+    mass_ash_kg = initial_mass_kg * initial_ash_frac
+    mass_fixed_carbon_kg = initial_mass_kg * initial_mass_fixed_carbon_daf
+    mass_remaining_components = (final_h_remaining + final_c_remaining + final_l_remaining) * initial_mass_kg
+
+    mass_biochar_total = mass_fixed_carbon_kg + mass_remaining_components + mass_ash_kg
+    final_solid_yield_percent = (mass_biochar_total / initial_mass_kg) * 100
+    
+    mass_moisture_loss_kg = (initial_moisture_frac - sol[:, 0][-1]) * initial_mass_kg
+    mass_non_condensable_gas_kg = total_volatiles_lost_frac * initial_mass_kg * comp["Gas_Factor"] 
+    mass_bio_oil_kg = total_volatiles_lost_frac * initial_mass_kg * (1 - comp["Gas_Factor"]) 
+
+    final_ash_percent = (mass_ash_kg / mass_biochar_total) * 100
+
+    yields_percent = pd.DataFrame({
+        "Yield (%)": [final_solid_yield_percent, (mass_bio_oil_kg / initial_mass_kg) * 100, (mass_non_condensable_gas_kg / initial_mass_kg) * 100, (mass_moisture_loss_kg / initial_mass_kg) * 100]},
+        index=["Biochar (Solid Product)", "Bio-Oil (Condensable)", "Non-Condensable Gases", "Moisture Loss (Water Vapor)"]
+    )
+    
+    yields_mass = yields_percent.copy()
+    yields_mass["Mass (kg)"] = yields_percent["Yield (%)"] * initial_mass_kg / 100
+    
+    solid_composition = pd.DataFrame({
+        "Mass (kg)": [mass_fixed_carbon_kg, mass_remaining_components, mass_ash_kg]
+    }, index=["Fixed Carbon", "Volatile Matter Remaining", "Ash"])
+
+    initial_hhv_mj_kg = HHV_INITIAL.get(biomass, 17.0) 
+    biochar_hhv_mj_kg = initial_hhv_mj_kg * HHV_ENRICHMENT_FACTOR
+    
+    initial_energy_mj = initial_mass_kg * initial_hhv_mj_kg * (1 - initial_moisture_frac)
+    final_biochar_energy_mj = mass_biochar_total * biochar_hhv_mj_kg
+    energy_yield_percent = (final_biochar_energy_mj / initial_energy_mj) * 100
+    
+    carbon_efficiency = final_solid_yield_percent * (biochar_hhv_mj_kg / initial_hhv_mj_kg) / 100 
+
+    df_mass_profile = pd.DataFrame({
+        'Time (min)': t,
+        'Hemicellulose': sol[:, 1] * initial_mass_kg,
+        'Cellulose': sol[:, 2] * initial_mass_kg,
+        'Lignin': sol[:, 3] * initial_mass_kg,
+        'Total Mass (DAF)': (sol[:, 1] + sol[:, 2] + sol[:, 3]) * initial_mass_kg
+    })
+    
+    return {
+        "yields_percent": yields_percent, "yields_mass": yields_mass, "solid_composition": solid_composition,
+        "final_ash_percent": final_ash_percent, "initial_hhv": initial_hhv_mj_kg,
+        "biochar_hhv": biochar_hhv_mj_kg, "energy_yield_percent": energy_yield_percent,
+        "carbon_efficiency": carbon_efficiency, 
+        "parameters": {
+            "biomass": biomass, "moisture": moisture, "temperature": temp_C, 
+            "duration": duration_min, "size": size, "initial_mass": initial_mass_kg,
+            "reactor": reactor_type
+        },
+        "df_mass_profile": df_mass_profile
+    }
+
+# --- D. SENSITIVITY ANALYSIS (Improved: Full 2D grid) ---
+@st.cache_data
+def run_sensitivity_analysis_2d(biomass, moisture, size, initial_mass_kg, reactor_type):
+    # استخدام نطاقات أوسع لإنشاء مخطط حراري أكثر دقة
+    T_points = 15
+    D_points = 15
+    T_range = np.linspace(220, 320, T_points)
+    D_range = np.linspace(30, 120, D_points)
+    
+    yield_matrix = np.zeros((T_points, D_points))
+    
+    for i, T in enumerate(T_range):
+        for j, D in enumerate(D_range):
+            res = simulate_torrefaction(biomass, moisture, T, D, size, initial_mass_kg, reactor_type) 
+            yield_matrix[i, j] = res["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]
+            
+    return T_range, D_range, yield_matrix
+
+# --- E. THERMAL MODELING UNIT ---
+def calculate_thermal_loads(biomass_type, initial_mass_kg, temp_C, duration_min, moisture):
+    T_ambient = 25.0 
+    T_reactor = temp_C 
+    
+    delta_T = T_reactor - T_ambient
+    mass_dry_biomass = initial_mass_kg * (1 - moisture / 100)
+    
+    Q_sensible_biomass = mass_dry_biomass * SPECIFIC_HEAT_BIOMASS * delta_T # kJ
+    
+    mass_water = initial_mass_kg * (moisture / 100)
+    Q_sensible_water = mass_water * SPECIFIC_HEAT_WATER * delta_T # kJ
+    
+    Q_latent_vaporization = mass_water * ENTHALPY_WATER_VAP # kJ
+    
+    Q_reaction_kJ_kg = -150 # kJ/kg (Assumed net endothermic)
+    Q_reaction = mass_dry_biomass * Q_reaction_kJ_kg # kJ
+    
+    reactor_volume_m3 = initial_mass_kg / (BIOMASS_COMPOSITION[biomass_type]["Density"] * 1.5)
+    reactor_surface_area_m2 = 6 * (reactor_volume_m3**(2/3))
+    
+    U_overall = 0.5 # kW/(m2.K)
+    delta_T_K = temp_C - 25.0
+    duration_s = duration_min * 60
+    
+    Q_loss = U_overall * 1000 * reactor_surface_area_m2 * delta_T_K * duration_s # J
+    Q_loss_kJ = Q_loss / 1000 
+    
+    Q_total_required_kJ = Q_sensible_biomass + Q_sensible_water + Q_latent_vaporization + abs(Q_reaction) + Q_loss_kJ
+    
+    Q_gas_potential_MJ = (initial_mass_kg * BIOMASS_COMPOSITION[biomass_type]["Gas_Factor"]) * 12 
+    Q_gas_potential_kJ = Q_gas_potential_MJ * 1000
+    Q_gas_utilized_kJ = Q_gas_potential_kJ * 0.50 
+    
+    Q_net_external_requirement_kJ = Q_total_required_kJ - Q_gas_utilized_kJ
+    
+    energy_required_kWh = Q_net_external_requirement_kJ / 3600
+    
+    return {
+        "Q_total_kJ": Q_total_required_kJ,
+        "Q_net_external_kJ": Q_net_external_requirement_kJ,
+        "Q_sensible_biomass": Q_sensible_biomass,
+        "Q_latent_vaporization": Q_latent_vaporization,
+        "Q_reaction": Q_reaction,
+        "Q_loss_kJ": Q_loss_kJ,
+        "Energy_kWh": energy_required_kWh,
+        "Gas_Self_Heating_kJ": Q_gas_utilized_kJ
+    }
+
+# --- F. OPTIMIZATION UNIT ---
+def optimization_function(params, biomass, moisture, size, initial_mass_kg):
+    T, D = params
+    
+    if not (220 <= T <= 320 and 30 <= D <= 120):
+        return 1e10 
+        
+    results = simulate_torrefaction(biomass, moisture, T, D, size, initial_mass_kg)
+    
+    energy_yield = results['energy_yield_percent'] / 100
+    mass_yield = results['yields_percent'].loc["Biochar (Solid Product)", "Yield (%)"] / 100
+    
+    cost_factor = (T / 320) + (D / 120) 
+    
+    objective = (energy_yield * mass_yield) - 0.2 * cost_factor
+    
+    return -objective
+
+def run_optimization(biomass, moisture, size, initial_mass_kg):
+    initial_guess = [275, 60]
+    bnds = ((220, 320), (30, 120))
+    
+    result = minimize(
+        optimization_function, 
+        initial_guess, 
+        args=(biomass, moisture, size, initial_mass_kg), 
+        method='L-BFGS-B', 
+        bounds=bnds,
+        options={'disp': False, 'maxiter': 50}
+    )
+    
+    if result.success:
+        opt_T = result.x[0]
+        opt_D = result.x[1]
+        opt_value = -result.fun
+        return opt_T, opt_D, opt_value
+    else:
+        return None, None, None
+
+# --- G. MOCK AI RESPONSE (for Tab 5) ---
+def mock_ai_response(prompt, results, annual_net_profit, payback_period_years):
+    p = results["parameters"]
+    prompt_lower = prompt.lower()
+    
+    summary = f"""
+    ## 🎯 ملخص تنفيذي (محدث)
+
+    **المردود الكتلي:** {results['yields_percent'].loc["Biochar (Solid Product)", "Yield (%)"]:.1f}\\%
+    **كفاءة الطاقة:** {results['energy_yield_percent']:.1f}\\%
+    **صافي الربح السنوي:** ${annual_net_profit:,.0f}
+    """ 
+    
+    if "thermal load" in prompt_lower or "حرارة" in prompt_lower:
+        thermal_results = calculate_thermal_loads(p["biomass"], p["initial_mass"], p["temperature"], p["duration"], p["moisture"])
+        return f"""
+        ## 🔥 تحليل الحمل الحراري (Thermal Load Analysis)
+        
+        * **الحرارة الكامنة للتبخير:** {thermal_results['Q_latent_vaporization']/1000:.1f} MJ
+        * **صافي الطاقة الخارجية المطلوبة:** {thermal_results['Q_net_external_kJ']/1000:.1f} MJ/Batch.
+        
+        **توصية:** لتقليل التكلفة، يجب تخفيض محتوى الرطوبة الابتدائي.
         """
-        return html
-
-# ==============================================================================
-# PART 7: MAIN UI LOGIC (الواجهة الرئيسية)
-# ==============================================================================
-
-def main_app():
-    # Session State Init
-    if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-    if 'username' not in st.session_state: st.session_state.username = ""
-
-    # --- LOGIN SYSTEM ---
-    if not st.session_state.logged_in:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown("<br><br>", unsafe_allow_html=True)
-            with st.container():
-                st.markdown('<div class="login-container">', unsafe_allow_html=True)
-                st.title("🔐 Secure Login")
-                user = st.text_input("Username")
-                pw = st.text_input("Password", type="password")
-                c1, c2 = st.columns(2)
-                if c1.button("Login", use_container_width=True):
-                    u = db.verify_user(user, pw)
-                    if u:
-                        st.session_state.logged_in = True
-                        st.session_state.username = user
-                        st.rerun()
-                    else:
-                        st.error("Invalid credentials")
-                if c2.button("Register", use_container_width=True):
-                    if db.add_user(user, pw):
-                        st.success("User created! Please login.")
-                    else:
-                        st.warning("User exists.")
-                st.markdown('</div>', unsafe_allow_html=True)
-        return
-
-    # --- MAIN DASHBOARD ---
+    elif "payback" in prompt_lower or "استرداد" in prompt_lower or "roi" in prompt_lower:
+        return f"""
+        ## 💰 تحليل الجدوى الاقتصادية (Payback Analysis)
+        
+        * **الربح السنوي الصافي:** ${annual_net_profit:,.0f}
+        * **فترة استرداد رأس المال:** **{payback_period_years:.1f} سنة**.
+        
+        **ملاحظة:** يرجى مراجعة التكاليف الرأسمالية (CAPEX) لضمان دقة هذا الرقم.
+        """
+    elif "optimal" in prompt_lower or "تحسين" in prompt_lower:
+         if 'opt_T' in st.session_state:
+             return f"""
+             ## ✨ نتائج التحسين (Optimization Results)
+             
+             * **الحرارة المثلى:** **{st.session_state['opt_T']:.1f}°C**
+             * **المدة المثلى:** **{st.session_state['opt_D']:.1f} min**
+             
+             لتحقيق أعلى ربحية ممكنة ضمن نطاق الشروط، يوصى باستخدام هذه الإعدادات.
+             """
+         else:
+            return "الرجاء تشغيل زر 'Run Optimization' في الشريط الجانبي أولاً للحصول على النتائج المثلى."
     
-    # Sidebar
+    return summary
+
+
+# --- H. MAIN STREAMLIT APPLICATION ---
+def main():
+    st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+    
+    # Initialize session state 
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = [{"role": "assistant", "content": "Welcome to Chemisco. Run the simulation first to get an executive summary."}]
+    if 'target_yield' not in st.session_state:
+        st.session_state['target_yield'] = 75
+        st.session_state['target_ash'] = 8.0
+        st.session_state['has_won'] = False
+        st.session_state['cost_biomass_per_ton'] = 30.0
+        st.session_state['cost_energy_per_hour'] = 5.0
+        st.session_state['price_biochar_per_kg'] = 1.20
+        st.session_state['capex'] = 1500000 
+        st.session_state['operating_days'] = 300 
+        
+    # --- Sidebar (Inputs) ---
     with st.sidebar:
-        st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=80)
-        st.title(f"Hello, {st.session_state.username}")
+        # Header with Logo
+        header_html = f"""
+            <div class="sidebar-header-box">
+                {'<img src="data:image/png;base64,' + LOGO_BASE64_STRING + '" style="max-width: 80px; margin-bottom: 10px;">' if LOGO_BASE64_STRING else ''}
+                <h1>CHEMISCO</h1>
+                <p>Advanced Process Simulation</p>
+                <hr style='margin: 10px 0; border-color: #00897B;'>
+            </div>
+            """
+        st.markdown(header_html, unsafe_allow_html=True)
+        
+        st.header("⚙️ Simulation Inputs")
+        
+        with st.expander("🏭 Reactor & Feedstock Type", expanded=True):
+            reactor_type = st.selectbox("🏭 Reactor Type", 
+                ["Rotary Drum Reactor", "Fluidized Bed Reactor", "Auger/Screw Reactor", "Fixed Bed Reactor"])
+            biomass_type = st.selectbox("🌿 Biomass Type", list(BIOMASS_COMPOSITION.keys()))
+            
+        with st.expander("🔬 Input Properties", expanded=True):
+            initial_mass_kg = st.number_input("⚖️ Initial Mass (kg/Batch)", min_value=1.0, value=100.0, step=10.0)
+            moisture_content = st.slider("💧 Initial Moisture (%)", 0.0, 50.0, 10.0, step=1.0)
+            particle_size = st.selectbox("📏 Particle Size", list(SIZE_FACTOR.keys()))
+            ash_percent_init = BIOMASS_COMPOSITION[biomass_type]["Ash"] * 100
+            st.markdown(f"<div class='custom-info-box'>Initial Ash Content: <b>{ash_percent_init:.1f}%</b></div>", unsafe_allow_html=True)
+            
+        with st.expander("🌡️ Process Conditions", expanded=True):
+            temperature = st.slider("🔥 Temperature (°C)", 200, 350, 275, step=5)
+            duration = st.slider("⏳ Duration (min)", 10, 120, 45, step=5)
+            
+        with st.expander("💰 Economic Factors (CAPEX/OPEX)", expanded=False):
+            st.session_state.capex = st.number_input("Total CAPEX ($)", min_value=100000, value=st.session_state.capex, step=50000)
+            st.session_state.operating_days = st.number_input("Operating Days/Year", min_value=100, value=st.session_state.operating_days, step=10)
+            st.session_state.cost_biomass_per_ton = st.number_input("Feedstock Cost ($/ton)", min_value=0.0, value=st.session_state.cost_biomass_per_ton, step=5.0)
+            st.session_state.cost_energy_per_hour = st.number_input("Operational Cost ($/hour)", min_value=0.0, value=st.session_state.cost_energy_per_hour, step=0.5)
+            st.session_state.price_biochar_per_kg = st.number_input("Biochar Price ($/kg)", min_value=0.0, value=st.session_state.price_biochar_per_kg, step=0.1)
+            
         st.markdown("---")
-        menu = st.radio("Navigation", ["Simulate", "Heat Transfer Map", "History", "Settings"])
-        if st.button("Logout"):
-            st.session_state.logged_in = False
-            st.rerun()
+        if st.button("✨ Run Optimization (Find Max Profit Conditions)"):
+            opt_T, opt_D, opt_val = run_optimization(biomass_type, moisture_content, particle_size, initial_mass_kg)
+            if opt_T and opt_D:
+                st.session_state['opt_T'] = opt_T
+                st.session_state['opt_D'] = opt_D
+                st.session_state['opt_val'] = opt_val
+                st.success(f"Optimal Conditions Found! T={opt_T:.1f}°C, D={opt_D:.1f} min")
+            else:
+                st.error("Optimization failed to converge.")
 
-    # View 1: Simulation
-    if menu == "Simulate":
-        st.title("🧪 Advanced Torrefaction Simulation")
+    # Input validation
+    if moisture_content / 100 + BIOMASS_COMPOSITION[biomass_type]["Ash"] > 1:
+        st.error("**Input Error:** Moisture and Ash content exceed 100%. Adjust inputs.")
+        return 
         
-        # Input Grid
-        col_in1, col_in2, col_in3 = st.columns(3)
-        with col_in1:
-            biomass = st.selectbox("Feedstock", ["Wood", "Straw", "Algae"])
-            mass = st.number_input("Batch Size (kg)", 100.0, 5000.0, 1000.0)
-        with col_in2:
-            temp = st.slider("Temperature (°C)", 200, 350, 275)
-            duration = st.slider("Duration (min)", 10, 120, 45)
-        with col_in3:
-            moisture = st.number_input("Moisture %", 0, 50, 10)
-            particle_r = st.selectbox("Particle Size", ["Small (5mm)", "Medium (10mm)", "Large (20mm)"])
+    # Run Simulation & Thermal Calculations
+    results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
+    thermal_results = calculate_thermal_loads(biomass_type, initial_mass_kg, temperature, duration, moisture_content)
+    
+    # Economic Calculations for KPIs
+    profit_delta = ((results['yields_mass'].loc['Biochar (Solid Product)', 'Mass (kg)'] * st.session_state.price_biochar_per_kg) - (initial_mass_kg / 1000) * st.session_state.cost_biomass_per_ton)
+    hourly_capex = st.session_state.capex / (5 * st.session_state.operating_days * (60/duration) * (duration/60)) if duration > 0 else 0 
+    net_hourly_profit = (profit_delta * (60/duration)) - st.session_state.cost_energy_per_hour - hourly_capex 
+    
+    # Annual Economics for Tabs
+    batch_per_day = 60 / duration if duration > 0 else 0
+    annual_batches = st.session_state.operating_days * batch_per_day
+    annual_feedstock_input_ton = (annual_batches * initial_mass_kg) / 1000
+    annual_biochar_output_kg = annual_batches * results['yields_mass'].loc["Biochar (Solid Product)", "Mass (kg)"]
+    annual_feedstock_cost = annual_feedstock_input_ton * st.session_state.cost_biomass_per_ton
+    annual_operational_cost = st.session_state.operating_days * 24 * st.session_state.cost_energy_per_hour 
+    total_annual_opex = annual_feedstock_cost + annual_operational_cost
+    annual_revenue = annual_biochar_output_kg * st.session_state.price_biochar_per_kg
+    annual_net_profit = annual_revenue - total_annual_opex
+    payback_period_years = st.session_state.capex / annual_net_profit if annual_net_profit > 0 else 999 
 
-        if st.button("🚀 RUN FULL SIMULATION", type="primary"):
-            with st.spinner("Calculating Finite Difference Heat Transfer & Kinetics..."):
-                time.sleep(1) # UX Delay
-                
-                # 1. Run Kinetics
-                k_eng = KineticEngine(biomass)
-                t_arr, sol = k_eng.run(temp, duration)
-                
-                # 2. Run AI
-                ai = AIPredictor()
-                eff = ai.predict_efficiency(temp, duration, moisture)
-                
-                # Calculations
-                final_mass_frac = np.sum(sol[-1])
-                mass_yield = final_mass_frac * 100
-                energy_yield = mass_yield * 1.2
-                
-                # Log to DB
-                db.log_simulation(st.session_state.username, 
-                                  {'biomass': biomass, 'temp': temp, 'duration': duration, 'yield': mass_yield, 'energy': energy_yield})
-                
-                # Display Results
-                st.markdown("### 📊 Executive Summary")
-                m1, m2, m3, m4 = st.columns(4)
-                m1.markdown(f'<div class="metric-box"><h3>Mass Yield</h3><h1>{mass_yield:.1f}%</h1></div>', unsafe_allow_html=True)
-                m2.markdown(f'<div class="metric-box"><h3>Energy Yield</h3><h1>{energy_yield:.1f}%</h1></div>', unsafe_allow_html=True)
-                m3.markdown(f'<div class="metric-box"><h3>AI Efficiency</h3><h1>{eff*100:.0f}%</h1></div>', unsafe_allow_html=True)
-                m4.markdown(f'<div class="metric-box"><h3>Profit Index</h3><h1>High</h1></div>', unsafe_allow_html=True)
-                
-                st.markdown("---")
-                
-                # Charts
-                c_chart1, c_chart2 = st.columns(2)
-                with c_chart1:
-                    st.subheader("Decomposition Profile")
-                    df_res = pd.DataFrame(sol, columns=['Hemi', 'Cell', 'Lig'])
-                    df_res['Time'] = t_arr / 60
-                    st.line_chart(df_res, x='Time')
-                
-                with c_chart2:
-                    st.subheader("Process Radar")
-                    fig = go.Figure(go.Scatterpolar(
-                        r=[mass_yield, energy_yield, eff*100, temp/3.5, duration],
-                        theta=['Mass Yield', 'Energy Yield', 'Efficiency', 'Temp Factor', 'Time Factor'],
-                        fill='toself',
-                        line_color='#00ADB5'
-                    ))
-                    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', polar=dict(bgcolor='#2D343E'))
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Report
-                rep = ReportGenerator()
-                html_rep = rep.generate_html(st.session_state.username, 
-                                            {'biomass': biomass, 'temp': temp, 'duration': duration},
-                                            {'yield': mass_yield, 'energy': energy_yield, 'ai_eff': eff})
-                st.download_button("📥 Download Report", html_rep, "report.html", "text/html")
+    # --- Main Content ---
+    st.title("CHEMISCO: Integrated Torrefaction Simulation Platform 🌌")
+    st.subheader("Advanced Kinetic, Thermal, and Economic Analysis (V4.0)")
+    
+    # 1. Block Flow Diagram (BFD)
+    st.markdown("---")
+    st.subheader("Process Flow and Status")
+    bfd_html = f"""
+    <div class="bfd-container" style="display: flex; justify-content: space-around; align-items: center; padding: 20px;">
+        <div class="bfd-block" style="border-left: 5px solid #4CAF50;">FEEDSTOCK<p style="color: #4CAF50; font-size: 1.1em;">{initial_mass_kg:.0f} kg @ {moisture_content}% H₂O</p></div>
+        <span style="color: #E0E0E0; font-size: 24px; margin: 0 15px;">➡️</span>
+        <div class="bfd-block" style="border-left: 5px solid #00BCD4;">DRYING<p style="color: #00BCD4; font-size: 1.1em;">Q_Latent: {thermal_results['Q_latent_vaporization']/1000:.1f} MJ</p></div>
+        <span style="color: #E0E0E0; font-size: 24px; margin: 0 15px;">➡️</span>
+        <div class="bfd-block" style="background: linear-gradient(135deg, #790000, #B71C1C); border-left: 5px solid #FFC107;">
+            TORREFACTION ({reactor_type})
+            <p style="color: #F5F5F5; font-size: 1.1em;">{temperature}°C for {duration} min</p>
+        </div>
+        <span style="color: #E0E0E0; font-size: 24px; margin: 0 15px;">➡️</span>
+        <div class="bfd-block" style="background: linear-gradient(135deg, #388E3C, #4CAF50); border-left: 5px solid #FFC107;">
+            BIOCHAR PRODUCT
+            <p style="color: #FFC107; font-size: 1.1em;">Yield: {results['yields_percent'].loc["Biochar (Solid Product)", "Yield (%)"]:.1f} %</p>
+        </div>
+    </div>
+    """
+    st.markdown(bfd_html, unsafe_allow_html=True)
+    st.markdown("---")
 
-    # View 2: Advanced Physics (Heat Map)
-    elif menu == "Heat Transfer Map":
-        st.title("🔥 Intra-Particle Heat Transfer (FDM)")
-        st.info("Simulating heat diffusion inside a spherical biomass particle using Crank-Nicolson Method.")
+    # 2. Results Dashboard (KPIs)
+    st.header("🔑 Key Performance Indicators (KPIs)")
+    col_kpi_1, col_kpi_2, col_kpi_3, col_kpi_4 = st.columns(4)
+    
+    col_kpi_1.metric("⚖️ Mass Yield", 
+        f"{results['yields_percent'].loc['Biochar (Solid Product)', 'Yield (%)']:.1f} %", 
+        delta=f"{results['yields_mass'].loc['Biochar (Solid Product)', 'Mass (kg)']:.2f} kg/Batch")
         
-        sim_temp = st.slider("Reactor Temp", 200, 500, 300)
+    col_kpi_2.metric("⚡ Energy Yield", 
+        f"{results['energy_yield_percent']:.1f} %",
+        delta=f"HHV: {results['biochar_hhv']:.2f} MJ/kg")
         
-        if st.button("Simulate Thermal Gradient"):
-            phy = PhysicsConfig(radius=0.02) # 2cm radius
-            solver = FiniteDifferenceSolver(phy, nodes=30)
+    col_kpi_3.metric("💰 Hourly Net Profit", 
+        f"${net_hourly_profit:.2f}",
+        delta="Incl. Amortization", delta_color="normal" if net_hourly_profit > 0 else "inverse")
+        
+    col_kpi_4.metric("📊 Carbon Efficiency", 
+        f"{results['carbon_efficiency'] * 100:.1f} %",
+        delta=f"Final Ash: {results['final_ash_percent']:.1f}%")
+
+    st.markdown("---")
+
+    # 3. Detailed Tabs
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Mass Balance & Quality", 
+        "🧪 Process Dynamics & Sensitivity", 
+        "🔥 Thermal & Energy Analysis", 
+        "💵 Project Economics", 
+        "🤖 AI Expert Consultant", 
+        "🎮 Manager Challenge"
+    ])
+    
+    # --- Tab 1: Mass Balance & Quality ---
+    with tab1:
+        st.subheader("Mass Distribution and Product Quality")
+        col_t1, col_t2 = st.columns(2)
+        
+        with col_t1:
+            st.markdown("##### Overall Mass Distribution")
+            df_global = results["yields_percent"].iloc[[0, 1, 2, 3]].reset_index()
+            df_global.rename(columns={'index': 'Component'}, inplace=True) 
             
-            # Solve
-            profile = solver.solve_heat_profile(sim_temp, duration_sec=300, dt=0.5)
+            fig2 = px.pie(df_global, values='Yield (%)', names='Component', hole=0.5, 
+                          color_discrete_sequence=['#4CAF50', '#00BCD4', '#FFC107', '#9E9E9E'], 
+                          title="Total Mass Yield Breakdown")
+            fig2.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#121212', width=1)))
+            fig2.update_layout(paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'), height=450)
+            st.plotly_chart(fig2, use_container_width=True)
+
+        with col_t2:
+            st.markdown("##### Biochar Solid Composition and Quality")
+            df_solid = results["solid_composition"].reset_index()
+            fig1 = px.bar(df_solid, x='index', y='Mass (kg)', 
+                          color='index', 
+                          color_discrete_map={"Fixed Carbon": "#00BCD4", "Volatile Matter Remaining": "#FFC107", "Ash": "#9E9E9E"},
+                          title="Solid Product Composition (Dry Basis)")
+            fig1.update_layout(paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'), height=450)
+            st.plotly_chart(fig1, use_container_width=True)
             
-            # Visualize as Heatmap
-            fig_heat = go.Figure(data=go.Heatmap(
-                z=profile.T,
-                x=np.arange(profile.shape[0]),
-                y=np.linspace(0, 20, 30),
-                colorscale='Inferno'
+            st.markdown(f"""
+                <div class='custom-success-box'>
+                    <p style='margin: 0; font-weight: bold; color: #4CAF50;'>💡 Product Quality Summary:</p>
+                    <ul style='list-style-type: none; padding-left: 0;'>
+                        <li>**HHV (Biochar):** <span style='color:#FFC107;'>{results['biochar_hhv']:.2f} MJ/kg</span></li>
+                        <li>**Final Ash:** <span style='color:#FFC107;'>{results['final_ash_percent']:.2f} %</span></li>
+                    </ul>
+                </div>
+            """, unsafe_allow_html=True)
+            
+    # --- Tab 2: Process Dynamics & Sensitivity ---
+    with tab2:
+        st.subheader("Kinetic Devolatilization and Process Sensitivity")
+        col_d1, col_d2 = st.columns(2)
+        
+        with col_d1:
+            st.markdown("##### Component Mass Consumption Over Time (Dry Basis)")
+            df_mass = results['df_mass_profile'].set_index('Time (min)').drop(columns=['Total Mass (DAF)'])
+            
+            fig_mass_loss = px.line(df_mass, 
+                                    x=df_mass.index, 
+                                    y=df_mass.columns, 
+                                    title='Mass Remaining of Biomass Components',
+                                    color_discrete_map={"Hemicellulose": "#FF5252", "Cellulose": "#00BCD4", "Lignin": "#FFC107"})
+            fig_mass_loss.update_layout(paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'),
+                                        yaxis_title='Mass Remaining (kg)', height=450)
+            st.plotly_chart(fig_mass_loss, use_container_width=True)
+
+        with col_d2:
+            st.markdown("##### 2D Sensitivity Analysis: Yield vs. Temp. & Duration")
+            T_range_sens, D_range_sens, yield_matrix = run_sensitivity_analysis_2d(biomass_type, moisture_content, particle_size, initial_mass_kg, reactor_type)
+            
+            fig_heatmap = go.Figure(data=go.Heatmap(
+                z=yield_matrix.T, # Transpose to match X (Duration) and Y (Temp)
+                x=D_range_sens,
+                y=T_range_sens,
+                colorscale='Viridis',
+                colorbar=dict(title='Yield (%)')
             ))
-            fig_heat.update_layout(
-                title="Internal Temperature Distribution (Core to Surface)",
-                xaxis_title="Time Steps",
-                yaxis_title="Radius Distance (mm)",
-                paper_bgcolor='rgba(0,0,0,0)', font_color='white'
-            )
-            st.plotly_chart(fig_heat, use_container_width=True)
+            fig_heatmap.update_layout(title='Biochar Yield (%) Heatmap', height=450,
+                                    xaxis_title='Duration (min)', yaxis_title='Temperature (°C)',
+                                    paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'))
+            st.plotly_chart(fig_heatmap, use_container_width=True)
+            
+            st.markdown(f"""
+            <div class='custom-info-box'>
+            <p><strong>Note:</strong> Heatmap shows the yield trade-off. Higher yields (Yellow/White) are achieved at higher temperatures and longer durations, but at higher cost.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-    # View 3: History
-    elif menu == "History":
-        st.title("📜 Operation Logs")
-        df_hist = db.get_history(st.session_state.username)
-        st.dataframe(df_hist, use_container_width=True)
+
+    # --- Tab 3: Thermal & Energy ---
+    with tab3:
+        st.subheader("Detailed Thermal Load and Energy Balance")
         
-        if not df_hist.empty:
-            st.subheader("Yield Trend")
-            st.area_chart(df_hist[['timestamp', 'yield']].set_index('timestamp'))
+        col_e1, col_e2, col_e3 = st.columns(3)
+        col_e1.metric("Heat Loss (Total)", f"{thermal_results['Q_loss_kJ']/1000:.1f} MJ", delta="From Reactor Surface")
+        col_e2.metric("Latent Heat (Drying)", f"{thermal_results['Q_latent_vaporization']/1000:.1f} MJ", delta="Drying is key step")
+        col_e3.metric("Net External Energy Req.", f"{thermal_results['Q_net_external_kJ']/1000:.1f} MJ", delta=f"{thermal_results['Energy_kWh']:.2f} kWh/Batch")
 
+        st.markdown("##### Energy Balance Waterfall (Total kJ/Batch)")
+        df_thermal = pd.DataFrame({
+            'Category': ["Sensible Heat (Biomass)", "Sensible Heat (Water)", "Latent Heat (Vaporization)", 
+                         "Reaction Heat (Endo)", "Heat Loss", "Gas Self-Heating (Credit)", "Net External Requirement"],
+            'Value': [thermal_results['Q_sensible_biomass'], thermal_results['Q_sensible_water'], 
+                      thermal_results['Q_latent_vaporization'], abs(thermal_results['Q_reaction']), 
+                      thermal_results['Q_loss_kJ'], -thermal_results['Gas_Self_Heating_kJ'], 
+                      thermal_results['Q_net_external_kJ']],
+            'Type': ['Demand', 'Demand', 'Demand', 'Demand', 'Demand', 'Credit', 'Net']
+        })
+
+        fig_thermal = go.Figure(go.Waterfall(
+            x=df_thermal['Category'],
+            y=df_thermal['Value'],
+            name="",
+            connector = {"line": {"color": "rgb(63, 63, 63)"}},
+            # Custom colors for better visibility
+            decreasing = {"marker":{"color": "#FF5252"}}, 
+            increasing = {"marker":{"color": "#4CAF50"}}, 
+            totals = {"marker":{"color": "#FFC107"}}
+        ))
+        fig_thermal.update_layout(title="Thermal Energy Waterfall (Total kJ)", showlegend=False, height=500,
+                                  paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'))
+        st.plotly_chart(fig_thermal, use_container_width=True)
+            
+    # --- Tab 4: Project Economics ---
+    with tab4:
+        st.subheader("Integrated Project Economics and CAPEX/OPEX Analysis")
+
+        col_p1, col_p2, col_p3 = st.columns(3)
+        col_p1.metric("Total Annual Revenue", f"${annual_revenue:.0f}", delta="Annual Biochar Sales")
+        col_p2.metric("Total Annual OPEX", f"${total_annual_opex:.0f}", delta="Feedstock + Operational Costs")
+        col_p3.metric("Payback Period (Years)", f"{payback_period_years:.1f}", delta=f"CAPEX: ${st.session_state.capex:,.0f}")
+        
+        st.markdown("##### Annual Financial Statement (Simplified)")
+        df_finance = pd.DataFrame({
+            "Metric": ["Annual Revenue (A)", "Annual Feedstock Cost (B)", "Annual Operational Cost (C)", "Total OPEX (B+C)", "Annual Net Profit (A - OPEX)", "CAPEX (D)"],
+            "Value": [annual_revenue, annual_feedstock_cost, annual_operational_cost, total_annual_opex, annual_net_profit, st.session_state.capex]
+        })
+        st.table(df_finance.style.format({"Value": "${:,.0f}"}).hide(axis="index"))
+        
+        st.markdown("##### Project Timeline Overview")
+        df_gantt = pd.DataFrame([
+            dict(Task="Permitting & Design", Start='2025-01-01', Finish='2025-06-30', Resource='Phase 1'),
+            dict(Task="Procurement & CAPEX", Start='2025-07-01', Finish='2026-03-31', Resource='Phase 2'),
+            dict(Task="Construction", Start='2026-04-01', Finish='2026-10-31', Resource='Phase 2'),
+            dict(Task="Commissioning", Start='2026-11-01', Finish='2027-01-31', Resource='Phase 3'),
+            dict(Task="Full Operation", Start='2027-02-01', Finish='2028-02-01', Resource='Phase 4')
+        ])
+        
+        fig_gantt = px.timeline(df_gantt, x_start="Start", x_end="Finish", y="Task", color="Resource")
+        fig_gantt.update_layout(title="Project Schedule Overview (Gantt Chart)", paper_bgcolor='#1E1E1E', plot_bgcolor='#1E1E1E', font=dict(color='#E0E0E0'))
+        st.plotly_chart(fig_gantt, use_container_width=True)
+
+    # --- Tab 5: AI Expert Analysis ---
+    with tab5:
+        st.header("🤖 AI Expert: Strategic Consulting")
+        st.markdown("""
+        <div class='custom-info-box'>
+        هذا المستشار الآلي (AI Expert) يوفر تحليلاً فورياً بناءً على نتائج المحاكاة.
+        يمكنك سؤاله عن:
+        <ul>
+        <li>**"Thermal Load" (الحمل الحراري):** لتحليل استهلاك الطاقة.</li>
+        <li>**"Payback Period" (فترة الاسترداد):** لتحليل الجدوى الاقتصادية.</li>
+        <li>**"Optimal Conditions" (الظروف المثلى):** بعد تشغيل زر التحسين.</li>
+        </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+        
+        if prompt := st.chat_input("Ask a question to the Expert..."):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing data and generating strategic report..."):
+                    time.sleep(2) 
+                    ai_response = mock_ai_response(prompt, results, annual_net_profit, payback_period_years)
+                    
+                st.markdown(ai_response)
+                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+
+    # --- Tab 6: Game Mode ---
+    with tab6:
+        st.header("🎮 Plant Manager Challenge: Quality Control")
+        game_mode = st.checkbox("Activate Plant Manager Challenge", value=False)
+        
+        if game_mode:
+            st.markdown("""
+            <div style="background-color: #3B3020; padding: 20px; border-radius: 10px; border-left: 6px solid #FFC107;">
+                <h3 style="color: #FFC107; margin-top:0;">Fulfill the Client Order!</h3>
+                <p style='color: #F5F5F5;'>Adjust **Temperature** and **Duration** in the sidebar to match the specifications below and maximize your score.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col_g1, col_g2, col_g3 = st.columns([1.5, 2, 1])
+            
+            with col_g3:
+                if st.button("🔄 New Client Order", key="new_order_btn_game"):
+                    st.session_state.target_yield = random.randint(60, 85)
+                    st.session_state.target_ash = round(random.uniform(ash_percent_init + 1.0, ash_percent_init + 5.0), 1)
+                    st.session_state.has_won = False
+                    st.experimental_rerun()
+            
+            with col_g1:
+                st.markdown(f"**🎯 Target Yield:** **`{st.session_state.target_yield}%`**")
+                st.markdown(f"**🎯 Max Ash Content:** **`{st.session_state.target_ash}%`**")
+                
+            with col_g2:
+                curr_yield = results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]
+                curr_ash = results["final_ash_percent"]
+                diff_yield = abs(curr_yield - st.session_state.target_yield)
+                diff_ash_penalty = max(0, curr_ash - st.session_state.target_ash)
+                
+                score = max(0, 100 - (diff_yield * 5 + diff_ash_penalty * 20)) # Weighted scoring
+                
+                st.metric("🏆 Your Efficiency Score", f"{score:.1f} / 100")
+                
+                if score >= 90 and diff_ash_penalty == 0:
+                    st.success("🎉 **PERFECT MATCH! Order fulfilled successfully.**")
+                    if not st.session_state.has_won:
+                        st.session_state.has_won = True
+                        st.balloons() 
+                elif score >= 70 and diff_ash_penalty == 0:
+                    st.warning("⚠️ Acceptable result. Try to optimize yield further.")
+                elif diff_ash_penalty > 0:
+                    st.error("❌ High Ash Content! Specifications failed.")
+                else:
+                    st.error("❌ Yield mismatch. Adjust conditions!")
+        else:
+            st.info("Activate the 'Plant Manager Challenge' to test your optimization skills!")
+
+
+# --- Execution Entry Point ---
 if __name__ == "__main__":
-    main_app()
-
-# ==============================================================================
-# END OF SYSTEM
-# To reach 2000 lines:
-# 1. Add Unit Tests (class TestChemisco(unittest.TestCase)...)
-# 2. Expand BIOMASS_DB to include 50+ types of materials.
-# 3. Add translation dictionary for Multi-language support.
-# 4. Implement detailed PDF generation code using FPDF library (drawing lines manually).
-# ==============================================================================
+    main()
