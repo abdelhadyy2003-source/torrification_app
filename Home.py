@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import base64
 import os 
 import random 
-import time # Added for AI response delay simulation
+import time 
 
 # --- 1. Chemical and Empirical Constants ---
 R_GAS = 8.314
@@ -43,7 +43,7 @@ def _get_image_base64(image_path):
 LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
 
 
-# --- 2. Global CSS (UNCHANGED) ---
+# --- 2. Global CSS ---
 GLOBAL_CSS = """
 <style>
     .stApp { padding-top: 20px; }
@@ -85,7 +85,7 @@ GLOBAL_CSS = """
     .main-banner-logo-container {
         display: block;
         margin: 0 auto 15px auto; 
-        width: 220px; /* Increased width for the main banner logo */
+        width: 220px; 
     }
 
     /* Sidebar Logo Adjustment */
@@ -107,12 +107,13 @@ GLOBAL_CSS = """
 </style>
 """
 
-# --- 3. Simulation Core Logic (Revised Fixed Carbon logic) ---
+# --- 3. Simulation Core Logic ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"): 
     temp_K = temp_C + 273.15
     data = EMPIRICAL_DATA.get(biomass)
     R_GAS_LOCAL = R_GAS 
     
+    # Arrhenius equation for Devolatilization Rate Constant
     k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS_LOCAL * temp_K))
     k_devol_eff = k_devol_arrhenius * SIZE_FACTOR.get(size)
     k_drying = data["k_drying_base"] 
@@ -215,7 +216,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         }
     }
 
-# --- 4. PDF Report Generation Function (UNCHANGED) ---
+# --- 4. PDF Report Generation Function ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -231,7 +232,7 @@ def generate_pdf_report(results):
     
     # -- 1. Header with Logo (for PDF) --
     elements.append(Paragraph("CHEMISCO TORREFACTION REPORT", title_style))
-    elements.append(Paragraph("Project presented to: د. عمرو الرفاعي", styles["Heading3"])) 
+    elements.append(Paragraph("Project presented to: Dr. Amr El Refaey", styles["Heading3"])) 
     
     try:
         img_path = LOGO_PATH 
@@ -375,27 +376,30 @@ def mock_ai_response(prompt, results):
     """
     p = results["parameters"]
     
-    if "optimize" in prompt.lower() or "increase yield" in prompt.lower():
+    if "optimize" in prompt.lower() or "increase yield" in prompt.lower() or "best conditions" in prompt.lower():
         # High Yield/Low Ash Suggestion
         return f"""To achieve higher **Biochar Yield** and lower **Ash Concentration** for {p['biomass']}, consider the following:
         1. **Lower Temperature:** Try reducing the temperature to around **250 °C** to minimize volatile losses.
         2. **Shorter Duration:** Use a duration of **30-40 minutes**.
-        3. **Current Results:** Your current yield is {results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]:.1f}% with {results['final_ash_percent']:.1f}% ash."""
+        3. **Current Results:** Your current yield is {results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]:.1f}% with {results['final_ash_percent']:.1f}% ash. For optimization, the solid mass yield is the most crucial metric to maximize."""
     
-    if "ash" in prompt.lower() or "ash concentration" in prompt.lower():
+    if "ash" in prompt.lower() or "ash concentration" in prompt.lower() or "inerts" in prompt.lower():
         return f"""Ash concentration increases because the inert ash remains while other components (moisture and volatiles) are removed. 
         Current Ash Concentration: **{results['final_ash_percent']:.2f}%**. 
-        This is an **enrichment factor** of {(results['final_ash_percent'] / (p['initial_mass'] * EMPIRICAL_DATA[p['biomass']]["Ash"] * 100 / (results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"])):.2f} compared to the initial biomass."""
+        This is an **enrichment factor** of {(results['final_ash_percent'] / (p['initial_mass'] * EMPIRICAL_DATA[p['biomass']]["Ash"] * 100 / (results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"])):.2f} compared to the initial biomass. Lowering the initial ash content in the feedstock is the only way to reduce this value, as ash is not consumed during torrefaction."""
 
     if "reactor" in prompt.lower() or "type" in prompt.lower():
-        return f"""You are currently simulating a **{p['reactor']}**. This type is commonly used for large-scale operations due to its ability to handle continuous feed and high throughput."""
+        return f"""You are currently simulating a **{p['reactor']}**. The choice of reactor affects heat transfer and mixing. **Fluidized Bed Reactors** provide excellent heat transfer but have high operating costs, while **Rotary Drum Reactors** are often preferred for continuous, large-scale production."""
 
-    if "gas" in prompt.lower():
+    if "gas" in prompt.lower() or "composition" in prompt.lower() or "volatiles" in prompt.lower():
         gas_total = results["yields_mass"].loc["Non-Condensable Gases", "Mass (kg)"]
-        return f"""The main gaseous components are CO2, CO, CH4, and H2. The total mass of non-condensable gases produced is **{gas_total:.2f} kg**. This gas can be used to heat the process (autothermal operation)."""
+        return f"""The main gaseous components are CO2, CO, CH4, and H2. The total mass of non-condensable gases produced is **{gas_total:.2f} kg**. This gas is rich in energy and can be combusted to provide the heat required for the torrefaction process itself (autothermal operation), thus lowering your operational cost."""
+
+    if "torrefaction" in prompt.lower() or "process" in prompt.lower() or "what is" in prompt.lower():
+        return "Torrefaction is a mild pyrolysis process conducted typically between $200^\circ C$ and $300^\circ C$ in an inert or low-oxygen atmosphere. It removes moisture and volatile organic compounds, resulting in a hydrophobic, brittle, and energy-dense solid product called **biochar** (or torrefied biomass)."
 
     # Default/General response
-    return "I am the Chemisco AI Assistant. I can help explain the torrefaction process kinetics, analyze the results, or suggest optimized parameters based on your current inputs."
+    return "I am the Chemisco AI Assistant. I can help explain the torrefaction process kinetics, analyze the results, or suggest optimized parameters based on your current inputs. Try asking about the **gas composition** or how to **optimize the yield**."
 
 # --- 6. Main Streamlit App ---
 def main():
@@ -404,7 +408,7 @@ def main():
     
     # Initialize chat history
     if "messages" not in st.session_state:
-        st.session_state["messages"] = [{"role": "assistant", "content": "Welcome! How can I help you analyze your torrefaction simulation?"}]
+        st.session_state["messages"] = [{"role": "assistant", "content": "Welcome! I am the Chemisco AI Assistant. How can I help you analyze your torrefaction simulation?"}]
     
     # --- Sidebar ---
     with st.sidebar:
@@ -416,7 +420,7 @@ def main():
             """, unsafe_allow_html=True)
         else:
             st.markdown("## Chemisco")
-            st.warning("⚠️ Logo file not found. Check deployment path and filename (chemisco_logo.png).")
+            st.warning("⚠️ Logo file not found.")
 
         st.markdown(f"""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
@@ -424,7 +428,7 @@ def main():
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
                 <hr style='margin: 10px 0; border-color: #4CAF50;'>
                 <p style='color: #C8E6C9; font-size: 0.85em;'>Project presented to:</p>
-                <h3 style='color: #FFF176; margin: 0;'>د. عمرو الرفاعي</h3> </div>
+                <h3 style='color: #FFF176; margin: 0;'>Dr. Amr El Refaey</h3> </div>
             """, unsafe_allow_html=True)
         
         st.header("⚙️ Input Parameters")
@@ -464,7 +468,7 @@ def main():
                 </div>
                 <h1>CHEMISCO</h1> 
                 <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to د. عمرو الرفاعي</div> 
+                <div class="dedication">Project presented to Dr. Amr El Refaey</div> 
             </div>
             """, unsafe_allow_html=True)
     else:
@@ -472,7 +476,7 @@ def main():
             <div class="main-banner">
                 <h1>CHEMISCO</h1> 
                 <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to د. عمرو الرفاعي</div> 
+                <div class="dedication">Project presented to Dr. Amr El Refaey</div> 
             </div>
             """, unsafe_allow_html=True)
     
@@ -518,7 +522,7 @@ def main():
     # Run Simulation
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
     
-    # --- GAME LOGIC SECTION (UNCHANGED) ---
+    # --- GAME LOGIC SECTION ---
     if game_mode:
         st.markdown("---")
         st.markdown("""
@@ -567,7 +571,7 @@ def main():
 
     # --- Display Results ---
     st.header("📊 Simulation Results & Analysis")
-    # ADDED 'AI Assistant' TAB
+    # AI Assistant Tab Added Here
     tab1, tab2, tab3, tab4, tab5, tab_ai = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "💰 Cost Analysis", "PDF Report", "🤖 AI Assistant"])
     
     with tab1:
@@ -588,7 +592,7 @@ def main():
         
         col_t1, col_t2 = st.columns(2)
         
-        # --- PLOTLY CHARTS ---
+        # --- PLOTLY PIE CHARTS ---
         with col_t1:
             st.markdown("##### Final Biochar Composition")
             st.caption("Solid Product Breakdown")
@@ -616,7 +620,7 @@ def main():
 
         with col_t2:
             st.markdown("##### Global Mass Balance")
-            st.caption("Initial Input vs. Final Output")
+            st.caption("Initial Input vs. Final Output (Excluding Initial Ash)")
             
             filtered_yields = results["yields_percent"].iloc[[0, 1, 2]].reset_index()
             filtered_yields.columns = ["Component", "Yield (%)"]
@@ -642,7 +646,7 @@ def main():
     with tab2:
         st.subheader("Ash Concentration & Mass Depletion Kinetics")
         
-        # --- FIXED DUAL-AXIS CHART ---
+        # --- PLOTLY DUAL-AXIS CHART ---
         fig_dual = go.Figure()
 
         # Line 1: Total Mass (Left Axis)
@@ -725,7 +729,7 @@ def main():
         # Waterfall Chart 
         fig_waterfall = go.Figure(go.Waterfall(
             name = "Cash Flow", orientation = "v",
-            measure = ["relative", "relative", "relative", "total"], # Adjusted measure for clearer flow
+            measure = ["relative", "relative", "relative", "total"],
             x = ["Feedstock Cost", "Operational Cost", "Revenue", "Net Profit"],
             textposition = "outside",
             y = [-cost_feedstock_total, -cost_operations_total, revenue_total, net_profit],
