@@ -22,7 +22,7 @@ EMPIRICAL_DATA = {
 }
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 
-# --- 2. Global CSS for Aesthetic and BFD ---
+# --- 2. Global CSS for Aesthetic and BFD (No need for Base64 classes) ---
 GLOBAL_CSS = """
 <style>
     .stApp { padding-top: 20px; }
@@ -56,29 +56,10 @@ GLOBAL_CSS = """
     .bfd-stream::before { content: ''; position: absolute; right: -10px; top: -5px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 10px solid #4CAF50; }
     .side-stream { position: absolute; left: 50%; transform: translateX(-50%); width: 3px; height: 40px; background-color: #FF9800; bottom: -40px; }
     .side-stream-label { position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; color: #FF9800; }
-
-    /* Logo Specific CSS for better display */
-    .sidebar-logo {
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-        width: 80%; /* Adjust as needed */
-        margin-bottom: 15px;
-        padding: 5px;
-        background-color: white; /* Optional: to make it stand out on dark sidebar */
-        border-radius: 8px;
-    }
-    .main-banner-logo {
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-        width: 150px; /* Specific width for the main banner */
-        margin-bottom: 10px;
-    }
 </style>
 """
 
-# --- 3. Simulation Core Logic ---
+# --- 3. Simulation Core Logic (UNCHANGED) ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type):
     temp_K = temp_C + 273.15
     data = EMPIRICAL_DATA.get(biomass)
@@ -176,7 +157,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         }
     }
 
-# --- 4. PDF Report Generation Function ---
+# --- 4. PDF Report Generation Function (UNCHANGED) ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -193,12 +174,12 @@ def generate_pdf_report(results):
     # -- 1. Header with Logo (for PDF) --
     try:
         # Load the logo for PDF
-        img_path = "chemisco_logo.png" # Make sure this path is correct
+        img_path = "chemisco_logo.png" 
         logo_pdf = ReportImage(img_path, width=1.5*inch, height=1.5*inch)
         logo_pdf.hAlign = 'CENTER'
         elements.append(logo_pdf)
     except FileNotFoundError:
-        st.warning("Logo file 'chemisco_logo.png' not found for PDF report. Please ensure it's in the same directory.")
+        elements.append(Paragraph("CHEMISCO", title_style)) # Fallback text
         
     elements.append(Paragraph("CHEMISCO REPORT", title_style))
     elements.append(Paragraph("Project presented to: Dr. Amr El-Rifai", styles["Heading3"]))
@@ -252,7 +233,7 @@ def generate_pdf_report(results):
     elements.append(Paragraph(f"<b>Final Ash Concentration:</b> {results['final_ash_percent']:.2f}%", normal_style))
     elements.append(Spacer(1, 0.2*inch))
     
-    # -- 4. Visualizations --
+    # -- 4. Visualizations (Code remains the same) --
     elements.append(Paragraph("3. Results Visualization", heading_style))
     
     def get_image_bytes(fig):
@@ -321,15 +302,21 @@ def generate_pdf_report(results):
     buffer.seek(0)
     return buffer
 
-# --- 5. Main Streamlit App ---
+# --- 5. Main Streamlit App (Simplified Logo Display) ---
 def main():
     st.set_page_config(page_title="Chemisco", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+    
+    LOGO_PATH = "chemisco_logo.png"
 
     # --- Sidebar ---
     with st.sidebar:
-        # Add Logo to Sidebar
-        st.image("chemisco_logo.png", use_column_width=True, output_format="PNG") # Adjust width if needed
+        # 1. SIMPLE AND ROBUST LOGO DISPLAY (Sidebar)
+        try:
+            st.image(LOGO_PATH, use_column_width=True) 
+        except FileNotFoundError:
+            st.info("Logo not found. Please ensure 'chemisco_logo.png' is in the same folder.")
+
         st.markdown("""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
                 <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO</h1>
@@ -371,18 +358,28 @@ def main():
         st.subheader("🎮 Gamification")
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
 
-    # Main Banner (with Logo)
-    st.markdown(f"""
-        <div class="main-banner">
-            <img src="data:image/png;base64,{_get_image_base64('chemisco_logo.png')}" class="main-banner-logo">
-            <h1>CHEMISCO</h1>
-            <p>Advanced Torrefaction Process Simulator</p>
-            <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # --- Main Banner (Using st.columns and st.image for robust display) ---
+    col_logo, col_text = st.columns([1, 4])
+    
+    with col_logo:
+        # 2. SIMPLE AND ROBUST LOGO DISPLAY (Main Banner)
+        try:
+            st.image(LOGO_PATH, width=150)
+        except FileNotFoundError:
+            st.write(" ") # Space placeholder if logo fails
+
+    with col_text:
+        st.markdown(f"""
+            <div style="background-color: #388E3C; padding: 15px 15px 15px 0; border-radius: 12px; margin-left: -50px; text-align: left;">
+                <h1 style="color: #FFFFFF; margin: 0; font-size: 2.5em; font-weight: 800; letter-spacing: 2px;">CHEMISCO</h1>
+                <p style="color: #C8E6C9; margin-top: 5px; font-size: 1em;">Advanced Torrefaction Process Simulator</p>
+                <div style="color: #FFEB3B; font-weight: bold; font-size: 0.9em; margin-top: 10px;">Project presented to Dr. Amr El-Rifai</div>
+            </div>
+            """, unsafe_allow_html=True)
     
     # BFD
     st.subheader("Process Flow Block Diagram (BFD)")
+    # ... (BFD HTML remains the same)
     bfd_html = f"""
     <div class="bfd-container">
         <div class="bfd-block">
@@ -491,3 +488,95 @@ def main():
         st.markdown("---")
         
         col_t1, col_t2 = st.columns(2)
+        
+        with col_t1:
+            st.markdown("##### Final Biochar Composition")
+            df_solid = results["solid_composition"].reset_index()
+            df_solid.columns = ["Component", "Mass (kg)"]
+            fig1 = px.pie(df_solid, values='Mass (kg)', names='Component', hole=0.5,
+                          color='Component',
+                          color_discrete_map={"Fixed Carbon": "#6A1B9A", "Remaining Volatiles": "#AB47BC", "Ash": "#BDBDBD"})
+            fig1.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
+            st.plotly_chart(fig1, use_container_width=True)
+
+        with col_t2:
+            st.markdown("##### Global Mass Balance")
+            filtered_yields = results["yields_percent"].iloc[[0, 1, 2]].reset_index()
+            filtered_yields.columns = ["Component", "Yield (%)"]
+            fig2 = px.pie(filtered_yields, values='Yield (%)', names='Component', hole=0.5,
+                          color='Component',
+                          color_discrete_map={"Biochar (Solid Product)": "#388E3C", "Non-Condensable Gases": "#7CB342", "Moisture Loss (Water Vapor)": "#C5E1A5"})
+            fig2.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
+            st.plotly_chart(fig2, use_container_width=True)
+
+    with tab2:
+        st.subheader("Mass Depletion Kinetics")
+        fig_dual = go.Figure()
+        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Total Mass Yield (%)"], name="Total Mass %", line=dict(color="#4CAF50", width=3), yaxis="y1"))
+        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Ash Concentration in Solid (%)"], name="Ash Concentration %", line=dict(color="#D32F2F", width=3, dash='dot'), yaxis="y2"))
+        fig_dual.update_layout(
+            xaxis=dict(title="Time (min)"),
+            yaxis=dict(title="Total Mass Remaining (%)", title_font=dict(color="#4CAF50"), tickfont=dict(color="#4CAF50")),
+            yaxis2=dict(title="Ash Concentration (%)", title_font=dict(color="#D32F2F"), tickfont=dict(color="#D32F2F"), overlaying="y", side="right"),
+            legend=dict(x=0.1, y=1.1, orientation="h"), height=450
+        )
+        st.plotly_chart(fig_dual, use_container_width=True)
+
+    with tab3:
+        st.subheader("Gas Composition")
+        st.bar_chart(results["gas_composition_molar"])
+
+    with tab4:
+        st.subheader("💰 Economic Feasibility Analysis")
+        cost_feedstock_total = (initial_mass_kg / 1000) * cost_biomass_per_ton
+        hours = duration / 60
+        cost_operations_total = hours * cost_energy_per_hour
+        total_cost = cost_feedstock_total + cost_operations_total
+        biochar_produced_kg = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
+        revenue_total = biochar_produced_kg * price_biochar_per_kg
+        net_profit = revenue_total - total_cost
+        roi = (net_profit / total_cost) * 100 if total_cost > 0 else 0
+        
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        col_c1.metric("📉 Total Cost", f"${total_cost:.2f}")
+        col_c2.metric("📈 Total Revenue", f"${revenue_total:.2f}")
+        col_c3.metric("💵 Net Profit", f"${net_profit:.2f}", delta=f"${abs(net_profit):.2f}", delta_color="normal" if net_profit > 0 else "inverse")
+        col_c4.metric("📊 ROI", f"{roi:.1f}%", delta=f"{abs(roi):.1f}%", delta_color="normal" if roi > 0 else "inverse")
+        
+        st.markdown("---")
+        
+        # Waterfall Chart 
+        fig_waterfall = go.Figure(go.Waterfall(
+            name = "Cash Flow", orientation = "v",
+            measure = ["relative", "relative", "relative", "total"],
+            x = ["Gross Revenue", "Feedstock Cost", "Operational Cost", "Net Profit"],
+            textposition = "outside",
+            text = [f"${revenue_total:.1f}", f"${-cost_feedstock_total:.1f}", f"${-cost_operations_total:.1f}", f"${net_profit:.1f}"],
+            y = [revenue_total, -cost_feedstock_total, -cost_operations_total, net_profit],
+            connector = {"line":{"color":"rgb(63, 63, 63)"}},
+            decreasing = {"marker":{"color":"#EF5350"}},
+            increasing = {"marker":{"color":"#66BB6A"}},
+            totals = {"marker":{"color":"#42A5F5"}}
+        ))
+        fig_waterfall.update_layout(title = "Cash Flow Waterfall Chart (USD)", showlegend = False, height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_waterfall, use_container_width=True)
+        
+        st.info(f"""
+        **Analysis:**
+        Producing **{biochar_produced_kg:.1f} kg** of biochar from **{initial_mass_kg} kg** biomass.
+        Break-even selling price: **${(total_cost/biochar_produced_kg):.2f} / kg**.
+        """)
+
+    with tab5:
+        st.subheader("Download Professional Report")
+        if st.button("⬇️ Generate PDF Report"):
+            pdf_buffer = generate_pdf_report(results)
+            st.download_button(
+                label="Download Report",
+                data=pdf_buffer,
+                file_name=f"Chemisco_Torrefaction_Report.pdf",
+                mime="application/pdf"
+            )
+
+if __name__ == "__main__":
+    main()
