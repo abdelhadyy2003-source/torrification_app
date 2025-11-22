@@ -10,7 +10,7 @@ from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 
-# --- 1. Chemical and Empirical Constants ---
+# --- 1. Chemical and Empirical Constants (Unchanged) ---
 R_GAS = 8.314  # Universal Gas Constant (J/mol·K)
 
 EMPIRICAL_DATA = {
@@ -34,50 +34,97 @@ SIZE_FACTOR = {
     "Coarse (>5mm)": 0.65
 }
 
-# --- 2. Static UI Components (CSS) ---
+# --- 2. Static UI Components (CSS & Helper) ---
 GLOBAL_CSS = """
 <style>
-    /* Main Content Styling */
-    .stApp { padding-top: 20px; }
+    /* Global Styling for Professional Look */
+    .stApp { padding-top: 20px; background-color: #f4f7f6; } 
     
     /* Custom Banner Style */
     .main-banner {
-        background-color: #388E3C; 
+        background: linear-gradient(135deg, #1e704b, #388E3C); /* Gradient Green */
         padding: 30px;
         border-radius: 12px;
         text-align: center;
         margin-bottom: 30px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
     }
-    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 2.5em; }
-    .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.1em; }
+    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 2.8em; }
+    .main-banner p { color: #E8F5E9; margin-top: 5px; font-size: 1.2em; }
     
     /* Sidebar Customization */
     .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { 
-        background-color: #F0F8FF;
+        background-color: #e3f2fd; /* Light Blue for contrast */
     }
-    /* Expander (Input) styling */
+    
+    /* Input Expander Style */
     .st-emotion-cache-p5m8m8 { 
         border-radius: 10px;
-        border-left: 5px solid #4CAF50;
+        border-left: 5px solid #00BCD4; /* Cyan accent */
         padding: 10px;
         margin-bottom: 15px;
         background-color: #FFFFFF;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
-    /* Metric Styling */
-    [data-testid="stMetricValue"] {
-        font-size: 28px;
-        color: #388E3C;
+
+    /* Scoreboard Metrics */
+    .scorecard-container {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        background-color: #FFFFFF;
     }
-    /* Tycoon Scoreboard */
-    .tycoon-metric-value {
-        font-size: 32px !important;
+    .scorecard-value {
+        font-size: 38px !important;
         font-weight: bold;
-        color: #FF4500 !important; /* Orange Red */
+        color: #1e704b !important; 
+        margin: 5px 0 0;
     }
 </style>
 """
+# --- Helper function for Gauge Chart (Visual KPI) ---
+def plot_gauge(value, title, min_val, max_val, color_map, unit=""):
+    """Creates a visually appealing gauge chart using Matplotlib."""
+    fig, ax = plt.subplots(figsize=(4, 2.5), subplot_kw={'aspect': 'equal'})
+    
+    # Draw background arc (Scale)
+    ax.add_patch(plt.Circle((0, 0), 1.0, color='lightgray', fill=False, linewidth=10))
+    
+    # Calculate angular position for the value
+    norm_val = (value - min_val) / (max_val - min_val)
+    angle = 180 * (1 - norm_val) # 180 (start) to 0 (end) degrees
+    
+    # Draw colored arcs (Color Map)
+    for limit, color in color_map.items():
+        if value > limit:
+            continue
+        
+        # Calculate angle for color limit
+        limit_angle = 180 * (1 - (limit - min_val) / (max_val - min_val))
+        
+        # Draw the colored arc
+        ax.add_patch(plt.Wedge((0, 0), 1.0, limit_angle, 180, color=color, linewidth=0, alpha=0.6))
+
+    # Draw the pointer (Needle)
+    x = 0.9 * np.cos(np.deg2rad(angle))
+    y = 0.9 * np.sin(np.deg2rad(angle))
+    ax.plot([0, x], [0, y], color='black', linewidth=3)
+    
+    # Center circle
+    ax.add_patch(plt.Circle((0, 0), 0.1, color='black', zorder=10))
+
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(0, 1.1)
+    ax.set_title(title, fontsize=10, pad=10)
+    ax.text(0, -0.15, f"{value:.2f}{unit}", ha='center', va='center', fontsize=16, weight='bold')
+    
+    # Hide axes
+    ax.axis('off')
+    
+    return fig
 
 # --- 3. Simulation Core Logic (Unchanged) ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg):
@@ -161,81 +208,68 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         }
     }
 
-# --- 4. Tycoon Game Logic ---
+# --- 4. Tycoon Game Logic (Updated) ---
 
 def calculate_tycoon_profit(results):
-    """Calculates the economic outcomes for the Tycoon Game."""
+    """Calculates the economic and energy outcomes for the Scorecard."""
     params = results["parameters"]
     data = EMPIRICAL_DATA.get(params["biomass"])
     
     initial_mass_kg = params["initial_mass"]
     final_biochar_mass = results["yields_mass"].loc["Biochar (Solid) & Ash", "Mass (kg)"]
     
-    # 1. Cost Calculations
-    
-    # Cost of Raw Material (Feedstock)
-    cost_feedstock = initial_mass_kg * data["Feedstock_Cost"] # $/kg * kg
-    
-    # Operating Cost (Proportional to Mass, Temperature, and Duration)
-    # Base cost: 0.01 $/kg. Increased by temperature and duration impact.
-    temp_factor = params["temperature"] / 200 # Normalized to a base of 200°C
-    time_factor = params["duration"] / 60   # Normalized to a base of 60 min
-    cost_operating = initial_mass_kg * 0.01 * temp_factor * time_factor 
-    
-    total_costs = cost_feedstock + cost_operating
-    
-    # 2. Revenue Calculations
-    
-    # Estimate Energy Density Ratio (EDR) for quality assessment
+    # 1. Energy & Quality Calculations (New Sustainability KPI)
     M_total = results["yields_percent"].loc["Biochar (Solid) & Ash", "Yield (%)"] / 100
     initial_moisture = params["moisture"] / 100
     initial_ash = data["Ash"]
     
-    # Mass Yield on Dry-Ash-Free basis (M_daf)
     M_daf = (M_total - initial_ash) / (1 - initial_moisture - initial_ash) if (1 - initial_moisture - initial_ash) > 0.001 else 1.0
     
-    # EDR (HHV_Product / HHV_Feed) ~ 1/M_daf (simplified)
+    # EDR (Energy Density Ratio) ~ 1/M_daf (simplified)
     EDR = 1 / M_daf if M_daf > 0.001 else 1.0 
+
+    # Thermal Efficiency (TE): Energy in Biochar / Energy in Feedstock
+    # TE = M_daf * EDR (simplified)
+    Thermal_Efficiency = M_daf * EDR * (0.8 + 0.2 * (EDR - 1)) # Add a slight correction factor
+    Thermal_Efficiency = min(Thermal_Efficiency, 0.99) # Max 99%
     
-    # Selling Price is adjusted based on EDR (Quality)
+    # 2. Economic Calculations
+    cost_feedstock = initial_mass_kg * data["Feedstock_Cost"]
+    temp_factor = params["temperature"] / 200
+    time_factor = params["duration"] / 60
+    cost_operating = initial_mass_kg * 0.01 * temp_factor * time_factor 
+    total_costs = cost_feedstock + cost_operating
+    
     BASE_SELLING_PRICE = 0.15 # $/kg
-    # Price multiplier: high EDR (e.g., 1.3) boosts price; low EDR (e.g., 1.1) reduces it slightly.
-    price_multiplier = 1 + (EDR - 1.0) * 2.5 # Aggressive pricing curve
-    
+    price_multiplier = 1 + (EDR - 1.0) * 2.5
     selling_price = BASE_SELLING_PRICE * price_multiplier
-    
     revenues = final_biochar_mass * selling_price
     
-    # 3. Final Profit
     net_profit = revenues - total_costs
     
     return {
         "final_biochar_mass": final_biochar_mass,
-        "cost_feedstock": cost_feedstock,
-        "cost_operating": cost_operating,
         "total_costs": total_costs,
         "revenues": revenues,
         "net_profit": net_profit,
         "EDR": EDR,
+        "Thermal_Efficiency": Thermal_Efficiency * 100, # Return as percentage
         "selling_price": selling_price
     }
 
 # --- 5. Main Streamlit App ---
 def main():
-    # Session state for Tycoon Game
+    # Session state initialization
     if 'capital' not in st.session_state:
-        st.session_state.capital = 5000.0  # Initial capital
+        st.session_state.capital = 5000.0
     if 'batch_count' not in st.session_state:
         st.session_state.batch_count = 0
         
     st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
-    
-    # Inject Global CSS
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
-    # 5.1. Sidebar (Inputs)
+    # 5.1. Sidebar (Inputs) - (Simplified and moved to sidebar)
     with st.sidebar:
-        # Logo and Title
         st.markdown("""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20;'>
                 <h1 style='color: white; margin: 0; font-size: 1.8em;'>CHEMISCO PRO</h1>
@@ -244,90 +278,150 @@ def main():
             """, unsafe_allow_html=True)
         st.header("⚙️ Input Parameters")
         
-        # Input Sections
-        with st.expander("🌲 Biomass Properties", expanded=True):
-            initial_mass_kg = st.number_input("Initial Biomass Mass (kg)", min_value=1.0, value=100.0, step=10.0, help="Initial mass of the feedstock entering the process.")
+        with st.expander("🌲 Biomass & Batch Size", expanded=True):
+            initial_mass_kg = st.number_input("Initial Batch Mass (kg)", min_value=1.0, value=100.0, step=50.0)
             biomass_type = st.selectbox("Biomass Type", list(EMPIRICAL_DATA.keys()))
-            moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0, help="Moisture percentage on a wet basis.")
+            moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0)
             particle_size = st.selectbox("Particle Size", list(SIZE_FACTOR.keys()))
         
         with st.expander("🌡️ Process Conditions", expanded=True):
-            temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5, help="Target operating temperature in the reactor.")
-            duration = st.slider("Process Duration (min)", 10, 120, 45, step=5, help="Time spent in the torrefaction zone.")
+            temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5)
+            duration = st.slider("Process Duration (min)", 10, 120, 45, step=5)
             
-            ash_percent = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
-            st.info(f"Assumed Initial Ash Content: **{ash_percent:.1f}%**")
-            
-    # 5.2. Main Content (Banner and Run Simulation)
-    
-    # Main Banner
+        st.markdown("---")
+        
+        # Tycoon Game Controls in Sidebar
+        st.subheader("💰 Tycoon Controls")
+        
+        # Run Button
+        if st.button("▶️ تشغيل دورة الإنتاج الحالية", help="يشغل دورة إنتاج واحدة بالإعدادات المحددة"):
+            if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
+                st.error("Input Error: Moisture and Ash > 100%.")
+            else:
+                st.session_state.run_batch = True
+        else:
+            st.session_state.run_batch = False
+        
+        if st.session_state.batch_count > 0:
+            if st.button("🔄 إعادة تعيين اللعبة", help="إعادة رأس المال والعدادات إلى القيمة الافتراضية"):
+                st.session_state.capital = 5000.0
+                st.session_state.batch_count = 0
+                st.rerun()
+
+    # 5.2. Main Content
     st.markdown("""
         <div class="main-banner">
             <h1>🔥 Advanced Torrefaction Simulator</h1>
-            <p>Enhanced Kinetic Model for Process Optimization</p>
+            <p>Strategic Dashboard for Process Optimization</p>
         </div>
         """, unsafe_allow_html=True)
     
-    # --- Run Simulation ---
-    if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
-        st.error("**Input Error:** Initial Moisture and Ash content exceed 100%. Please adjust the parameters.")
-        return 
-        
+    # --- Scoreboard Bar ---
+    st.subheader("لوحة التحكم الاستراتيجية (Scoreboard)")
+    col_sc1, col_sc2, col_sc3 = st.columns(3)
+    
+    col_sc1.markdown('<div class="scorecard-container"><h4>🏦 رأس المال الكلي</h4><p class="scorecard-value">$%s</p></div>' % f"{st.session_state.capital:,.2f}", unsafe_allow_html=True)
+    col_sc2.markdown('<div class="scorecard-container"><h4>🏭 دورات الإنتاج المنفذة</h4><p class="scorecard-value">%s</p></div>' % f"{st.session_state.batch_count}", unsafe_allow_html=True)
+    
+    if st.session_state.capital >= 15000:
+        col_sc3.markdown('<div class="scorecard-container" style="background-color: #E8F5E9;"><h4>🏆 حالة التحدي</h4><p class="scorecard-value" style="color:#2E7D32;">هدف تم تحقيقه!</p></div>', unsafe_allow_html=True)
+    elif st.session_state.capital >= 5000:
+        col_sc3.markdown('<div class="scorecard-container" style="background-color: #FFFDE7;"><h4>🎯 هدف الربح</h4><p class="scorecard-value" style="color:#FBC02D;">$15,000</p></div>', unsafe_allow_html=True)
+    else:
+        col_sc3.markdown('<div class="scorecard-container" style="background-color: #FFEBEE;"><h4>🚨 هدف الربح</h4><p class="scorecard-value" style="color:#C62828;">$15,000</p></div>', unsafe_allow_html=True)
+
+
+    st.markdown("---")
+    
+    # --- Run Logic and Display Tabs ---
+    
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg)
     
-    # --- Display Results ---
-    st.header("📊 Simulation Results & Analysis")
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Yields & Mass Balance", "Mass Conversion Kinetics", "Gas Composition", "PDF Report", "💰 Torrefaction Tycoon"])
-    
-    # --- Tab 1: Yields & Mass Balance ---
+    tab1, tab2, tab3 = st.tabs(["🔥 بطاقة الأداء (KPIs)", "📈 تفاصيل المحاكاة", "📄 تقرير PDF"])
+
     with tab1:
-        st.subheader(f"Product Yields (Based on {initial_mass_kg:.0f} kg Input)")
-        col_m1, col_m2, col_m3 = st.columns(3)
+        st.subheader("بطاقة الأداء الاستراتيجية ودورة الإنتاج")
         
-        biochar_mass_metric = results["yields_mass"].loc["Biochar (Solid) & Ash", "Mass (kg)"]
-        col_m1.metric("⚖️ Total Solid Product (kg)", f"{biochar_mass_metric:.2f} kg", delta=f"{results['k_devol_eff']:.3f} min⁻¹ (Rate)")
+        # 1. KPIs Visuals
+        col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
         
-        gas_mass_metric = results["yields_mass"].loc["Non-Condensable Gases", "Mass (kg)"]
-        col_m2.metric("💨 Non-Condensable Gas Mass (kg)", f"{gas_mass_metric:.2f} kg")
+        tycoon_results = calculate_tycoon_profit(results)
         
-        moisture_mass_metric = results["yields_mass"].loc["Moisture Loss (Water Vapor)", "Mass (kg)"]
-        col_m3.metric("💧 Water Vapor Loss (kg)", f"{moisture_mass_metric:.2f} kg")
+        # KPI 1: Profitability
+        profit_map = {-50: 'red', 0: 'orange', 100: 'green'}
+        profit_fig = plot_gauge(tycoon_results['net_profit'], "1. الأداء الاقتصادي (الربح الصافي)", min_val=-100, max_val=200, color_map=profit_map, unit="$")
+        col_kpi1.pyplot(profit_fig)
+
+        # KPI 2: Biochar Quality (EDR)
+        edr_map = {1.1: 'red', 1.25: 'yellow', 1.4: 'green'}
+        edr_fig = plot_gauge(tycoon_results['EDR'], "2. جودة المنتج (نسبة كثافة الطاقة)", min_val=1.0, max_val=1.5, color_map=edr_map)
+        col_kpi2.pyplot(edr_fig)
+
+        # KPI 3: Thermal Efficiency
+        te_map = {60: 'red', 75: 'yellow', 90: 'green'}
+        te_fig = plot_gauge(tycoon_results['Thermal_Efficiency'], "3. الكفاءة الحرارية (%)", min_val=50, max_val=100, color_map=te_map, unit="%")
+        col_kpi3.pyplot(te_fig)
 
         st.markdown("---")
         
-        col_t1, col_t2 = st.columns(2)
-        with col_t1:
-            st.subheader("Yield Distribution Tables")
-            st.markdown("##### 1. Mass Yields (kg)")
-            st.dataframe(results["yields_mass"].style.format("{:.2f}"), use_container_width=True)
-            st.markdown("##### 2. Mass Fractions (%)")
-            st.dataframe(results["yields_percent"].style.format("{:.2f}"), use_container_width=True)
+        # 2. Batch Execution Summary
+        st.markdown("### 📝 نتائج دورة الإنتاج الأخيرة")
+        if st.session_state.run_batch:
+            
+            # Update capital and count here after successful run check in sidebar
+            if st.session_state.capital >= initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"]:
+                st.session_state.capital += tycoon_results["net_profit"]
+                st.session_state.batch_count += 1
+                
+                col_sum1, col_sum2, col_sum3 = st.columns(3)
+                col_sum1.metric("الربح الصافي ($)", f"${tycoon_results['net_profit']:,.2f}", delta=f"{tycoon_results['net_profit']/tycoon_results['total_costs'] * 100:.1f} % هامش ربح")
+                col_sum2.metric("سعر البيع المعدل ($/kg)", f"${tycoon_results['selling_price']:.4f}")
+                col_sum3.metric("عائد الكتلة (%)", f"{results['yields_percent'].loc['Biochar (Solid) & Ash', 'Yield (%)']:.2f} %")
+
+                st.markdown("##### تحليل التكاليف والإيرادات:")
+                profit_df = pd.DataFrame({
+                    "البند": ["تكلفة المواد الخام", "تكلفة التشغيل", "إجمالي التكاليف", "الإيرادات الكلية"],
+                    "القيمة ($)": [
+                        tycoon_results["cost_feedstock"], 
+                        tycoon_results["cost_operating"], 
+                        tycoon_results["total_costs"], 
+                        tycoon_results["revenues"]
+                    ]
+                }).set_index("البند")
+                st.dataframe(profit_df.style.format("${:,.2f}"), use_container_width=True)
+                
+            else:
+                st.error("⚠️ فشلت الدورة! رأس مالك الحالي غير كافٍ لشراء المواد الخام. حاول تقليل حجم الدفعة أو اختيار مادة خام أرخص.")
+                
+            st.session_state.run_batch = False # Reset flag
+
+    # --- Tab 2: Simulation Details ---
+    with tab2:
+        st.subheader("تفاصيل ميزان الكتلة والمحاكاة الحركية")
+        col_d1, col_d2 = st.columns(2)
         
-        with col_t2:
-            st.subheader("Mass Balance Pie Chart")
-            fig1, ax1 = plt.subplots(figsize=(6, 6))
+        with col_d1:
+            st.markdown("##### 1. Mass Conversion Kinetics")
+            st.line_chart(results["mass_profile"], use_container_width=True)
+            st.markdown("##### 2. Gas Composition")
+            st.bar_chart(results["gas_composition_molar"], use_container_width=True)
+            
+        with col_d2:
+            st.markdown("##### 3. Yield Distribution (kg)")
+            st.dataframe(results["yields_mass"].style.format("{:.2f}"), use_container_width=True)
+            st.markdown("##### 4. Mass Balance Pie Chart")
+            fig1, ax1 = plt.subplots(figsize=(5, 5))
             filtered_yields = results["yields_percent"].iloc[[0, 1, 2]] 
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
 
-    # --- Tab 2 & 3 ---
-    with tab2:
-        st.subheader("Mass Component Conversion Over Time")
-        st.line_chart(results["mass_profile"])
-        st.caption("The curves show how Moisture and Volatiles fractions decrease as the Biochar fraction forms over time.")
-
+    # --- Tab 3: PDF Report ---
     with tab3:
-        st.subheader("Non-Condensable Dry Gas Composition")
-        st.bar_chart(results["gas_composition_molar"])
-        st.caption("Molar percentages of gaseous products from devolatilization (dry basis).")
-        
-    # --- Tab 4 (PDF Report) ---
-    with tab4:
         st.subheader("Generate Comprehensive PDF Report")
         st.markdown("Click the button below to generate and download a detailed report of the simulation.")
         
-        if st.button("⬇️ Download PDF Report"):
+        if st.button("⬇️ Download PDF Report", key="pdf_download"):
             pdf_buffer = generate_pdf_report(results)
             st.download_button(
                 label="Download Report",
@@ -336,71 +430,8 @@ def main():
                 mime="application/pdf"
             )
 
-    # --- Tab 5: Tycoon Game ---
-    with tab5:
-        st.title("💰 Torrefaction Tycoon: تحدي الربح")
-        st.write("هدفك هو الوصول إلى أعلى ربح صافي ممكن عن طريق ضبط ظروف التفحيم (درجة الحرارة والمدة).")
-        st.markdown("---")
-        
-        # Display Current Capital
-        col_cap1, col_cap2 = st.columns([1, 2])
-        col_cap1.markdown(f"## 🏦 رأس مالك الحالي:")
-        col_cap1.markdown(f"<p class='tycoon-metric-value'>${st.session_state.capital:,.2f}</p>", unsafe_allow_html=True)
-        col_cap2.info(f"**تنبيه:** يتم استخدام إعدادات المحاكاة الحالية ({initial_mass_kg:.0f} كجم من {biomass_type}) في دورة الإنتاج.")
-
-        st.markdown("---")
-
-        if st.button("▶️ تشغيل دورة الإنتاج الحالية", help="يشغل دورة إنتاج واحدة بالإعدادات المحددة في الشريط الجانبي"):
-            
-            # Check if capital is enough to cover feedstock cost
-            feedstock_cost_check = initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"]
-            if st.session_state.capital < feedstock_cost_check:
-                st.error("⚠️ فشلت الدورة! رأس مالك الحالي غير كافٍ لشراء المواد الخام.")
-            else:
-                # Calculate Profit
-                tycoon_results = calculate_tycoon_profit(results)
-                
-                # Update Capital and Batch Count
-                st.session_state.capital += tycoon_results["net_profit"]
-                st.session_state.batch_count += 1
-                
-                st.success(f"✅ تم تشغيل الدورة رقم {st.session_state.batch_count} بنجاح!")
-                
-                # Display Results Table
-                st.markdown("### 📈 ملخص الدورة الإنتاجية")
-                
-                # Metrics
-                col_r1, col_r2, col_r3 = st.columns(3)
-                col_r1.metric("الإيرادات الكلية ($)", f"${tycoon_results['revenues']:,.2f}", delta_color="off")
-                col_r2.metric("التكاليف الكلية ($)", f"${tycoon_results['total_costs']:,.2f}", delta_color="off")
-                col_r3.metric("الربح الصافي ($)", f"${tycoon_results['net_profit']:,.2f}", delta=f"{tycoon_results['net_profit']/tycoon_results['total_costs'] * 100:.1f} % هامش ربح", delta_color="normal")
-                
-                st.markdown("##### تفاصيل الحسابات:")
-                profit_df = pd.DataFrame({
-                    "البند": ["تكلفة المواد الخام", "تكلفة التشغيل", "إجمالي التكاليف", "الإيرادات الكلية", "الربح الصافي"],
-                    "القيمة ($)": [
-                        tycoon_results["cost_feedstock"], 
-                        tycoon_results["cost_operating"], 
-                        tycoon_results["total_costs"], 
-                        tycoon_results["revenues"], 
-                        tycoon_results["net_profit"]
-                    ]
-                }).set_index("البند")
-                st.dataframe(profit_df.style.format("${:,.2f}"), use_container_width=True)
-
-                st.info(f"""
-                    * **جودة المنتج (EDR):** {tycoon_results['EDR']:.3f} (كلما زادت القيمة، زادت كثافة الطاقة).
-                    * **سعر البيع المعدل:** ${tycoon_results['selling_price']:.4f} / كجم.
-                    * **الكتلة الحيوية النهائية:** {tycoon_results['final_biochar_mass']:.2f} كجم.
-                """)
-
-        if st.session_state.batch_count > 0:
-            if st.button("🔄 إعادة تعيين اللعبة"):
-                st.session_state.capital = 5000.0
-                st.session_state.batch_count = 0
-                st.rerun()
-
-# --- 6. PDF Report Generation Function ---
+# --- 6. PDF Report Generation Function (Unchanged) ---
+# ... (The rest of the generate_pdf_report function remains the same as in V8)
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
