@@ -9,8 +9,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
+from matplotlib.patches import Circle, Wedge # <--- تم إضافة هذا الاستيراد لتصحيح الخطأ
 
-# --- 1. Chemical and Empirical Constants (Unchanged) ---
+# --- 1. Chemical and Empirical Constants ---
 R_GAS = 8.314  # Universal Gas Constant (J/mol·K)
 
 EMPIRICAL_DATA = {
@@ -91,22 +92,24 @@ def plot_gauge(value, title, min_val, max_val, color_map, unit=""):
     fig, ax = plt.subplots(figsize=(4, 2.5), subplot_kw={'aspect': 'equal'})
     
     # Draw background arc (Scale)
-    ax.add_patch(plt.Circle((0, 0), 1.0, color='lightgray', fill=False, linewidth=10))
+    # Using 'Circle' imported from matplotlib.patches
+    ax.add_patch(Circle((0, 0), 1.0, color='lightgray', fill=False, linewidth=10))
     
     # Calculate angular position for the value
     norm_val = (value - min_val) / (max_val - min_val)
     angle = 180 * (1 - norm_val) # 180 (start) to 0 (end) degrees
     
     # Draw colored arcs (Color Map)
-    for limit, color in color_map.items():
-        if value > limit:
+    for limit, color in sorted(color_map.items(), reverse=True): # Sort descending to draw from largest arc
+        if value < limit: # Only draw the color band if the value is below the threshold
             continue
         
         # Calculate angle for color limit
         limit_angle = 180 * (1 - (limit - min_val) / (max_val - min_val))
         
         # Draw the colored arc
-        ax.add_patch(plt.Wedge((0, 0), 1.0, limit_angle, 180, color=color, linewidth=0, alpha=0.6))
+        # Using 'Wedge' imported from matplotlib.patches - FIX for AttributeError
+        ax.add_patch(Wedge((0, 0), 1.0, limit_angle, 180, color=color, linewidth=0, alpha=0.6))
 
     # Draw the pointer (Needle)
     x = 0.9 * np.cos(np.deg2rad(angle))
@@ -114,7 +117,7 @@ def plot_gauge(value, title, min_val, max_val, color_map, unit=""):
     ax.plot([0, x], [0, y], color='black', linewidth=3)
     
     # Center circle
-    ax.add_patch(plt.Circle((0, 0), 0.1, color='black', zorder=10))
+    ax.add_patch(Circle((0, 0), 0.1, color='black', zorder=10))
 
     ax.set_xlim(-1.1, 1.1)
     ax.set_ylim(0, 1.1)
@@ -208,8 +211,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         }
     }
 
-# --- 4. Tycoon Game Logic (Updated) ---
-
+# --- 4. Tycoon Game Logic (Unchanged) ---
 def calculate_tycoon_profit(results):
     """Calculates the economic and energy outcomes for the Scorecard."""
     params = results["parameters"]
@@ -264,11 +266,13 @@ def main():
         st.session_state.capital = 5000.0
     if 'batch_count' not in st.session_state:
         st.session_state.batch_count = 0
+    if 'run_batch' not in st.session_state:
+        st.session_state.run_batch = False
         
     st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
-    # 5.1. Sidebar (Inputs) - (Simplified and moved to sidebar)
+    # 5.1. Sidebar (Inputs) 
     with st.sidebar:
         st.markdown("""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20;'>
@@ -297,10 +301,9 @@ def main():
         if st.button("▶️ تشغيل دورة الإنتاج الحالية", help="يشغل دورة إنتاج واحدة بالإعدادات المحددة"):
             if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
                 st.error("Input Error: Moisture and Ash > 100%.")
+                st.session_state.run_batch = False
             else:
                 st.session_state.run_batch = True
-        else:
-            st.session_state.run_batch = False
         
         if st.session_state.batch_count > 0:
             if st.button("🔄 إعادة تعيين اللعبة", help="إعادة رأس المال والعدادات إلى القيمة الافتراضية"):
@@ -348,17 +351,17 @@ def main():
         tycoon_results = calculate_tycoon_profit(results)
         
         # KPI 1: Profitability
-        profit_map = {-50: 'red', 0: 'orange', 100: 'green'}
+        profit_map = {100: 'green', 0: 'yellow', -50: 'red'} # Green=High Profit, Yellow=Low, Red=Loss
         profit_fig = plot_gauge(tycoon_results['net_profit'], "1. الأداء الاقتصادي (الربح الصافي)", min_val=-100, max_val=200, color_map=profit_map, unit="$")
         col_kpi1.pyplot(profit_fig)
 
         # KPI 2: Biochar Quality (EDR)
-        edr_map = {1.1: 'red', 1.25: 'yellow', 1.4: 'green'}
+        edr_map = {1.4: 'green', 1.25: 'yellow', 1.1: 'red'} # Green=High EDR, Yellow=Medium, Red=Low
         edr_fig = plot_gauge(tycoon_results['EDR'], "2. جودة المنتج (نسبة كثافة الطاقة)", min_val=1.0, max_val=1.5, color_map=edr_map)
         col_kpi2.pyplot(edr_fig)
 
         # KPI 3: Thermal Efficiency
-        te_map = {60: 'red', 75: 'yellow', 90: 'green'}
+        te_map = {90: 'green', 75: 'yellow', 60: 'red'} # Green=High Efficiency, Yellow=Medium, Red=Low
         te_fig = plot_gauge(tycoon_results['Thermal_Efficiency'], "3. الكفاءة الحرارية (%)", min_val=50, max_val=100, color_map=te_map, unit="%")
         col_kpi3.pyplot(te_fig)
 
@@ -368,8 +371,12 @@ def main():
         st.markdown("### 📝 نتائج دورة الإنتاج الأخيرة")
         if st.session_state.run_batch:
             
-            # Update capital and count here after successful run check in sidebar
-            if st.session_state.capital >= initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"]:
+            # Check for capital after run_batch is True
+            feedstock_cost_check = initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"]
+            
+            if st.session_state.capital >= feedstock_cost_check:
+                
+                # Update capital and count
                 st.session_state.capital += tycoon_results["net_profit"]
                 st.session_state.batch_count += 1
                 
@@ -382,8 +389,8 @@ def main():
                 profit_df = pd.DataFrame({
                     "البند": ["تكلفة المواد الخام", "تكلفة التشغيل", "إجمالي التكاليف", "الإيرادات الكلية"],
                     "القيمة ($)": [
-                        tycoon_results["cost_feedstock"], 
-                        tycoon_results["cost_operating"], 
+                        initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"], 
+                        tycoon_results["total_costs"] - initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"], 
                         tycoon_results["total_costs"], 
                         tycoon_results["revenues"]
                     ]
@@ -431,7 +438,6 @@ def main():
             )
 
 # --- 6. PDF Report Generation Function (Unchanged) ---
-# ... (The rest of the generate_pdf_report function remains the same as in V8)
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
