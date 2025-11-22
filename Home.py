@@ -43,51 +43,14 @@ def _get_image_base64(image_path):
 LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
 
 
-# --- 2. Global CSS ---
+# --- 2. Global CSS (Updated to remove main banner styling) ---
 GLOBAL_CSS = """
 <style>
     .stApp { padding-top: 20px; }
-    .main-banner {
-        background-color: #388E3C; /* Dark Green */
-        padding: 30px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 30px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    }
-    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 3em; font-weight: 800; letter-spacing: 2px;}
-    
-    /* NEW BANNER/TAGLINE STYLE */
-    .banner-tagline { 
-        color: #FFFFFF; 
-        font-size: 1.4em; 
-        font-weight: 500;
-        margin: 10px 0 20px 0;
-        padding: 5px 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.5);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-    }
-    
-    .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.2em; }
-    .dedication { 
-        color: #FFEB3B; /* Yellow */
-        font-weight: bold; 
-        font-size: 1.1em; 
-        margin-top: 15px; 
-        padding-top: 10px;
-        border-top: 1px solid rgba(255,255,255,0.3);
-    }
     
     /* Metrics Style */
     [data-testid="stMetricValue"] { font-size: 28px; color: #388E3C; }
     
-    /* Custom classes for logo sizing in main banner (INCREASED SIZE) */
-    .main-banner-logo-container {
-        display: block;
-        margin: 0 auto 15px auto; 
-        width: 220px; 
-    }
-
     /* Sidebar Logo Adjustment */
     .sidebar-logo-container {
         padding: 10px;
@@ -368,7 +331,7 @@ def generate_pdf_report(results):
     buffer.seek(0)
     return buffer
 
-# --- 5. AI Chatbot Logic (MOCK FUNCTION) ---
+# --- 5. AI Chatbot Logic (MOCK FUNCTION) - UPDATED with Pyrolysis comparison ---
 def mock_ai_response(prompt, results):
     """
     MOCK AI function: Provides simulated responses based on keywords.
@@ -376,6 +339,22 @@ def mock_ai_response(prompt, results):
     """
     p = results["parameters"]
     
+    # --- NEW: Pyrolysis vs Torrefaction Comparison ---
+    if "pyrolysis" in prompt.lower() and "torrefaction" in prompt.lower() or "pyrolysis" in prompt.lower() and "vs" in prompt.lower() or "مقارنة" in prompt:
+        
+        return """Torrefaction and Pyrolysis are both thermal processes but differ significantly in **temperature**, **product focus**, and **biomass change**. Here is a quick comparison:
+
+| Feature | Torrefaction (Mild Pyrolysis) | Pyrolysis (Fast/Intermediate) |
+| :--- | :--- | :--- |
+| **Temperature** | $200^\circ C$ to $300^\circ C$ (Low) | $400^\circ C$ to $700^\circ C$ (High) |
+| **Atmosphere** | Inert or low oxygen (Mild) | Inert (Strictly oxygen-free) |
+| **Main Product** | **Solid Biochar** (Torrefied Biomass) | **Bio-Oil/Bio-Fuel** (Liquid) |
+| **Yield Focus** | Maximize **Solid** yield (70-90% mass) | Maximize **Liquid** yield (50-75% mass) |
+| **Biomass Change** | Removes water, slight devolatilization. Biochar is **hydrophobic** and brittle. | Heavy devolatilization. Structure completely breaks down. |
+| **Process Duration** | Minutes to Hours (Slower) | Seconds (Very Fast) |
+
+**Conclusion:** Since our simulator focuses on the $200^\circ C$ to $350^\circ C$ range, it is modeling a **Torrefaction** or a **Mild Pyrolysis** process, aiming for a high-quality solid fuel."""
+
     if "optimize" in prompt.lower() or "increase yield" in prompt.lower() or "best conditions" in prompt.lower():
         # High Yield/Low Ash Suggestion
         return f"""To achieve higher **Biochar Yield** and lower **Ash Concentration** for {p['biomass']}, consider the following:
@@ -385,17 +364,13 @@ def mock_ai_response(prompt, results):
     
     if "ash" in prompt.lower() or "ash concentration" in prompt.lower() or "inerts" in prompt.lower():
         
-        # --- FIX: Calculate the complex value OUTSIDE the f-string ---
         initial_ash_percentage = EMPIRICAL_DATA[p['biomass']]["Ash"] * 100
         
         if initial_ash_percentage > 0:
             enrichment_factor = results['final_ash_percent'] / initial_ash_percentage
         else:
-            # Handle case where initial ash is zero or near zero to avoid ZeroDivisionError
-            enrichment_factor = 1.0 if results['final_ash_percent'] < 0.01 else 999.0 # If final ash is high, factor is huge
+            enrichment_factor = 1.0 if results['final_ash_percent'] < 0.01 else 999.0
 
-        # --- END OF FIX ---
-        
         return f"""Ash concentration increases because the inert ash remains while other components (moisture and volatiles) are removed. 
         Current Ash Concentration: **{results['final_ash_percent']:.2f}%**. 
         This is an **enrichment factor** of {enrichment_factor:.2f} compared to the initial biomass. Lowering the initial ash content in the feedstock is the only way to reduce this value, as ash is not consumed during torrefaction."""
@@ -434,13 +409,14 @@ def main():
             st.markdown("## Chemisco")
             st.warning("⚠️ Logo file not found.")
 
+        # Updated Sidebar Header (Arabic Name, Removed Banner)
         st.markdown(f"""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
                 <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO</h1>
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
                 <hr style='margin: 10px 0; border-color: #4CAF50;'>
                 <p style='color: #C8E6C9; font-size: 0.85em;'>Project presented to:</p>
-                <h3 style='color: #FFF176; margin: 0;'>Dr. Amr El Refaey</h3> </div>
+                <h3 style='color: #FFF176; margin: 0; font-family: Tahoma, Arial, sans-serif;'>د. عمرو الرفاعي</h3> </div>
             """, unsafe_allow_html=True)
         
         st.header("⚙️ Input Parameters")
@@ -471,26 +447,9 @@ def main():
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
 
 
-    # --- Main Banner ---
-    if LOGO_BASE64_STRING:
-        st.markdown(f"""
-            <div class="main-banner">
-                <div class="main-banner-logo-container">
-                    <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 100%; height: auto; border-radius: 8px;">
-                </div>
-                <h1>CHEMISCO</h1> 
-                <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to Dr. Amr El Refaey</div> 
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-            <div class="main-banner">
-                <h1>CHEMISCO</h1> 
-                <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to Dr. Amr El Refaey</div> 
-            </div>
-            """, unsafe_allow_html=True)
+    # --- Main Header (Replaced Banner with simple header) ---
+    st.title("CHEMISCO: Advanced Torrefaction Simulator")
+    st.markdown("---")
     
     # BFD (Block Flow Diagram)
     bfd_html = f"""
@@ -778,7 +737,7 @@ def main():
     # --- NEW AI ASSISTANT TAB ---
     with tab_ai:
         st.header("🤖 AI Assistant: Torrefaction Expert")
-        st.info("Ask me about process optimization, result analysis, or the chemical kinetics!")
+        st.info("Ask me about process optimization, result analysis, the difference between Pyrolysis and Torrefaction, or the chemical kinetics!")
 
         # Display chat messages from history
         for message in st.session_state.messages:
@@ -786,7 +745,7 @@ def main():
                 st.markdown(message["content"])
 
         # Chat input handling
-        if prompt := st.chat_input("Ask a question (e.g., 'How to increase yield?')"):
+        if prompt := st.chat_input("Ask a question (e.g., 'Pyrolysis vs Torrefaction')"):
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
             
