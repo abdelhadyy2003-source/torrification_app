@@ -13,6 +13,9 @@ from reportlab.lib import colors
 # --- 1. الثوابت الكيميائية الحرارية ---
 R_GAS = 8.314  # ثابت الغازات العام (J/mol·K)
 
+# المعاملات التجريبية (A: عامل التردد [1/min], Ea: طاقة التنشيط [J/mol])
+# k_drying_base: ثابت معدل التجفيف الأساسي عند 250°C (1/min)
+# Gas_Factor: عامل قياس للغازات المتكونة
 EMPIRICAL_DATA = {
     "Wood": {
         "A": 2.5e10, "Ea": 135000, "k_drying_base": 0.05, 
@@ -28,43 +31,59 @@ EMPIRICAL_DATA = {
     }
 }
 
+# عامل تصحيح لحجم الجسيمات (يؤثر على انتقال الحرارة)
 SIZE_FACTOR = {
     "Fine (<1mm)": 1.0,
     "Medium (1-5mm)": 0.85,
     "Coarse (>5mm)": 0.65
 }
 
-# --- 2. دالة المحاكاة (بدون تغيير في المنطق الأساسي) ---
+# --- 2. دالة المحاكاة (simulate_torrefaction) ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size):
-    """منطق محاكاة التفحيم الاحترافي."""
+    """منطق محاكاة التفحيم الاحترافي باستخدام Arrhenius وتأثير حجم الجسيمات."""
     temp_K = temp_C + 273.15
     data = EMPIRICAL_DATA.get(biomass)
     
+    # 1. حساب ثابت معدل التطاير (k_devol) باستخدام Arrhenius
     k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS * temp_K))
+    
+    # 2. تطبيق عامل تصحيح حجم الجسيمات
     size_correction = SIZE_FACTOR.get(size)
     k_devol_eff = k_devol_arrhenius * size_correction
     k_drying = data["k_drying_base"]
     ash_content = data["Ash"]
 
+    # 3. حل المعادلات التفاضلية العادية (ODEs)
     def model(y, t, k1, k2):
         moisture, volatiles = y
+        # يتم فقدان الرطوبة حتى تجف تماماً
         d_moisture = -k1 * moisture if moisture > 0.001 else 0
+        # يتم فقدان المواد المتطايرة
         d_volatiles = -k2 * volatiles
         return [d_moisture, d_volatiles]
     
     t = np.linspace(0, duration_min, 100)
-    y0 = [moisture / 100, 1 - moisture / 100 - ash_content]
+    # y0: [الرطوبة الابتدائية (كسر الكتلة), المتطايرات العضوية الابتدائية (كسر الكتلة)]
+    initial_moisture_fraction = moisture / 100
+    initial_volatiles_fraction = 1 - initial_moisture_fraction - ash_content
+    y0 = [initial_moisture_fraction, initial_volatiles_fraction]
     
     if y0[1] < 0:
         y0[1] = 0
-        st.error("خطأ: مجموع الرطوبة والرماد يتجاوز 100%. يرجى التحقق من المدخلات.")
+        # لا نعرض الخطأ هنا لتجنب التكرار في Streamlit، بل نعتمد على st.error في الواجهة
         
     sol = odeint(model, y0, t, args=(k_drying, k_devol_eff))
     
+    # ضمان عدم وجود كسور سالبة بسبب أخطاء التكامل
+    sol[sol < 0] = 0
+
+    # 4. حساب تحول الكتلة بمرور الزمن
     final_moisture = sol[-1, 0]
     final_volatiles_remaining = sol[-1, 1]
-    
-    # حساب تحول الكتلة بمرور الزمن
+    final_biochar_yield = (1 - final_moisture - final_volatiles_remaining - ash_content)
+    final_volatiles_lost = initial_volatiles_fraction - final_volatiles_remaining
+    moisture_lost = initial_moisture_fraction - final_moisture
+
     mass_profile = pd.DataFrame({
         "Time (min)": t,
         "Moisture Fraction": sol[:, 0],
@@ -72,11 +91,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size):
         "Biochar Fraction": 1 - sol[:, 0] - sol[:, 1] - ash_content,
     }).set_index("Time (min)")
     
-    # حساب العوائد النهائية
-    final_biochar_yield = (1 - final_moisture - final_volatiles_remaining - ash_content)
-    final_volatiles_lost = y0[1] - final_volatiles_remaining
-    moisture_lost = (moisture/100 - final_moisture)
-    
+    # 5. توزيع نواتج التحلل
     gas_fraction = final_volatiles_lost * data["Gas_Factor"]
     
     gas_comp = {
@@ -86,6 +101,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size):
         "H2": 0.05 * gas_fraction
     }
     
+    # 6. تجهيز مخرجات النتائج
     yields = pd.DataFrame({
         "Yield (%)": [
             (final_biochar_yield + ash_content) * 100,
@@ -97,6 +113,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size):
     )
     
     gas_composition = pd.DataFrame.from_dict(
+        # تحويل ناتج الغاز إلى نسب مولارية مئوية (على أساس جاف)
         {k: v * 100 / final_volatiles_lost for k, v in gas_comp.items() if final_volatiles_lost > 0.001}, 
         orient="index", columns=["Molar % in Dry Gas"]
     ).fillna(0)
@@ -105,7 +122,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size):
         "yields": yields,
         "temp_profile": pd.DataFrame({"Temperature (°C)": temp_C * np.ones_like(t)}, index=t),
         "gas_composition": gas_composition,
-        "mass_profile": mass_profile, # إضافة التحول بمرور الزمن
+        "mass_profile": mass_profile,
         "k_devol_eff": k_devol_eff,
         "parameters": {
             "biomass": biomass, "moisture": moisture, "temperature": temp_C, 
@@ -117,11 +134,9 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size):
 def main():
     st.set_page_config(page_title="Chemisco Pro Torrefaction Simulator", layout="wide")
     
-    # 3.1. الشعار والبانر
-    
-    # الشعار في الشريط الجانبي (Placeholder)
+    # 3.1. الشعار والبانر (استخدام HTML/Markdown للعرض الاحترافي)
     with st.sidebar:
-        # يمكنك استبدال هذه بـ st.image("path/to/logo.png")
+        # الشعار في الشريط الجانبي (Placeholder - استبدله بـ st.image)
         st.markdown(
             """
             <div style='text-align: center; padding: 10px; background-color: #0E1117; border-radius: 5px;'>
@@ -144,7 +159,7 @@ def main():
             duration = st.slider("مدة العملية (دقيقة)", 10, 120, 45, step=5)
             
             ash_percent = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
-            st.info(f"الرماد المفترض: **{ash_percent:.1f}%**")
+            st.info(f"محتوى الرماد الأولي المُفترض: **{ash_percent:.1f}%**")
             
     # البانر (العنوان الرئيسي)
     st.markdown(
@@ -160,6 +175,11 @@ def main():
     # --- تشغيل المحاكاة ---
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size)
     
+    # التحقق من المدخلات (تجنب الرماد والرطوبة > 100%)
+    if results["parameters"]["moisture"] / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
+        st.error("**خطأ في المدخلات:** مجموع الرطوبة الأولية ومحتوى الرماد يتجاوز 100%. يرجى خفض الرطوبة.")
+        return # إيقاف العرض إذا كانت المدخلات غير صالحة
+
     # --- عرض النتائج الاحترافية في Tabs ---
     st.header("📊 مخرجات المحاكاة والتحليل")
     tab1, tab2, tab3, tab4 = st.tabs(["نتائج العائد (Yields)", "تحول الكتلة (Mass Conversion)", "تركيبة الغاز", "تقرير PDF"])
@@ -189,20 +209,20 @@ def main():
         with col_t2:
             st.subheader("مخطط الميزان الكتلي")
             fig1, ax1 = plt.subplots(figsize=(6, 6))
-            filtered_yields = results["yields"].iloc[[0, 1, 2]] # لا نعرض الرماد بشكل منفصل في المخطط الدائري
+            # نأخذ العوائد الرئيسية الثلاثة للعرض
+            filtered_yields = results["yields"].iloc[[0, 1, 2]] 
             ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
             ax1.axis('equal')
             st.pyplot(fig1)
             
 
 [Image of mass balance pie chart for torrefaction products]
-
+ # صورة تمثيلية للمخطط الدائري
 
     with tab2:
         st.subheader("تتبع تحول مكونات الكتلة الحيوية عبر الزمن")
         st.line_chart(results["mass_profile"])
-        st.caption("المنحنى يوضح كيف تتناقص كسور الرطوبة والمواد المتطايرة لتشكيل كسر الفحم الحيوي.")
-        
+        st.caption("المنحنى يوضح كيف تتناقص كسور الرطوبة والمواد المتطايرة وتتشكل حصة الفحم الحيوي مع تقدم العملية.")
 
     with tab3:
         st.subheader("تركيبة الغازات غير القابلة للتكثف (على أساس جاف)")
@@ -222,7 +242,7 @@ def main():
                 mime="application/pdf"
             )
 
-# --- 4. دالة إنشاء تقرير PDF مُحسَّنة ---
+# --- 4. دالة إنشاء تقرير PDF مُحسَّنة (generate_pdf_report) ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -234,7 +254,7 @@ def generate_pdf_report(results):
     styles = getSampleStyleSheet()
     elements = []
     
-    # Header & Banner (Placeholder for Logo)
+    # Header & Banner
     elements.append(Paragraph("<font size=16 color='#4CAF50'>CHEMISCO PRO TORREFACTION REPORT</font>", styles["Title"]))
     elements.append(Paragraph(f"تاريخ التقرير: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", styles["Italic"]))
     elements.append(Spacer(1, 0.25*inch))
@@ -268,7 +288,7 @@ def generate_pdf_report(results):
     # 3. Charts
     elements.append(Paragraph("3. Results Visualization", styles["h2"]))
     
-    # Mass Conversion Plot (New)
+    # Chart 1: Mass Conversion Plot 
     fig3, ax3 = plt.subplots(figsize=(6, 4))
     results["mass_profile"].plot(ax=ax3)
     plt.title("Mass Component Conversion Over Time")
@@ -281,7 +301,7 @@ def generate_pdf_report(results):
     elements.append(ReportImage(imgdata3, width=5.5*inch, height=3.7*inch))
     elements.append(Spacer(1, 0.25*inch))
     
-    # Mass balance pie chart
+    # Chart 2: Mass balance pie chart
     fig1, ax1 = plt.subplots(figsize=(5, 5))
     filtered_yields = results["yields"].iloc[[0, 1, 2]]
     ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90)
@@ -293,7 +313,7 @@ def generate_pdf_report(results):
     elements.append(ReportImage(imgdata1, width=3*inch, height=3*inch))
     elements.append(Spacer(1, 0.25*inch))
     
-    # Gas composition bar chart
+    # Chart 3: Gas composition bar chart
     fig2, ax2 = plt.subplots(figsize=(5, 4))
     results["gas_composition"].plot(kind='bar', ax=ax2, legend=False)
     plt.title("Dry Gas Composition (Molar %)")
