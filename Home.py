@@ -43,7 +43,7 @@ def _get_image_base64(image_path):
 LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
 
 
-# --- 2. Global CSS ---
+# --- 2. Global CSS (UPDATED: Logo size and new Banner style) ---
 GLOBAL_CSS = """
 <style>
     .stApp { padding-top: 20px; }
@@ -56,6 +56,18 @@ GLOBAL_CSS = """
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
     }
     .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 3em; font-weight: 800; letter-spacing: 2px;}
+    
+    /* NEW BANNER/TAGLINE STYLE */
+    .banner-tagline { 
+        color: #FFFFFF; 
+        font-size: 1.4em; 
+        font-weight: 500;
+        margin: 10px 0 20px 0;
+        padding: 5px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.5);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    
     .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.2em; }
     .dedication { 
         color: #FFEB3B; /* Yellow */
@@ -69,11 +81,11 @@ GLOBAL_CSS = """
     /* Metrics Style */
     [data-testid="stMetricValue"] { font-size: 28px; color: #388E3C; }
     
-    /* Custom classes for logo sizing in main banner */
+    /* Custom classes for logo sizing in main banner (INCREASED SIZE) */
     .main-banner-logo-container {
         display: block;
-        margin: 0 auto 10px auto;
-        width: 150px; /* Specific width for the main banner */
+        margin: 0 auto 15px auto; 
+        width: 220px; /* Increased width for the main banner logo */
     }
 
     /* Sidebar Logo Adjustment */
@@ -195,7 +207,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         }
     }
 
-# --- 4. PDF Report Generation Function (UPDATED for Logo stability) ---
+# --- 4. PDF Report Generation Function (UNCHANGED) ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -358,7 +370,7 @@ def main():
     st.set_page_config(page_title="Chemisco", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
-    # --- Sidebar ---
+    # --- Sidebar (UNCHANGED) ---
     with st.sidebar:
         # LOGO DISPLAY: Use Base64 if available, otherwise show warning text
         if LOGO_BASE64_STRING:
@@ -415,25 +427,29 @@ def main():
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
 
 
-    # --- Main Banner (with Base64 Image Embedding) ---
+    # --- Main Banner (with Base64 Image Embedding) (UPDATED HTML) ---
     if LOGO_BASE64_STRING:
         st.markdown(f"""
             <div class="main-banner">
                 <div class="main-banner-logo-container">
                     <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 100%; height: auto; border-radius: 8px;">
                 </div>
-                <h1>CHEMISCO</h1> <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to د. عمرو الرفاعي</div> </div>
+                <h1>CHEMISCO</h1> 
+                <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
+                <div class="dedication">Project presented to د. عمرو الرفاعي</div> 
+            </div>
             """, unsafe_allow_html=True)
     else:
         # Fallback if image fails to load (to prevent black screen)
         st.markdown("""
             <div class="main-banner">
-                <h1>CHEMISCO</h1> <p>Advanced Torrefaction Simulator</p>
-                <div class="dedication">Project presented to د. عمرو الرفاعي</div> </div>
+                <h1>CHEMISCO</h1> 
+                <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
+                <div class="dedication">Project presented to د. عمرو الرفاعي</div> 
+            </div>
             """, unsafe_allow_html=True)
     
-    # BFD
+    # BFD (UNCHANGED)
     st.subheader("Process Flow Block Diagram (BFD)")
     bfd_html = f"""
     <div class="bfd-container">
@@ -475,7 +491,7 @@ def main():
     # Run Simulation
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
     
-    # --- GAME LOGIC SECTION ---
+    # --- GAME LOGIC SECTION (UNCHANGED) ---
     if game_mode:
         st.markdown("---")
         st.markdown("""
@@ -522,9 +538,8 @@ def main():
         st.markdown("---")
     # --------------------------
 
-    # --- Display Results ---
+    # --- Display Results (UNCHANGED) ---
     st.header("📊 Simulation Results & Analysis")
-    # Removed 'Professional' from Cost Analysis Tab Title (though it was an addition)
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "💰 Cost Analysis", "PDF Report"])
     
     with tab1:
@@ -711,7 +726,7 @@ def main():
             st.download_button(
                 label="Download Report",
                 data=pdf_buffer,
-                file_name=f"Torrefaction_Report_Chemisco.pdf", # Renamed file
+                file_name=f"Torrefaction_Report_Chemisco.pdf", 
                 mime="application/pdf"
             )
 
