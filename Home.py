@@ -56,6 +56,25 @@ GLOBAL_CSS = """
     .bfd-stream::before { content: ''; position: absolute; right: -10px; top: -5px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 10px solid #4CAF50; }
     .side-stream { position: absolute; left: 50%; transform: translateX(-50%); width: 3px; height: 40px; background-color: #FF9800; bottom: -40px; }
     .side-stream-label { position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; color: #FF9800; }
+
+    /* Logo Specific CSS for better display */
+    .sidebar-logo {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        width: 80%; /* Adjust as needed */
+        margin-bottom: 15px;
+        padding: 5px;
+        background-color: white; /* Optional: to make it stand out on dark sidebar */
+        border-radius: 8px;
+    }
+    .main-banner-logo {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        width: 150px; /* Specific width for the main banner */
+        margin-bottom: 10px;
+    }
 </style>
 """
 
@@ -65,32 +84,27 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     data = EMPIRICAL_DATA.get(biomass)
     R_GAS_LOCAL = R_GAS 
     
-    # Arrhenius equation for devolatilization rate constant
     k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS_LOCAL * temp_K))
     k_devol_eff = k_devol_arrhenius * SIZE_FACTOR.get(size)
     k_drying = data["k_drying_base"] 
     
     initial_moisture_frac = moisture / 100
     initial_ash_frac = data["Ash"]
-    # Initial volatile fraction calculation
     initial_volatiles_frac = 1.0 - initial_moisture_frac - initial_ash_frac
     
-    # Mass calculations
     mass_ash_kg = initial_mass_kg * initial_ash_frac
     fixed_carbon_frac_initial = 1.0 - initial_moisture_frac - initial_volatiles_frac - initial_ash_frac
     
-    # ODE Model for mass reduction
     def model(y, t, k1, k2):
         m_moist, m_vol = y
-        d_moist = -k1 * m_moist if m_moist > 0.001 else 0 # Drying is usually fast
+        d_moist = -k1 * m_moist if m_moist > 0.001 else 0
         d_vol = -k2 * m_vol
         return [d_moist, d_vol]
     
     t = np.linspace(0, duration_min, 100)
     y0 = [initial_moisture_frac, initial_volatiles_frac]
-    # Integrate the ODEs
     sol = odeint(model, y0, t, args=(k_drying, k_devol_eff))
-    sol[sol < 0] = 0 # Ensure no negative mass fractions
+    sol[sol < 0] = 0
     
     moisture_curve = sol[:, 0] 
     volatiles_curve = sol[:, 1]
@@ -98,8 +112,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     current_total_mass_fraction = moisture_curve + volatiles_curve + fixed_carbon_frac_initial + initial_ash_frac
     ash_concentration_percent = (initial_ash_frac / current_total_mass_fraction) * 100
     
-    # Final state calculations
-    final_moisture_loss = initial_moisture_frac # All initial moisture is assumed lost in this model
+    final_moisture_loss = initial_moisture_frac
     final_volatiles_remaining = volatiles_curve[-1]
     final_volatiles_lost = initial_volatiles_frac - final_volatiles_remaining
     
@@ -107,7 +120,6 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     mass_biochar_total = final_solid_fraction * initial_mass_kg
     final_ash_percent = (mass_ash_kg / mass_biochar_total) * 100
 
-    # Output DataFrames
     yields_percent = pd.DataFrame({
         "Yield (%)": [final_solid_fraction * 100, final_volatiles_lost * 100, final_moisture_loss * 100, initial_ash_frac * 100]},
         index=["Biochar (Solid Product)", "Non-Condensable Gases", "Moisture Loss (Water Vapor)", "Original Ash Content"]
@@ -123,26 +135,25 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         "Mass (kg)": [mass_fixed_carbon, mass_volatiles_remaining, mass_ash_kg]
     }, index=["Fixed Carbon", "Remaining Volatiles", "Ash"])
 
-    # Gas Composition Approximation
     gas_fraction = final_volatiles_lost * data["Gas_Factor"]
     gas_comp_mass_fractions = {"CO2": 0.45, "CO": 0.35, "CH4": 0.15, "H2": 0.05}
     
-    # Calculate Molar % in Dry Gas (Approximation)
     total_volatiles_lost_mass = final_volatiles_lost * initial_mass_kg
     
     gas_composition_molar_data = {}
     if total_volatiles_lost_mass > 0.001:
         for gas, fraction in gas_comp_mass_fractions.items():
-            gas_mass = fraction * total_volatiles_lost_mass
-            # Here we assume the total dry gas is proportional to total_volatiles_lost_mass * Gas_Factor
-            # For simplicity in output, we present a composition relative to the total gas mass lost
-            gas_composition_molar_data[gas] = (fraction * 100) # Simple approximation of composition
+            gas_composition_molar_data[gas] = (fraction * 100) 
     
     gas_composition_molar = pd.DataFrame.from_dict(
         gas_composition_molar_data, 
         orient="index", columns=["Molar % in Dry Gas"]
     ).fillna(0)
-    gas_composition_molar = gas_composition_molar / gas_composition_molar.sum() * 100 # Normalize to 100%
+    if not gas_composition_molar.empty and gas_composition_molar["Molar % in Dry Gas"].sum() > 0:
+        gas_composition_molar = gas_composition_molar / gas_composition_molar["Molar % in Dry Gas"].sum() * 100 
+    else:
+        gas_composition_molar = pd.DataFrame(0, index=["CO2", "CO", "CH4", "H2"], columns=["Molar % in Dry Gas"])
+
 
     mass_profile = pd.DataFrame({
         "Time (min)": t,
@@ -179,7 +190,16 @@ def generate_pdf_report(results):
     heading_style.textColor = colors.HexColor("#2E7D32")
     normal_style = styles["Normal"]
     
-    # -- 1. Header (UPDATED NAME) --
+    # -- 1. Header with Logo (for PDF) --
+    try:
+        # Load the logo for PDF
+        img_path = "chemisco_logo.png" # Make sure this path is correct
+        logo_pdf = ReportImage(img_path, width=1.5*inch, height=1.5*inch)
+        logo_pdf.hAlign = 'CENTER'
+        elements.append(logo_pdf)
+    except FileNotFoundError:
+        st.warning("Logo file 'chemisco_logo.png' not found for PDF report. Please ensure it's in the same directory.")
+        
     elements.append(Paragraph("CHEMISCO REPORT", title_style))
     elements.append(Paragraph("Project presented to: Dr. Amr El-Rifai", styles["Heading3"]))
     elements.append(Paragraph(f"Report Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", normal_style))
@@ -306,10 +326,12 @@ def main():
     st.set_page_config(page_title="Chemisco", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
-    # Sidebar (UPDATED NAME)
+    # --- Sidebar ---
     with st.sidebar:
+        # Add Logo to Sidebar
+        st.image("chemisco_logo.png", use_column_width=True, output_format="PNG") # Adjust width if needed
         st.markdown("""
-            <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20;'>
+            <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
                 <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO</h1>
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
                 <hr style='margin: 10px 0; border-color: #4CAF50;'>
@@ -327,7 +349,7 @@ def main():
             moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0)
             particle_size = st.selectbox("Particle Size", list(SIZE_FACTOR.keys()))
             
-        # Group 2: Process (UPDATED WITH REACTOR TYPE)
+        # Group 2: Process 
         with st.expander("🌡️ Process Conditions", expanded=True):
             reactor_type = st.selectbox("Reactor Type", 
                 ["Rotary Drum Reactor", "Fluidized Bed Reactor", "Auger/Screw Reactor", "Fixed Bed Reactor"])
@@ -337,28 +359,29 @@ def main():
             ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
             
-        # Group 3: Cost Management (RESTORED)
+        # Group 3: Cost Management
         with st.expander("💰 Cost Management", expanded=False):
             st.caption("Economic Feasibility Parameters")
             cost_biomass_per_ton = st.number_input("Biomass Feedstock Cost ($/ton)", min_value=0.0, value=30.0, step=5.0)
             cost_energy_per_hour = st.number_input("Operational/Energy Cost ($/hour)", min_value=0.0, value=5.0, step=0.5, help="Total cost of electricity + labor per hour of operation")
             price_biochar_per_kg = st.number_input("Biochar Selling Price ($/kg)", min_value=0.0, value=1.20, step=0.1)
         
-        # Game Mode Toggle (RESTORED)
+        # Game Mode Toggle
         st.markdown("---")
         st.subheader("🎮 Gamification")
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
 
-    # Main Banner (UPDATED NAME)
-    st.markdown("""
+    # Main Banner (with Logo)
+    st.markdown(f"""
         <div class="main-banner">
+            <img src="data:image/png;base64,{_get_image_base64('chemisco_logo.png')}" class="main-banner-logo">
             <h1>CHEMISCO</h1>
             <p>Advanced Torrefaction Process Simulator</p>
             <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
         </div>
         """, unsafe_allow_html=True)
     
-    # BFD (RESTORED DETAILED HTML)
+    # BFD
     st.subheader("Process Flow Block Diagram (BFD)")
     bfd_html = f"""
     <div class="bfd-container">
@@ -399,7 +422,7 @@ def main():
     # Run Simulation
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
     
-    # --- GAME LOGIC SECTION (RESTORED) ---
+    # --- GAME LOGIC SECTION ---
     if game_mode:
         st.markdown("---")
         st.markdown("""
@@ -468,95 +491,3 @@ def main():
         st.markdown("---")
         
         col_t1, col_t2 = st.columns(2)
-        
-        with col_t1:
-            st.markdown("##### Final Biochar Composition")
-            df_solid = results["solid_composition"].reset_index()
-            df_solid.columns = ["Component", "Mass (kg)"]
-            fig1 = px.pie(df_solid, values='Mass (kg)', names='Component', hole=0.5,
-                          color='Component',
-                          color_discrete_map={"Fixed Carbon": "#6A1B9A", "Remaining Volatiles": "#AB47BC", "Ash": "#BDBDBD"})
-            fig1.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
-            st.plotly_chart(fig1, use_container_width=True)
-
-        with col_t2:
-            st.markdown("##### Global Mass Balance")
-            filtered_yields = results["yields_percent"].iloc[[0, 1, 2]].reset_index()
-            filtered_yields.columns = ["Component", "Yield (%)"]
-            fig2 = px.pie(filtered_yields, values='Yield (%)', names='Component', hole=0.5,
-                          color='Component',
-                          color_discrete_map={"Biochar (Solid Product)": "#388E3C", "Non-Condensable Gases": "#7CB342", "Moisture Loss (Water Vapor)": "#C5E1A5"})
-            fig2.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
-            st.plotly_chart(fig2, use_container_width=True)
-
-    with tab2:
-        st.subheader("Mass Depletion Kinetics")
-        fig_dual = go.Figure()
-        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Total Mass Yield (%)"], name="Total Mass %", line=dict(color="#4CAF50", width=3), yaxis="y1"))
-        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Ash Concentration in Solid (%)"], name="Ash Concentration %", line=dict(color="#D32F2F", width=3, dash='dot'), yaxis="y2"))
-        fig_dual.update_layout(
-            xaxis=dict(title="Time (min)"),
-            yaxis=dict(title="Total Mass Remaining (%)", title_font=dict(color="#4CAF50"), tickfont=dict(color="#4CAF50")),
-            yaxis2=dict(title="Ash Concentration (%)", title_font=dict(color="#D32F2F"), tickfont=dict(color="#D32F2F"), overlaying="y", side="right"),
-            legend=dict(x=0.1, y=1.1, orientation="h"), height=450
-        )
-        st.plotly_chart(fig_dual, use_container_width=True)
-
-    with tab3:
-        st.subheader("Gas Composition")
-        st.bar_chart(results["gas_composition_molar"])
-
-    with tab4:
-        st.subheader("💰 Economic Feasibility Analysis")
-        cost_feedstock_total = (initial_mass_kg / 1000) * cost_biomass_per_ton
-        hours = duration / 60
-        cost_operations_total = hours * cost_energy_per_hour
-        total_cost = cost_feedstock_total + cost_operations_total
-        biochar_produced_kg = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
-        revenue_total = biochar_produced_kg * price_biochar_per_kg
-        net_profit = revenue_total - total_cost
-        roi = (net_profit / total_cost) * 100 if total_cost > 0 else 0
-        
-        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-        col_c1.metric("📉 Total Cost", f"${total_cost:.2f}")
-        col_c2.metric("📈 Total Revenue", f"${revenue_total:.2f}")
-        col_c3.metric("💵 Net Profit", f"${net_profit:.2f}", delta=f"${abs(net_profit):.2f}", delta_color="normal" if net_profit > 0 else "inverse")
-        col_c4.metric("📊 ROI", f"{roi:.1f}%", delta=f"{abs(roi):.1f}%", delta_color="normal" if roi > 0 else "inverse")
-        
-        st.markdown("---")
-        
-        # Waterfall Chart (RESTORED)
-        fig_waterfall = go.Figure(go.Waterfall(
-            name = "Cash Flow", orientation = "v",
-            measure = ["relative", "relative", "relative", "total"],
-            x = ["Gross Revenue", "Feedstock Cost", "Operational Cost", "Net Profit"],
-            textposition = "outside",
-            text = [f"${revenue_total:.1f}", f"${-cost_feedstock_total:.1f}", f"${-cost_operations_total:.1f}", f"${net_profit:.1f}"],
-            y = [revenue_total, -cost_feedstock_total, -cost_operations_total, net_profit],
-            connector = {"line":{"color":"rgb(63, 63, 63)"}},
-            decreasing = {"marker":{"color":"#EF5350"}},
-            increasing = {"marker":{"color":"#66BB6A"}},
-            totals = {"marker":{"color":"#42A5F5"}}
-        ))
-        fig_waterfall.update_layout(title = "Cash Flow Waterfall Chart (USD)", showlegend = False, height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_waterfall, use_container_width=True)
-        
-        st.info(f"""
-        **Analysis:**
-        Producing **{biochar_produced_kg:.1f} kg** of biochar from **{initial_mass_kg} kg** biomass.
-        Break-even selling price: **${(total_cost/biochar_produced_kg):.2f} / kg**.
-        """)
-
-    with tab5:
-        st.subheader("Download Professional Report")
-        if st.button("⬇️ Generate PDF Report"):
-            pdf_buffer = generate_pdf_report(results)
-            st.download_button(
-                label="Download Report",
-                data=pdf_buffer,
-                file_name=f"Chemisco_Torrefaction_Report.pdf",
-                mime="application/pdf"
-            )
-
-if __name__ == "__main__":
-    main()
