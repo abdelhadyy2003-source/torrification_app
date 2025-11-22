@@ -1,317 +1,3 @@
-Abdelhady 110
-abdelhady110
-In a call
-
-madbouly — 2025-11-18 7:52 PM
-https://chatgpt.com/share/691cb227-21fc-8010-8509-eec1232151d4
-ChatGPT
-ChatGPT - أفكار كود توريفاكشن
-Shared via ChatGPT
-Image
-Abdelhady 110 — 2025-11-18 8:12 PM
-https://chatgpt.com/share/691cb6fa-06f0-8001-97d0-c5e75fc0edf7
-ChatGPT
-ChatGPT - أفكار كود توريفاكشن
-Shared via ChatGPT
-Image
-# Torrefaction Full Simulation Notebook
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.optimize import minimize
-Expand
-message.txt
-4 KB
-You missed a call from 
-madbouly
- that lasted 3 minutes. — 2025-11-20 3:51 PM
-Abdelhady 110 — 2025-11-20 6:13 PM
-
-
-
-import streamlit as st
-import numpy as np
-import pandas as pd
-Expand
-message.txt
-7 KB
-Abdelhady 110
- started a call that lasted a minute. — 2025-11-20 6:49 PM
-madbouly — 2025-11-20 6:49 PM
-import streamlit as st
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, PageBreak
-)
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.lib.units import cm
-from reportlab.pdfgen import canvas
-import matplotlib.pyplot as plt
-import tempfile, io, os, glob
-import base64
-
-# ----- CONFIG -----
-st.set_page_config(page_title="Chemisco - Torrefaction", layout="wide", initial_sidebar_state="collapsed")
-
-# ----- SESSION STATE INIT -----
-if 'simulations' not in st.session_state:
-    st.session_state.simulations = []
-
-# --- Utility: find uploaded image ---
-def find_first_file(containing):
-    candidates = glob.glob("/mnt/data/*")
-    for c in candidates:
-        if containing.lower() in os.path.basename(c).lower():
-            return c
-    return ""
-
-# Images
-HERO_COVER = find_first_file("cover") or ""
-BANNER_COVER = find_first_file("banner") or HERO_COVER
-LOGO_PATH = find_first_file("logo") or ""
-
-def img_to_base64(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-HERO_B64 = img_to_base64(HERO_COVER) if HERO_COVER else ""
-BANNER_B64 = img_to_base64(BANNER_COVER) if BANNER_COVER else ""
-
-# Hero & Banner CSS
-hero_css = f"""
-<style>
-.hero {{
-  {"background-image: url('data:image/png;base64," + HERO_B64 + "');" if HERO_B64 else ""}
-  background-size: cover;
-  background-position: center;
-  height: 40vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  text-shadow: 2px 2px #000;
-}}
-.hero h1 {{ font-size: 48px; margin:0; color:#FFD700; }}
-
-.banner {{
-  {"background-image: url('data:image/png;base64," + BANNER_B64 + "');" if BANNER_B64 else ""}
-  background-size: cover;
-  background-position: center;
-  height: 12vh;
-  display:flex;
-  align-items:center;
-  padding-left:2rem;
-  color:#fff;
-  text-shadow:1px 1px #000;
-  border-radius:8px;
-  margin-top:1rem;
-  margin-bottom:1rem;
-}}
-
-.glass {{
-    background: rgba(255,255,255,0.06);
-    border-radius: 12px;
-    padding: 18px;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 1px solid rgba(255,255,255,0.12);
-}}
-</style>
-"""
-st.markdown(hero_css, unsafe_allow_html=True)
-st.markdown('<div class="hero"><h1>Chemisco Pro — Advanced Torrefaction</h1></div>', unsafe_allow_html=True)
-st.markdown('<div class="banner"><h3>Torrefaction Simulator — Realistic process & analytics</h3></div>', unsafe_allow_html=True)
-
-# ---------- Torrefaction simulation ----------
-def simulate_torrefaction(waste_type, mass, moisture, temp, residence_time):
-    water_loss = mass * (moisture / 100.0) * (1.0 - np.exp(-0.6 * residence_time))
-    volatile_fraction = np.clip(0.30 + 0.12 * ((temp - 200.0) / 100.0), 0.0, 0.9)
-    volatile_loss = max(0.0, (mass - water_loss) * volatile_fraction)
-    ash_mass = mass * 0.05
-    biochar_mass = max(0.0, mass - water_loss - volatile_loss - ash_mass)
-    fixed_carbon = biochar_mass * 0.78
-
-    return {
-        'Biochar (kg)': biochar_mass,
-        'Gas & Volatiles (kg)': volatile_loss,
-... (223 lines left)
-Collapse
-Home (1).py
-14 KB
-ن
-madbouly
- started a call that lasted 16 minutes. — 2025-11-20 6:53 PM
-madbouly — 2025-11-20 6:53 PM
-تعاله
-ظ
-Image
-Abdelhady 110 — 2025-11-20 6:55 PM
-streamlit
-pandas
-numpy
-plotly
-graphviz
-reportlab
-matplotlib
-fpdf
-kaleido
-scipy
-
-
-Collapse
-requirements.txt
-1 KB
-Abdelhady 110
- started a call that lasted an hour. — 3:51 PM
-Abdelhady 110 — 3:53 PM
-
-
-
-import streamlit as st
-import numpy as np
-import pandas as pd
-Expand
-message.txt
-7 KB
-Abdelhady 110 — 4:02 PM
-https://torrificationapp-bgviskrym2re6jyv3nwbsw.streamlit.app/
-Abdelhady 110 — 4:20 PM
-import streamlit as st
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.integrate import odeint
-from reportlab.lib.pagesizes import letter
-Expand
-message.txt
-20 KB
-Abdelhady 110 — 4:34 PM
-import streamlit as st
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.integrate import odeint
-from reportlab.lib.pagesizes import letter
-Expand
-Home (2).py
-19 KB
-madbouly — 5:33 PM
-انا شغال عليه دلوقتي
-madbouly — 5:55 PM
-import streamlit as st
-import numpy as np
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from scipy.integrate import odeint
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportImage, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from io import BytesIO
-from reportlab.lib.units import inch
-from reportlab.lib import colors
-import matplotlib.pyplot as plt # Essential for PDF generation
-
-# --- 1. Chemical and Empirical Constants (UNCHANGED) ---
-R_GAS = 8.314
-EMPIRICAL_DATA = {
-    "Wood": {"A": 2.5e10, "Ea": 135000, "k_drying_base": 0.05, "Ash": 0.02, "Gas_Factor": 0.35},
-    "Agricultural Waste": {"A": 5.0e11, "Ea": 150000, "k_drying_base": 0.07, "Ash": 0.08, "Gas_Factor": 0.45},
-    "Municipal Waste": {"A": 1.0e12, "Ea": 165000, "k_drying_base": 0.10, "Ash": 0.15, "Gas_Factor": 0.55}
-}
-SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
-
-# --- 2. Global CSS (UNCHANGED) ---
-GLOBAL_CSS = """
-<style>
-    .stApp { padding-top: 20px; }
-    .main-banner {
-        background-color: #388E3C;
-        padding: 30px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 30px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    }
-    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 2.5em; }
-    .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.1em; }
-    .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { background-color: #F0F8FF; }
-    .st-emotion-cache-p5m8m8 { 
-        border-radius: 10px;
-        border-left: 5px solid #4CAF50; 
-        padding: 10px;
-        margin-bottom: 15px;
-        background-color: #FFFFFF;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    [data-testid="stMetricValue"] {
-        font-size: 28px;
-        color: #388E3C; 
-    }
-    /* BFD Styles */
-    .bfd-container { display: flex; justify-content: center; align-items: center; margin: 30px 0 60px 0; position: relative; }
-    .bfd-block { padding: 15px 25px; border: 3px solid #4CAF50; border-radius: 6px; text-align: center; background-color: #E8F5E9; box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); font-weight: bold; color: #1B5E20; position: relative; min-width: 180px; }
-    .bfd-block p { margin: 5px 0 0; font-size: 12px; font-weight: normal; }
-    .bfd-stream { width: 70px; height: 3px; background-color: #4CAF50; position: relative; }
-    .bfd-stream::before { content: ''; position: absolute; right: -10px; top: -5px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 10px solid #4CAF50; }
-    .side-stream { position: absolute; left: 50%; transform: translateX(-50%); width: 3px; height: 40px; background-color: #FF9800; bottom: -40px; }
-    .side-stream-label { position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; color: #FF9800; }
-</style>
-"""
-
-# --- 3. Simulation Core Logic (UNCHANGED) ---
-def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg):
-    temp_K = temp_C + 273.15
-    data = EMPIRICAL_DATA.get(biomass)
-    k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS * temp_K))
-    k_devol_eff = k_devol_arrhenius * SIZE_FACTOR.get(size)
-    k_drying = data["k_drying_base"] 
-    initial_moisture_frac = moisture / 100
-    initial_ash_frac = data["Ash"]
-    initial_volatiles_frac = 1.0 - initial_moisture_frac - initial_ash_frac
-    mass_ash_kg = initial_mass_kg * initial_ash_frac
-    
-    def model(y, t, k1, k2):
-        m_moist, m_vol = y
-        d_moist = -k1 * m_moist if m_moist > 0.001 else 0
-        d_vol = -k2 * m_vol
-        return [d_moist, d_vol]
-    
-    t = np.linspace(0, duration_min, 100)
-    y0 = [initial_moisture_frac, initial_volatiles_frac]
-    sol = odeint(model, y0, t, args=(k_drying, k_devol_eff))
-    sol[sol < 0] = 0
-    moisture_curve = sol[:, 0] 
-    volatiles_curve = sol[:, 1]
-    fixed_carbon_frac_initial = 1.0 - initial_moisture_frac - initial_volatiles_frac - initial_ash_frac
-    current_total_mass_fraction = moisture_curve + volatiles_curve + fixed_carbon_frac_initial + initial_ash_frac
-    ash_concentration_percent = (initial_ash_frac / current_total_mass_fraction) * 100
-    
-    final_moisture_loss = initial_moisture_frac
-    final_volatiles_remaining = volatiles_curve[-1]
-    final_volatiles_lost = initial_volatiles_frac - final_volatiles_remaining
-    final_solid_fraction = 1.0 - final_moisture_loss - final_volatiles_lost
-    mass_biochar_total = final_solid_fraction * initial_mass_kg
-    final_ash_percent = (mass_ash_kg / mass_biochar_total) * 100
-
-    yields_percent = pd.DataFrame({
-        "Yield (%)": [final_solid_fraction * 100, final_volatiles_lost * 100, final_moisture_loss * 100, initial_ash_frac * 100]},
-        index=["Biochar (Solid Product)", "Non-Condensable Gases", "Moisture Loss (Water Vapor)", "Original Ash Content"]
-    )
-... (415 lines left)
-Collapse
-message.txt
-24 KB
-Abdelhady 110
- started a call. — 5:59 PM
-madbouly — 6:00 PM
-https://madbouly04522124-aijpjfesvks2krkekjzshj.streamlit.app/
-﻿
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -484,7 +170,7 @@ def generate_pdf_report(results):
         ["Biomass Type", p['biomass']],
         ["Initial Mass", f"{p['initial_mass']} kg"],
         ["Moisture Content", f"{p['moisture']}%"],
-        ["Temperature", f"{p['temperature']} Â°C"],
+        ["Temperature", f"{p['temperature']} °C"],
         ["Duration", f"{p['duration']} min"],
         ["Particle Size", p["size"]],
         ["Eff. Devol Rate", f"{results['k_devol_eff']:.4f} min-1"]
@@ -614,14 +300,14 @@ def main():
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
             </div>
             """, unsafe_allow_html=True)
-        st.header("âš™ï¸ Input Parameters")
-        with st.expander("ðŸŒ² Biomass Properties", expanded=True):
+        st.header("⚙️ Input Parameters")
+        with st.expander("🌲 Biomass Properties", expanded=True):
             initial_mass_kg = st.number_input("Initial Biomass Mass (kg)", min_value=1.0, value=100.0, step=10.0)
             biomass_type = st.selectbox("Biomass Type", list(EMPIRICAL_DATA.keys()))
             moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0)
             particle_size = st.selectbox("Particle Size", list(SIZE_FACTOR.keys()))
-        with st.expander("ðŸŒ¡ï¸ Process Conditions", expanded=True):
-            temperature = st.slider("Torrefaction Temperature (Â°C)", 200, 350, 275, step=5)
+        with st.expander("🌡️ Process Conditions", expanded=True):
+            temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5)
             duration = st.slider("Process Duration (min)", 10, 120, 45, step=5)
             ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
@@ -629,7 +315,7 @@ def main():
     # Main Banner
     st.markdown("""
         <div class="main-banner">
-            <h1>ðŸ”¥ Advanced Torrefaction Simulator</h1>
+            <h1>🔥 Advanced Torrefaction Simulator</h1>
             <p>Enhanced Kinetic Model for Process Optimization</p>
         </div>
         """, unsafe_allow_html=True)
@@ -646,14 +332,14 @@ def main():
         <div class="bfd-stream"></div>
         <div class="bfd-block">
             DRYING & PREHEATING
-            <p>100 Â°C - 200 Â°C</p>
+            <p>100 °C - 200 °C</p>
             <div class="side-stream"></div>
             <div class="side-stream-label">Water Vapor</div>
         </div>
         <div class="bfd-stream"></div>
         <div class="bfd-block" style="border-color: #D32F2F; background-color: #FFCDD2; color: #B71C1C;">
             TORREFACTION REACTOR
-            <p style="color: #B71C1C;">Temp: {temperature} Â°C</p>
+            <p style="color: #B71C1C;">Temp: {temperature} °C</p>
             <p style="color: #B71C1C;">Duration: {duration} min</p>
             <div class="side-stream" style="background-color: #FFC107;"></div>
             <div class="side-stream-label" style="color: #FFC107;">Volatile Gases</div>
@@ -675,7 +361,7 @@ def main():
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg)
     
     # --- Display Results ---
-    st.header("ðŸ“Š Simulation Results & Analysis")
+    st.header("📊 Simulation Results & Analysis")
     tab1, tab2, tab3, tab4 = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "PDF Report"])
     
     with tab1:
@@ -683,14 +369,14 @@ def main():
         col_m1, col_m2, col_m3 = st.columns(3)
         
         biochar_mass = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
-        col_m1.metric("âš–ï¸ Total Biochar Mass", f"{biochar_mass:.2f} kg")
+        col_m1.metric("⚖️ Total Biochar Mass", f"{biochar_mass:.2f} kg")
         
         final_ash = results["final_ash_percent"]
         ash_increase = final_ash - ash_percent_init
-        col_m2.metric("âš—ï¸ Final Ash Concentration", f"{final_ash:.2f} %", delta=f"+{ash_increase:.2f}% (Enrichment)")
+        col_m2.metric("⚗️ Final Ash Concentration", f"{final_ash:.2f} %", delta=f"+{ash_increase:.2f}% (Enrichment)")
         
         moisture_loss = results["yields_mass"].loc["Moisture Loss (Water Vapor)", "Mass (kg)"]
-        col_m3.metric("ðŸ’§ Moisture Removed", f"{moisture_loss:.2f} kg")
+        col_m3.metric("💧 Moisture Removed", f"{moisture_loss:.2f} kg")
 
         st.markdown("---")
         
@@ -816,7 +502,7 @@ def main():
         st.subheader("Download Professional Report")
         st.markdown("Generate a high-quality PDF report including all tables and charts properly formatted.")
         
-        if st.button("â¬‡ï¸ Download PDF Report"):
+        if st.button("⬇️ Download PDF Report"):
             pdf_buffer = generate_pdf_report(results)
             st.download_button(
                 label="Download Report",
@@ -827,5 +513,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-message.txt
-24 KB
