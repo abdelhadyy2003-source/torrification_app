@@ -11,7 +11,7 @@ from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 import matplotlib.pyplot as plt
-import random  # مكتبة جديدة للعبة
+import random  # الضرورية للعبة
 
 # --- 1. Chemical and Empirical Constants ---
 R_GAS = 8.314
@@ -275,7 +275,7 @@ def generate_pdf_report(results):
     buffer.seek(0)
     return buffer
 
-# --- 5. Main Streamlit App (UPDATED) ---
+# --- 5. Main Streamlit App ---
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
@@ -300,11 +300,11 @@ def main():
             ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
         
-        # --- [NEW] Game Mode Toggle ---
+        # --- Game Mode Toggle ---
         st.markdown("---")
         st.subheader("🎮 Gamification")
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
-        # ------------------------------
+        # -------------------------
 
     # Main Banner
     st.markdown("""
@@ -355,13 +355,14 @@ def main():
     # Run Simulation
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg)
     
-    # --- [NEW] GAME LOGIC SECTION ---
+    # --- GAME LOGIC SECTION ---
     if game_mode:
         st.markdown("---")
+        # NEW: Green Styled Alert
         st.markdown("""
-        <div style="background-color: #FFF3E0; padding: 20px; border-radius: 10px; border-left: 6px solid #FF9800;">
-            <h3 style="color: #E65100; margin-top:0;">🏭 Plant Manager Challenge</h3>
-            <p>The client has sent specific requirements for the Biochar. Adjust <b>Temperature</b> and <b>Duration</b> to match them!</p>
+        <div style="background-color: #E8F5E9; padding: 20px; border-radius: 10px; border-left: 6px solid #2E7D32; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="color: #1B5E20; margin-top:0;">🏭 Plant Manager Challenge</h3>
+            <p style="color: #388E3C; font-size: 1.1em;">The client has sent specific requirements for the Biochar. Adjust <b>Temperature</b> and <b>Duration</b> to match them!</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -405,7 +406,7 @@ def main():
                 st.session_state.has_won = False
                 st.rerun()
         st.markdown("---")
-    # --------------------------------
+    # --------------------------
 
     # --- Display Results ---
     st.header("📊 Simulation Results & Analysis")
