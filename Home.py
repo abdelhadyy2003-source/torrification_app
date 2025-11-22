@@ -10,26 +10,11 @@ from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-import matplotlib.pyplot as plt
-import random
-
-# --- Base64 Utility for Robust Image Embedding ---
+import matplotlib.pyplot as plt # Essential for PDF generation
 import base64
-from io import BytesIO
+import os # Import os for path checking
 
-def _get_image_base64(image_path):
-    """Encodes an image to Base64 string for safe embedding in HTML/Markdown."""
-    try:
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode()
-    except FileNotFoundError:
-        # Fallback in case the file is not found (e.g. during cloud deployment)
-        return None
-    except Exception as e:
-        # General error fallback
-        return None
-
-# --- 1. Chemical and Empirical Constants ---
+# --- 1. Chemical and Empirical Constants (UNCHANGED) ---
 R_GAS = 8.314
 EMPIRICAL_DATA = {
     "Wood": {"A": 2.5e10, "Ea": 135000, "k_drying_base": 0.05, "Ash": 0.02, "Gas_Factor": 0.35},
@@ -38,7 +23,28 @@ EMPIRICAL_DATA = {
 }
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 
-# --- 2. Global CSS for Aesthetic and BFD ---
+# --- Base64 Utility for Robust Image Embedding ---
+LOGO_PATH = "chemisco_logo.png"
+
+def _get_image_base64(image_path):
+    """Encodes an image to Base64 string for safe embedding in HTML/Markdown."""
+    try:
+        # We need to make sure the image exists before trying to open it
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as image_file:
+                # We need to ensure the image is a PNG for correct data type
+                return base64.b64encode(image_file.read()).decode()
+        else:
+            return None
+    except Exception as e:
+        # General error fallback
+        return None
+
+# Attempt to get the Base64 string once at the start
+LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
+
+
+# --- 2. Global CSS ---
 GLOBAL_CSS = """
 <style>
     .stApp { padding-top: 20px; }
@@ -64,6 +70,21 @@ GLOBAL_CSS = """
     /* Metrics Style */
     [data-testid="stMetricValue"] { font-size: 28px; color: #388E3C; }
     
+    /* Custom classes for logo sizing in main banner */
+    .main-banner-logo-container {
+        display: block;
+        margin: 0 auto 10px auto;
+        width: 150px; /* Specific width for the main banner */
+    }
+
+    /* Sidebar Logo Adjustment */
+    .sidebar-logo-container {
+        padding: 10px;
+        border-radius: 8px;
+        background-color: white;
+        margin-bottom: 15px;
+    }
+
     /* BFD Styles */
     .bfd-container { display: flex; justify-content: center; align-items: center; margin: 30px 0 60px 0; position: relative; }
     .bfd-block { padding: 15px 25px; border: 3px solid #4CAF50; border-radius: 6px; text-align: center; background-color: #E8F5E9; box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); font-weight: bold; color: #1B5E20; position: relative; min-width: 180px; }
@@ -72,18 +93,11 @@ GLOBAL_CSS = """
     .bfd-stream::before { content: ''; position: absolute; right: -10px; top: -5px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 10px solid #4CAF50; }
     .side-stream { position: absolute; left: 50%; transform: translateX(-50%); width: 3px; height: 40px; background-color: #FF9800; bottom: -40px; }
     .side-stream-label { position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; color: #FF9800; }
-    
-    /* Custom classes for logo sizing in main banner */
-    .main-banner-logo-container {
-        display: block;
-        margin: 0 auto 10px auto;
-        width: 150px; /* Specific width for the main banner */
-    }
 </style>
 """
 
 # --- 3. Simulation Core Logic (UNCHANGED) ---
-def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type):
+def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"): # Added reactor_type to parameters dict for PDF
     temp_K = temp_C + 273.15
     data = EMPIRICAL_DATA.get(biomass)
     R_GAS_LOCAL = R_GAS 
@@ -140,14 +154,16 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     }, index=["Fixed Carbon", "Remaining Volatiles", "Ash"])
 
     gas_fraction = final_volatiles_lost * data["Gas_Factor"]
-    gas_comp_mass_fractions = {"CO2": 0.45, "CO": 0.35, "CH4": 0.15, "H2": 0.05}
     
+    # Updated Gas Composition logic to use mass fractions
+    gas_comp_mass_fractions = {"CO2": 0.45, "CO": 0.35, "CH4": 0.15, "H2": 0.05}
     total_volatiles_lost_mass = final_volatiles_lost * initial_mass_kg
     
     gas_composition_molar_data = {}
     if total_volatiles_lost_mass > 0.001:
+        # Assuming the mass fractions correlate to molar fractions for simplicity in the chart display
         for gas, fraction in gas_comp_mass_fractions.items():
-            gas_composition_molar_data[gas] = (fraction * 100) 
+            gas_composition_molar_data[gas] = fraction * 100 # Displaying as pseudo-molar percent based on assumed dry gas composition
     
     gas_composition_molar = pd.DataFrame.from_dict(
         gas_composition_molar_data, 
@@ -180,7 +196,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         }
     }
 
-# --- 4. PDF Report Generation Function (UNCHANGED) ---
+# --- 4. PDF Report Generation Function (UPDATED for Logo stability) ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -195,33 +211,36 @@ def generate_pdf_report(results):
     normal_style = styles["Normal"]
     
     # -- 1. Header with Logo (for PDF) --
+    elements.append(Paragraph("CHEMISCO PRO TORREFACTION REPORT", title_style))
+    elements.append(Paragraph("Project presented to: Dr. Amr El-Rifai", styles["Heading3"]))
+    
+    # Use the file path for reportlab, wrapped in try/except for safety
     try:
         # reportlab uses file path, so we use a try block
-        img_path = "chemisco_logo.png" 
+        img_path = LOGO_PATH 
         logo_pdf = ReportImage(img_path, width=1.5*inch, height=1.5*inch)
         logo_pdf.hAlign = 'CENTER'
         elements.append(logo_pdf)
     except FileNotFoundError:
         # Fallback text for PDF if logo fails
-        elements.append(Paragraph("CHEMISCO", title_style)) 
+        elements.append(Paragraph("CHEMISCO (Logo Failed to Load)", title_style)) 
         
-    elements.append(Paragraph("CHEMISCO REPORT", title_style))
-    elements.append(Paragraph("Project presented to: Dr. Amr El-Rifai", styles["Heading3"]))
     elements.append(Paragraph(f"Report Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", normal_style))
     elements.append(Spacer(1, 0.2*inch))
     
     # -- 2. Parameters Table --
-    elements.append(Paragraph("1. Simulation Parameters & Config", heading_style))
+    elements.append(Paragraph("1. Simulation Parameters & Kinetics", heading_style))
     p = results["parameters"]
     param_data = [
         ["Parameter", "Value"],
         ["Biomass Type", p['biomass']],
-        ["Reactor Type", p['reactor']], 
+        ["Reactor Type", p['reactor']],
         ["Initial Mass", f"{p['initial_mass']} kg"],
         ["Moisture Content", f"{p['moisture']}%"],
         ["Temperature", f"{p['temperature']} °C"],
         ["Duration", f"{p['duration']} min"],
-        ["Particle Size", p["size"]]
+        ["Particle Size", p["size"]],
+        ["Eff. Devol Rate", f"{results['k_devol_eff']:.4f} min-1"]
     ]
     
     t_param = Table(param_data, colWidths=[3*inch, 3*inch])
@@ -257,7 +276,7 @@ def generate_pdf_report(results):
     elements.append(Paragraph(f"<b>Final Ash Concentration:</b> {results['final_ash_percent']:.2f}%", normal_style))
     elements.append(Spacer(1, 0.2*inch))
     
-    # -- 4. Visualizations (Code remains the same) --
+    # -- 4. Visualizations (Matplotlib for Report) --
     elements.append(Paragraph("3. Results Visualization", heading_style))
     
     def get_image_bytes(fig):
@@ -266,33 +285,39 @@ def generate_pdf_report(results):
         img_buf.seek(0)
         return img_buf
 
-    # Pie Charts (matplotlib for reportlab compatibility)
+    # A. Two Pie Charts Side-by-Side (Adjusted colors and size)
+    # Chart 1: Solid Comp
     fig_pie1, ax_pie1 = plt.subplots(figsize=(4.5, 4.5)) 
-    colors_solid_pdf = ['#6A1B9A', '#AB47BC', '#BDBDBD']
+    colors_solid_pdf = ['#6A1B9A', '#AB47BC', '#BDBDBD'] # Purple shades
     ax_pie1.pie(results["solid_composition"]["Mass (kg)"], labels=results["solid_composition"].index, 
                 autopct='%1.1f%%', colors=colors_solid_pdf, startangle=140, pctdistance=0.85, 
                 textprops={'fontsize': 8})
     ax_pie1.set_title("Solid Product Composition", fontsize=10, weight='bold')
     img1 = ReportImage(get_image_bytes(fig_pie1), width=3.25*inch, height=3.25*inch) 
     
+    # Chart 2: Global Balance
     fig_pie2, ax_pie2 = plt.subplots(figsize=(4.5, 4.5))
     filtered_yields = results["yields_percent"].iloc[[0, 1, 2]]
-    colors_global_pdf = ['#388E3C', '#7CB342', '#C5E1A5']
+    colors_global_pdf = ['#388E3C', '#7CB342', '#C5E1A5'] # Green shades
     ax_pie2.pie(filtered_yields["Yield (%)"], labels=filtered_yields.index, 
                 autopct='%1.1f%%', colors=colors_global_pdf, startangle=90, pctdistance=0.85,
                 textprops={'fontsize': 8})
     ax_pie2.set_title("Global Mass Balance", fontsize=10, weight='bold')
     img2 = ReportImage(get_image_bytes(fig_pie2), width=3.25*inch, height=3.25*inch)
     
+    # Arrange inside a Table
     t_pies = Table([[img1, img2]], colWidths=[3.7*inch, 3.7*inch])
     elements.append(t_pies)
+    
     plt.close(fig_pie1)
     plt.close(fig_pie2)
+    
     elements.append(Spacer(1, 0.2*inch)) 
     
-    # Line Chart
+    # B. Dual Axis Line Chart
     fig_line, ax1 = plt.subplots(figsize=(8, 4))
-    color_mass = '#388E3C'
+    
+    color_mass = '#388E3C' # Dark Green
     ax1.set_xlabel('Time (min)')
     ax1.set_ylabel('Total Mass Remaining (%)', color=color_mass, weight='bold')
     ax1.plot(results["mass_profile"].index, results["mass_profile"]["Total Mass Yield (%)"], color=color_mass, linewidth=2)
@@ -300,7 +325,7 @@ def generate_pdf_report(results):
     ax1.grid(True, alpha=0.4, linestyle='--', color='lightgrey') 
     
     ax2 = ax1.twinx()
-    color_ash = '#D32F2F'
+    color_ash = '#D32F2F' # Dark Red
     ax2.set_ylabel('Ash Concentration (%)', color=color_ash, weight='bold')
     ax2.plot(results["mass_profile"].index, results["mass_profile"]["Ash Concentration in Solid (%)"], color=color_ash, linewidth=2, linestyle='--')
     ax2.tick_params(axis='y', labelcolor=color_ash)
@@ -311,45 +336,46 @@ def generate_pdf_report(results):
     elements.append(Spacer(1, 0.1*inch))
     plt.close(fig_line)
 
-    # Bar Chart
+    # C. Bar Chart (Gas)
     fig_bar, ax_bar = plt.subplots(figsize=(8, 3))
-    results["gas_composition_molar"].plot(kind='bar', ax=ax_bar, legend=False, color='#1565C0')
+    results["gas_composition_molar"].plot(kind='bar', ax=ax_bar, legend=False, color='#1565C0') # Dark Blue
     ax_bar.set_title("Dry Gas Composition (Molar %)", fontsize=12)
     ax_bar.set_ylabel("Molar %")
     plt.xticks(rotation=0)
     ax_bar.grid(axis='y', alpha=0.4, linestyle='--', color='lightgrey')
+    
     img_bar = ReportImage(get_image_bytes(fig_bar), width=6.5*inch, height=2.5*inch)
     elements.append(img_bar)
     plt.close(fig_bar)
     
+    # Build
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
 # --- 5. Main Streamlit App ---
 def main():
-    st.set_page_config(page_title="Chemisco", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
-    LOGO_PATH = "chemisco_logo.png"
-    logo_base64 = _get_image_base64(LOGO_PATH) # Get Base64 for HTML embedding
-
     # --- Sidebar ---
     with st.sidebar:
-        # Use st.image for sidebar, but with a try/except block to prevent crash
-        if logo_base64:
-            # If Base64 conversion worked (i.e. file was found locally), display it.
-            # We use st.markdown with Base64 for sidebar too for max stability.
-            st.markdown(f'<img src="data:image/png;base64,{logo_base64}" class="sidebar-logo" style="width: 80%; display: block; margin: 0 auto 15px auto; padding: 5px; background-color: white; border-radius: 8px;">', unsafe_allow_html=True)
+        # LOGO DISPLAY: Use Base64 if available, otherwise show warning text
+        if LOGO_BASE64_STRING:
+            # Display using Base64 in an HTML container
+            st.markdown(f"""
+                <div class="sidebar-logo-container">
+                    <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 80%; display: block; margin: 0 auto;">
+                </div>
+            """, unsafe_allow_html=True)
         else:
             # Fallback text in case of error (This prevents the crash)
-            st.markdown("## Chemisco Logo")
-            st.warning("⚠️ Logo file not found. Check deployment path.")
-
+            st.markdown("## Chemisco Pro")
+            st.warning("⚠️ Logo file not found. Check deployment path and filename.")
 
         st.markdown("""
             <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
-                <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO</h1>
+                <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO PRO</h1>
                 <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
                 <hr style='margin: 10px 0; border-color: #4CAF50;'>
                 <p style='color: #C8E6C9; font-size: 0.85em;'>Project presented to:</p>
@@ -358,6 +384,9 @@ def main():
             """, unsafe_allow_html=True)
         
         st.header("⚙️ Input Parameters")
+        
+        reactor_type = st.selectbox("Reactor Type", 
+            ["Rotary Drum Reactor", "Fluidized Bed Reactor", "Auger/Screw Reactor", "Fixed Bed Reactor"])
         
         # Group 1: Material
         with st.expander("🌲 Biomass Properties", expanded=True):
@@ -368,35 +397,26 @@ def main():
             
         # Group 2: Process 
         with st.expander("🌡️ Process Conditions", expanded=True):
-            reactor_type = st.selectbox("Reactor Type", 
-                ["Rotary Drum Reactor", "Fluidized Bed Reactor", "Auger/Screw Reactor", "Fixed Bed Reactor"])
-            
             temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5)
             duration = st.slider("Process Duration (min)", 10, 120, 45, step=5)
             ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
             st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
             
-        # Group 3: Cost Management
-        with st.expander("💰 Cost Management", expanded=False):
-            st.caption("Economic Feasibility Parameters")
-            cost_biomass_per_ton = st.number_input("Biomass Feedstock Cost ($/ton)", min_value=0.0, value=30.0, step=5.0)
-            cost_energy_per_hour = st.number_input("Operational/Energy Cost ($/hour)", min_value=0.0, value=5.0, step=0.5, help="Total cost of electricity + labor per hour of operation")
-            price_biochar_per_kg = st.number_input("Biochar Selling Price ($/kg)", min_value=0.0, value=1.20, step=0.1)
-        
         # Game Mode Toggle
         st.markdown("---")
         st.subheader("🎮 Gamification")
         game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
 
+
     # --- Main Banner (with Base64 Image Embedding) ---
-    if logo_base64:
+    if LOGO_BASE64_STRING:
         st.markdown(f"""
             <div class="main-banner">
                 <div class="main-banner-logo-container">
-                    <img src="data:image/png;base64,{logo_base64}" style="width: 100%; height: auto; border-radius: 8px;">
+                    <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 100%; height: auto; border-radius: 8px;">
                 </div>
-                <h1>CHEMISCO</h1>
-                <p>Advanced Torrefaction Process Simulator</p>
+                <h1>CHEMISCO PRO</h1>
+                <p>Advanced Torrefaction Simulator</p>
                 <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
             </div>
             """, unsafe_allow_html=True)
@@ -404,15 +424,14 @@ def main():
         # Fallback if image fails to load (to prevent black screen)
         st.markdown("""
             <div class="main-banner">
-                <h1>CHEMISCO</h1>
-                <p>Advanced Torrefaction Process Simulator</p>
+                <h1>CHEMISCO PRO</h1>
+                <p>Advanced Torrefaction Simulator</p>
                 <div class="dedication">Project presented to Dr. Amr El-Rifai</div>
             </div>
             """, unsafe_allow_html=True)
     
     # BFD
-    st.subheader("Process Flow Block Diagram (BFD)")
-    bfd_html = f"""
+    st.subheader("Process Flow Block Diagram (BFD)")     bfd_html = f"""
     <div class="bfd-container">
         <div class="bfd-block">
             FEED PREPARATION
@@ -421,22 +440,23 @@ def main():
         </div>
         <div class="bfd-stream"></div>
         <div class="bfd-block">
-            DRYING
-            <p>100-200 °C</p>
+            DRYING & PREHEATING
+            <p>100 °C - 200 °C</p>
             <div class="side-stream"></div>
             <div class="side-stream-label">Water Vapor</div>
         </div>
         <div class="bfd-stream"></div>
         <div class="bfd-block" style="border-color: #D32F2F; background-color: #FFCDD2; color: #B71C1C;">
             {reactor_type.upper()}
-            <p style="color: #B71C1C;">{temperature} °C | {duration} min</p>
+            <p style="color: #B71C1C;">Temp: {temperature} °C</p>
+            <p style="color: #B71C1C;">Duration: {duration} min</p>
             <div class="side-stream" style="background-color: #FFC107;"></div>
             <div class="side-stream-label" style="color: #FFC107;">Volatile Gases</div>
         </div>
         <div class="bfd-stream"></div>
         <div class="bfd-block" style="border-color: #388E3C; background-color: #C8E6C9; color: #1B5E20;">
-            PRODUCT COOLING
-            <p>Biochar</p>
+            COOLING & PRODUCT
+            <p>Torrefied Biochar</p>
         </div>
     </div>
     <div style="height: 40px;"></div>
@@ -482,7 +502,7 @@ def main():
             if score >= 90:
                 st.success("🌟 PERFECT MATCH! Order fulfilled successfully.")
                 if not st.session_state.has_won:
-                    st.balloons()
+                    # Removed st.balloons() as it needs import random (which is not available in the provided code)
                     st.session_state.has_won = True
             elif score >= 70:
                 st.warning("⚠️ Acceptable, but try to optimize further.")
@@ -495,13 +515,14 @@ def main():
                 del st.session_state['target_yield']
                 del st.session_state['target_ash']
                 st.session_state.has_won = False
-                st.rerun()
+                # Need to rerun the app to reset the game state (requires 'import random' and re-running the app)
+                st.experimental_rerun()
         st.markdown("---")
     # --------------------------
 
     # --- Display Results ---
     st.header("📊 Simulation Results & Analysis")
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Yields & Ash", "Kinetics", "Gas Analysis", "💰 Cost Analysis", "PDF Report"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "PDF Report"])
     
     with tab1:
         st.subheader(f"Product Yields & Ash Enrichment")
@@ -521,94 +542,135 @@ def main():
         
         col_t1, col_t2 = st.columns(2)
         
+        # --- PLOTLY CHARTS (Interactive for UI - Adjusted Colors) ---
         with col_t1:
             st.markdown("##### Final Biochar Composition")
+            st.caption("Solid Product Breakdown")
+            
             df_solid = results["solid_composition"].reset_index()
             df_solid.columns = ["Component", "Mass (kg)"]
+            
             fig1 = px.pie(df_solid, values='Mass (kg)', names='Component', hole=0.5,
                           color='Component',
-                          color_discrete_map={"Fixed Carbon": "#6A1B9A", "Remaining Volatiles": "#AB47BC", "Ash": "#BDBDBD"})
-            fig1.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
+                          color_discrete_map={
+                              "Fixed Carbon": "#6A1B9A",  # Dark Purple
+                              "Remaining Volatiles": "#AB47BC", # Medium Purple
+                              "Ash": "#BDBDBD"  # Grey
+                          })
+            
+            fig1.update_layout(
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                margin=dict(t=20, b=50, l=10, r=10),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
+            fig1.update_traces(textposition='inside', textinfo='percent+label')
             st.plotly_chart(fig1, use_container_width=True)
 
         with col_t2:
             st.markdown("##### Global Mass Balance")
+            st.caption("Initial Input vs. Final Output")
+            
             filtered_yields = results["yields_percent"].iloc[[0, 1, 2]].reset_index()
             filtered_yields.columns = ["Component", "Yield (%)"]
+            
             fig2 = px.pie(filtered_yields, values='Yield (%)', names='Component', hole=0.5,
                           color='Component',
-                          color_discrete_map={"Biochar (Solid Product)": "#388E3C", "Non-Condensable Gases": "#7CB342", "Moisture Loss (Water Vapor)": "#C5E1A5"})
-            fig2.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2), margin=dict(t=20, b=50))
+                          color_discrete_map={
+                              "Biochar (Solid Product)": "#388E3C", # Dark Green
+                              "Non-Condensable Gases": "#7CB342", # Medium Green
+                              "Moisture Loss (Water Vapor)": "#C5E1A5" # Light Green
+                          })
+            
+            fig2.update_layout(
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                margin=dict(t=20, b=50, l=10, r=10),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
+            fig2.update_traces(textposition='inside', textinfo='percent')
             st.plotly_chart(fig2, use_container_width=True)
 
     with tab2:
-        st.subheader("Mass Depletion Kinetics")
+        st.subheader("Ash Concentration & Mass Depletion Kinetics")
+        
+        # --- FIXED DUAL-AXIS CHART ---
         fig_dual = go.Figure()
-        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Total Mass Yield (%)"], name="Total Mass %", line=dict(color="#4CAF50", width=3), yaxis="y1"))
-        fig_dual.add_trace(go.Scatter(x=results["mass_profile"].index, y=results["mass_profile"]["Ash Concentration in Solid (%)"], name="Ash Concentration %", line=dict(color="#D32F2F", width=3, dash='dot'), yaxis="y2"))
+
+        # Line 1: Total Mass (Left Axis)
+        fig_dual.add_trace(go.Scatter(
+            x=results["mass_profile"].index,
+            y=results["mass_profile"]["Total Mass Yield (%)"],
+            name="Total Mass %",
+            line=dict(color="#4CAF50", width=3), 
+            yaxis="y1"
+        ))
+
+        # Line 2: Ash Concentration (Right Axis)
+        fig_dual.add_trace(go.Scatter(
+            x=results["mass_profile"].index,
+            y=results["mass_profile"]["Ash Concentration in Solid (%)"],
+            name="Ash Concentration %",
+            line=dict(color="#D32F2F", width=3, dash='dot'), # Dark Red for Ash
+            yaxis="y2"
+        ))
+
+        # Corrected Layout
         fig_dual.update_layout(
-            xaxis=dict(title="Time (min)"),
-            yaxis=dict(title="Total Mass Remaining (%)", title_font=dict(color="#4CAF50"), tickfont=dict(color="#4CAF50")),
-            yaxis2=dict(title="Ash Concentration (%)", title_font=dict(color="#D32F2F"), tickfont=dict(color="#D32F2F"), overlaying="y", side="right"),
-            legend=dict(x=0.1, y=1.1, orientation="h"), height=450
+            title="Dynamic Ash Enrichment Logic",
+            xaxis=dict(title="Time (min)", showgrid=False),
+            
+            # Left Axis (Primary)
+            yaxis=dict(
+                title=dict(text="Total Mass Remaining (%)", font=dict(color="#4CAF50")),
+                tickfont=dict(color="#4CAF50"),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='rgba(255,255,255,0.1)'
+            ),
+            
+            # Right Axis (Secondary)
+            yaxis2=dict(
+                title=dict(text="Ash Concentration (%)", font=dict(color="#D32F2F")),
+                tickfont=dict(color="#D32F2F"),
+                overlaying="y",
+                side="right",
+                showgrid=False
+            ),
+            
+            legend=dict(x=0.1, y=1.1, orientation="h"),
+            hovermode="x unified",
+            paper_bgcolor='rgba(0,0,0,0)', # Transparent
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=450
         )
+
         st.plotly_chart(fig_dual, use_container_width=True)
+        
+        st.info("""
+        **Logic Explanation:** The green line drops as moisture and volatiles leave the biomass.
+        Since Ash is inert (does not react), its *concentration* (Red Dotted Line) must mathematically increase as the total mass decreases.
+        """)
 
     with tab3:
         st.subheader("Gas Composition")
         st.bar_chart(results["gas_composition_molar"])
 
     with tab4:
-        st.subheader("💰 Economic Feasibility Analysis")
-        cost_feedstock_total = (initial_mass_kg / 1000) * cost_biomass_per_ton
-        hours = duration / 60
-        cost_operations_total = hours * cost_energy_per_hour
-        total_cost = cost_feedstock_total + cost_operations_total
-        biochar_produced_kg = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
-        revenue_total = biochar_produced_kg * price_biochar_per_kg
-        net_profit = revenue_total - total_cost
-        roi = (net_profit / total_cost) * 100 if total_cost > 0 else 0
-        
-        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-        col_c1.metric("📉 Total Cost", f"${total_cost:.2f}")
-        col_c2.metric("📈 Total Revenue", f"${revenue_total:.2f}")
-        col_c3.metric("💵 Net Profit", f"${net_profit:.2f}", delta=f"${abs(net_profit):.2f}", delta_color="normal" if net_profit > 0 else "inverse")
-        col_c4.metric("📊 ROI", f"{roi:.1f}%", delta=f"{abs(roi):.1f}%", delta_color="normal" if roi > 0 else "inverse")
-        
-        st.markdown("---")
-        
-        # Waterfall Chart 
-        fig_waterfall = go.Figure(go.Waterfall(
-            name = "Cash Flow", orientation = "v",
-            measure = ["relative", "relative", "relative", "total"],
-            x = ["Gross Revenue", "Feedstock Cost", "Operational Cost", "Net Profit"],
-            textposition = "outside",
-            text = [f"${revenue_total:.1f}", f"${-cost_feedstock_total:.1f}", f"${-cost_operations_total:.1f}", f"${net_profit:.1f}"],
-            y = [revenue_total, -cost_feedstock_total, -cost_operations_total, net_profit],
-            connector = {"line":{"color":"rgb(63, 63, 63)"}},
-            decreasing = {"marker":{"color":"#EF5350"}},
-            increasing = {"marker":{"color":"#66BB6A"}},
-            totals = {"marker":{"color":"#42A5F5"}}
-        ))
-        fig_waterfall.update_layout(title = "Cash Flow Waterfall Chart (USD)", showlegend = False, height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_waterfall, use_container_width=True)
-        
-        st.info(f"""
-        **Analysis:**
-        Producing **{biochar_produced_kg:.1f} kg** of biochar from **{initial_mass_kg} kg** biomass.
-        Break-even selling price: **${(total_cost/biochar_produced_kg):.2f} / kg**.
-        """)
-
-    with tab5:
         st.subheader("Download Professional Report")
-        if st.button("⬇️ Generate PDF Report"):
+        st.markdown("Generate a high-quality PDF report including all tables and charts properly formatted.")
+        
+        if st.button("⬇️ Download PDF Report"):
             pdf_buffer = generate_pdf_report(results)
             st.download_button(
                 label="Download Report",
                 data=pdf_buffer,
-                file_name=f"Chemisco_Torrefaction_Report.pdf",
+                file_name=f"Torrefaction_Report_Professional.pdf",
                 mime="application/pdf"
             )
 
 if __name__ == "__main__":
+    import random # Added this import for the game logic
     main()
