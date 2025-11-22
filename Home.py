@@ -9,7 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from matplotlib.patches import Circle, Wedge # <--- تم إضافة هذا الاستيراد لتصحيح الخطأ
+from matplotlib.patches import Circle, Wedge 
 
 # --- 1. Chemical and Empirical Constants ---
 R_GAS = 8.314  # Universal Gas Constant (J/mol·K)
@@ -39,11 +39,11 @@ SIZE_FACTOR = {
 GLOBAL_CSS = """
 <style>
     /* Global Styling for Professional Look */
-    .stApp { padding-top: 20px; background-color: #f4f7f6; } 
+    .stApp { padding-top: 20px; background-color: #F4F6F7; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } 
     
-    /* Custom Banner Style */
+    /* Custom Banner Style (Teal Gradient) */
     .main-banner {
-        background: linear-gradient(135deg, #1e704b, #388E3C); /* Gradient Green */
+        background: linear-gradient(135deg, #16A085, #1ABC9C); 
         padding: 30px;
         border-radius: 12px;
         text-align: center;
@@ -55,13 +55,13 @@ GLOBAL_CSS = """
     
     /* Sidebar Customization */
     .st-emotion-cache-1na6f8g, .st-emotion-cache-1d391kg { 
-        background-color: #e3f2fd; /* Light Blue for contrast */
+        background-color: #ECF0F1; /* Light Gray background */
     }
     
     /* Input Expander Style */
     .st-emotion-cache-p5m8m8 { 
         border-radius: 10px;
-        border-left: 5px solid #00BCD4; /* Cyan accent */
+        border-left: 5px solid #1ABC9C; /* Teal Accent */
         padding: 10px;
         margin-bottom: 15px;
         background-color: #FFFFFF;
@@ -77,38 +77,42 @@ GLOBAL_CSS = """
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         margin-bottom: 20px;
         background-color: #FFFFFF;
+        color: #2C3E50; /* Dark text for professionalism */
     }
     .scorecard-value {
         font-size: 38px !important;
         font-weight: bold;
-        color: #1e704b !important; 
+        color: #16A085 !important; /* Primary Teal Accent */
         margin: 5px 0 0;
+    }
+    /* Metric Delta (for profit) */
+    [data-testid="stMetricDelta"] {
+        font-weight: bold;
     }
 </style>
 """
+
 # --- Helper function for Gauge Chart (Visual KPI) ---
 def plot_gauge(value, title, min_val, max_val, color_map, unit=""):
-    """Creates a visually appealing gauge chart using Matplotlib."""
+    """Creates a visually appealing gauge chart using Matplotlib and imported patches."""
     fig, ax = plt.subplots(figsize=(4, 2.5), subplot_kw={'aspect': 'equal'})
     
     # Draw background arc (Scale)
-    # Using 'Circle' imported from matplotlib.patches
-    ax.add_patch(Circle((0, 0), 1.0, color='lightgray', fill=False, linewidth=10))
+    ax.add_patch(Circle((0, 0), 1.0, color='#BDC3C7', fill=False, linewidth=10, alpha=0.5))
     
     # Calculate angular position for the value
     norm_val = (value - min_val) / (max_val - min_val)
+    # Clamp value between 0 and 1
+    norm_val = max(0, min(1, norm_val))
     angle = 180 * (1 - norm_val) # 180 (start) to 0 (end) degrees
     
     # Draw colored arcs (Color Map)
-    for limit, color in sorted(color_map.items(), reverse=True): # Sort descending to draw from largest arc
-        if value < limit: # Only draw the color band if the value is below the threshold
-            continue
-        
+    # Color map is sorted in reverse to draw larger arcs first
+    for limit, color in sorted(color_map.items(), reverse=True): 
         # Calculate angle for color limit
         limit_angle = 180 * (1 - (limit - min_val) / (max_val - min_val))
         
         # Draw the colored arc
-        # Using 'Wedge' imported from matplotlib.patches - FIX for AttributeError
         ax.add_patch(Wedge((0, 0), 1.0, limit_angle, 180, color=color, linewidth=0, alpha=0.6))
 
     # Draw the pointer (Needle)
@@ -121,8 +125,14 @@ def plot_gauge(value, title, min_val, max_val, color_map, unit=""):
 
     ax.set_xlim(-1.1, 1.1)
     ax.set_ylim(0, 1.1)
-    ax.set_title(title, fontsize=10, pad=10)
-    ax.text(0, -0.15, f"{value:.2f}{unit}", ha='center', va='center', fontsize=16, weight='bold')
+    ax.set_title(title, fontsize=12, pad=10, color='#2C3E50', weight='bold')
+    
+    # Display the actual value
+    ax.text(0, -0.15, f"{value:.2f}{unit}", ha='center', va='center', fontsize=16, weight='bold', color='#2C3E50')
+    
+    # Add min/max labels for context
+    ax.text(-1.0, 0.0, f"{min_val}", ha='left', va='center', fontsize=8, color='#555')
+    ax.text(1.0, 0.0, f"{max_val}", ha='right', va='center', fontsize=8, color='#555')
     
     # Hide axes
     ax.axis('off')
@@ -220,7 +230,7 @@ def calculate_tycoon_profit(results):
     initial_mass_kg = params["initial_mass"]
     final_biochar_mass = results["yields_mass"].loc["Biochar (Solid) & Ash", "Mass (kg)"]
     
-    # 1. Energy & Quality Calculations (New Sustainability KPI)
+    # 1. Energy & Quality Calculations (Sustainability KPI)
     M_total = results["yields_percent"].loc["Biochar (Solid) & Ash", "Yield (%)"] / 100
     initial_moisture = params["moisture"] / 100
     initial_ash = data["Ash"]
@@ -230,10 +240,9 @@ def calculate_tycoon_profit(results):
     # EDR (Energy Density Ratio) ~ 1/M_daf (simplified)
     EDR = 1 / M_daf if M_daf > 0.001 else 1.0 
 
-    # Thermal Efficiency (TE): Energy in Biochar / Energy in Feedstock
-    # TE = M_daf * EDR (simplified)
-    Thermal_Efficiency = M_daf * EDR * (0.8 + 0.2 * (EDR - 1)) # Add a slight correction factor
-    Thermal_Efficiency = min(Thermal_Efficiency, 0.99) # Max 99%
+    # Thermal Efficiency (TE)
+    Thermal_Efficiency = M_daf * EDR * (0.8 + 0.2 * (EDR - 1))
+    Thermal_Efficiency = min(Thermal_Efficiency, 0.99)
     
     # 2. Economic Calculations
     cost_feedstock = initial_mass_kg * data["Feedstock_Cost"]
@@ -256,7 +265,9 @@ def calculate_tycoon_profit(results):
         "net_profit": net_profit,
         "EDR": EDR,
         "Thermal_Efficiency": Thermal_Efficiency * 100, # Return as percentage
-        "selling_price": selling_price
+        "selling_price": selling_price,
+        "cost_feedstock": cost_feedstock,
+        "cost_operating": cost_operating
     }
 
 # --- 5. Main Streamlit App ---
@@ -275,9 +286,9 @@ def main():
     # 5.1. Sidebar (Inputs) 
     with st.sidebar:
         st.markdown("""
-            <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20;'>
+            <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #16A085;'>
                 <h1 style='color: white; margin: 0; font-size: 1.8em;'>CHEMISCO PRO</h1>
-                <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
+                <p style='color: #E8F5E9; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
             </div>
             """, unsafe_allow_html=True)
         st.header("⚙️ Input Parameters")
@@ -298,15 +309,15 @@ def main():
         st.subheader("💰 Tycoon Controls")
         
         # Run Button
-        if st.button("▶️ تشغيل دورة الإنتاج الحالية", help="يشغل دورة إنتاج واحدة بالإعدادات المحددة"):
+        if st.button("▶️ Run Production Batch", help="Runs one production cycle with the specified settings."):
             if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
-                st.error("Input Error: Moisture and Ash > 100%.")
+                st.error("Input Error: Moisture and Ash content exceeds 100%.")
                 st.session_state.run_batch = False
             else:
                 st.session_state.run_batch = True
         
         if st.session_state.batch_count > 0:
-            if st.button("🔄 إعادة تعيين اللعبة", help="إعادة رأس المال والعدادات إلى القيمة الافتراضية"):
+            if st.button("🔄 Reset Tycoon Game", help="Resets capital and counters to default."):
                 st.session_state.capital = 5000.0
                 st.session_state.batch_count = 0
                 st.rerun()
@@ -314,24 +325,24 @@ def main():
     # 5.2. Main Content
     st.markdown("""
         <div class="main-banner">
-            <h1>🔥 Advanced Torrefaction Simulator</h1>
-            <p>Strategic Dashboard for Process Optimization</p>
+            <h1>🔥 Torrefaction Strategy Dashboard</h1>
+            <p>Optimize Process for Maximum Profit and Biochar Quality</p>
         </div>
         """, unsafe_allow_html=True)
     
     # --- Scoreboard Bar ---
-    st.subheader("لوحة التحكم الاستراتيجية (Scoreboard)")
+    st.subheader("Tycoon Scoreboard")
     col_sc1, col_sc2, col_sc3 = st.columns(3)
     
-    col_sc1.markdown('<div class="scorecard-container"><h4>🏦 رأس المال الكلي</h4><p class="scorecard-value">$%s</p></div>' % f"{st.session_state.capital:,.2f}", unsafe_allow_html=True)
-    col_sc2.markdown('<div class="scorecard-container"><h4>🏭 دورات الإنتاج المنفذة</h4><p class="scorecard-value">%s</p></div>' % f"{st.session_state.batch_count}", unsafe_allow_html=True)
+    col_sc1.markdown('<div class="scorecard-container"><h4>🏦 Current Capital</h4><p class="scorecard-value">$%s</p></div>' % f"{st.session_state.capital:,.2f}", unsafe_allow_html=True)
+    col_sc2.markdown('<div class="scorecard-container"><h4>🏭 Batches Executed</h4><p class="scorecard-value">%s</p></div>' % f"{st.session_state.batch_count}", unsafe_allow_html=True)
     
     if st.session_state.capital >= 15000:
-        col_sc3.markdown('<div class="scorecard-container" style="background-color: #E8F5E9;"><h4>🏆 حالة التحدي</h4><p class="scorecard-value" style="color:#2E7D32;">هدف تم تحقيقه!</p></div>', unsafe_allow_html=True)
+        col_sc3.markdown('<div class="scorecard-container" style="background-color: #E8F5E9;"><h4>🏆 Challenge Status</h4><p class="scorecard-value" style="color:#2ECC71;">GOAL ACHIEVED!</p></div>', unsafe_allow_html=True)
     elif st.session_state.capital >= 5000:
-        col_sc3.markdown('<div class="scorecard-container" style="background-color: #FFFDE7;"><h4>🎯 هدف الربح</h4><p class="scorecard-value" style="color:#FBC02D;">$15,000</p></div>', unsafe_allow_html=True)
+        col_sc3.markdown('<div class="scorecard-container" style="background-color: #FFFDE7;"><h4>🎯 Profit Goal</h4><p class="scorecard-value" style="color:#F1C40F;">$15,000</p></div>', unsafe_allow_html=True)
     else:
-        col_sc3.markdown('<div class="scorecard-container" style="background-color: #FFEBEE;"><h4>🚨 هدف الربح</h4><p class="scorecard-value" style="color:#C62828;">$15,000</p></div>', unsafe_allow_html=True)
+        col_sc3.markdown('<div class="scorecard-container" style="background-color: #FFEBEE;"><h4>🚨 Profit Goal</h4><p class="scorecard-value" style="color:#E74C3C;">$15,000</p></div>', unsafe_allow_html=True)
 
 
     st.markdown("---")
@@ -340,39 +351,38 @@ def main():
     
     results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg)
     
-    tab1, tab2, tab3 = st.tabs(["🔥 بطاقة الأداء (KPIs)", "📈 تفاصيل المحاكاة", "📄 تقرير PDF"])
+    tab1, tab2, tab3 = st.tabs(["🔥 Strategy Scorecard (KPIs)", "📈 Simulation Details", "📄 PDF Report"])
 
     with tab1:
-        st.subheader("بطاقة الأداء الاستراتيجية ودورة الإنتاج")
+        st.subheader("Key Performance Indicators (KPIs) - Optimized Performance")
         
         # 1. KPIs Visuals
         col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
         
         tycoon_results = calculate_tycoon_profit(results)
         
-        # KPI 1: Profitability
-        profit_map = {100: 'green', 0: 'yellow', -50: 'red'} # Green=High Profit, Yellow=Low, Red=Loss
-        profit_fig = plot_gauge(tycoon_results['net_profit'], "1. الأداء الاقتصادي (الربح الصافي)", min_val=-100, max_val=200, color_map=profit_map, unit="$")
+        # KPI 1: Profitability (using hex colors)
+        profit_map = {100: '#2ECC71', 0: '#F1C40F', -50: '#E74C3C'} 
+        profit_fig = plot_gauge(tycoon_results['net_profit'], "1. Economic Performance (Net Profit)", min_val=-100, max_val=200, color_map=profit_map, unit="$")
         col_kpi1.pyplot(profit_fig)
 
         # KPI 2: Biochar Quality (EDR)
-        edr_map = {1.4: 'green', 1.25: 'yellow', 1.1: 'red'} # Green=High EDR, Yellow=Medium, Red=Low
-        edr_fig = plot_gauge(tycoon_results['EDR'], "2. جودة المنتج (نسبة كثافة الطاقة)", min_val=1.0, max_val=1.5, color_map=edr_map)
+        edr_map = {1.4: '#2ECC71', 1.25: '#F1C40F', 1.1: '#E74C3C'}
+        edr_fig = plot_gauge(tycoon_results['EDR'], "2. Product Quality (Energy Density Ratio)", min_val=1.0, max_val=1.5, color_map=edr_map)
         col_kpi2.pyplot(edr_fig)
 
         # KPI 3: Thermal Efficiency
-        te_map = {90: 'green', 75: 'yellow', 60: 'red'} # Green=High Efficiency, Yellow=Medium, Red=Low
-        te_fig = plot_gauge(tycoon_results['Thermal_Efficiency'], "3. الكفاءة الحرارية (%)", min_val=50, max_val=100, color_map=te_map, unit="%")
+        te_map = {90: '#2ECC71', 75: '#F1C40F', 60: '#E74C3C'}
+        te_fig = plot_gauge(tycoon_results['Thermal_Efficiency'], "3. Thermal Efficiency (%)", min_val=50, max_val=100, color_map=te_map, unit="%")
         col_kpi3.pyplot(te_fig)
 
         st.markdown("---")
         
         # 2. Batch Execution Summary
-        st.markdown("### 📝 نتائج دورة الإنتاج الأخيرة")
+        st.markdown("### 📝 Last Batch Summary")
         if st.session_state.run_batch:
             
-            # Check for capital after run_batch is True
-            feedstock_cost_check = initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"]
+            feedstock_cost_check = tycoon_results["cost_feedstock"]
             
             if st.session_state.capital >= feedstock_cost_check:
                 
@@ -380,46 +390,48 @@ def main():
                 st.session_state.capital += tycoon_results["net_profit"]
                 st.session_state.batch_count += 1
                 
+                st.success(f"Batch #{st.session_state.batch_count} executed successfully! Capital Updated.")
+                
                 col_sum1, col_sum2, col_sum3 = st.columns(3)
-                col_sum1.metric("الربح الصافي ($)", f"${tycoon_results['net_profit']:,.2f}", delta=f"{tycoon_results['net_profit']/tycoon_results['total_costs'] * 100:.1f} % هامش ربح")
-                col_sum2.metric("سعر البيع المعدل ($/kg)", f"${tycoon_results['selling_price']:.4f}")
-                col_sum3.metric("عائد الكتلة (%)", f"{results['yields_percent'].loc['Biochar (Solid) & Ash', 'Yield (%)']:.2f} %")
+                col_sum1.metric("Net Profit ($)", f"${tycoon_results['net_profit']:,.2f}", delta=f"{tycoon_results['net_profit']/tycoon_results['total_costs'] * 100:.1f} % Margin")
+                col_sum2.metric("Adjusted Selling Price ($/kg)", f"${tycoon_results['selling_price']:.4f}")
+                col_sum3.metric("Mass Yield (%)", f"{results['yields_percent'].loc['Biochar (Solid) & Ash', 'Yield (%)']:.2f} %")
 
-                st.markdown("##### تحليل التكاليف والإيرادات:")
+                st.markdown("##### Detailed Costs and Revenue:")
                 profit_df = pd.DataFrame({
-                    "البند": ["تكلفة المواد الخام", "تكلفة التشغيل", "إجمالي التكاليف", "الإيرادات الكلية"],
-                    "القيمة ($)": [
-                        initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"], 
-                        tycoon_results["total_costs"] - initial_mass_kg * EMPIRICAL_DATA[biomass_type]["Feedstock_Cost"], 
+                    "Item": ["Feedstock Cost", "Operating Cost", "Total Costs", "Total Revenue"],
+                    "Value ($)": [
+                        tycoon_results["cost_feedstock"], 
+                        tycoon_results["cost_operating"], 
                         tycoon_results["total_costs"], 
                         tycoon_results["revenues"]
                     ]
-                }).set_index("البند")
+                }).set_index("Item")
                 st.dataframe(profit_df.style.format("${:,.2f}"), use_container_width=True)
                 
             else:
-                st.error("⚠️ فشلت الدورة! رأس مالك الحالي غير كافٍ لشراء المواد الخام. حاول تقليل حجم الدفعة أو اختيار مادة خام أرخص.")
+                st.error("⚠️ Batch Failed! Insufficient capital to purchase feedstock. Try reducing batch size or selecting cheaper biomass.")
                 
             st.session_state.run_batch = False # Reset flag
 
     # --- Tab 2: Simulation Details ---
     with tab2:
-        st.subheader("تفاصيل ميزان الكتلة والمحاكاة الحركية")
+        st.subheader("Mass Balance and Kinetic Simulation Details")
         col_d1, col_d2 = st.columns(2)
         
         with col_d1:
-            st.markdown("##### 1. Mass Conversion Kinetics")
+            st.markdown("##### 1. Mass Component Conversion Over Time")
             st.line_chart(results["mass_profile"], use_container_width=True)
-            st.markdown("##### 2. Gas Composition")
+            st.markdown("##### 2. Non-Condensable Gas Composition")
             st.bar_chart(results["gas_composition_molar"], use_container_width=True)
             
         with col_d2:
-            st.markdown("##### 3. Yield Distribution (kg)")
+            st.markdown("##### 3. Product Yields (Mass in kg)")
             st.dataframe(results["yields_mass"].style.format("{:.2f}"), use_container_width=True)
             st.markdown("##### 4. Mass Balance Pie Chart")
             fig1, ax1 = plt.subplots(figsize=(5, 5))
             filtered_yields = results["yields_percent"].iloc[[0, 1, 2]] 
-            ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#8B4513', '#A9A9A9', '#ADD8E6'])
+            ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#34495E', '#95A5A6', '#DCECF1'])
             ax1.axis('equal')
             st.pyplot(fig1)
 
@@ -437,7 +449,7 @@ def main():
                 mime="application/pdf"
             )
 
-# --- 6. PDF Report Generation Function (Unchanged) ---
+# --- 6. PDF Report Generation Function ---
 def generate_pdf_report(results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -448,7 +460,7 @@ def generate_pdf_report(results):
     elements = []
     
     # Header & Banner
-    elements.append(Paragraph("<font size=16 color='#4CAF50'>CHEMISCO PRO TORREFACTION REPORT</font>", styles["Title"]))
+    elements.append(Paragraph("<font size=16 color='#16A085'>CHEMISCO PRO TORREFACTION REPORT</font>", styles["Title"]))
     elements.append(Paragraph(f"Report Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", styles["Italic"]))
     elements.append(Spacer(1, 0.25*inch))
     
@@ -493,7 +505,7 @@ def generate_pdf_report(results):
     
     # Chart 1: Mass Conversion Plot 
     fig3, ax3 = plt.subplots(figsize=(6, 4))
-    results["mass_profile"].plot(ax=ax3)
+    results["mass_profile"].plot(ax=ax3, color=['#1ABC9C', '#2C3E50', '#95A5A6'])
     plt.title("Mass Component Conversion Over Time")
     plt.xlabel("Time (min)")
     plt.ylabel("Mass Fraction")
@@ -507,7 +519,7 @@ def generate_pdf_report(results):
     # Chart 2: Mass balance pie chart
     fig1, ax1 = plt.subplots(figsize=(5, 5))
     filtered_yields = results["yields_percent"].iloc[[0, 1, 2]]
-    ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90)
+    ax1.pie(filtered_yields["Yield (%)"].values, labels=filtered_yields.index, autopct='%1.1f%%', startangle=90, colors=['#34495E', '#95A5A6', '#DCECF1'])
     ax1.axis('equal')
     plt.title("Mass Balance Distribution (%)")
     imgdata1 = BytesIO()
@@ -518,7 +530,7 @@ def generate_pdf_report(results):
     
     # Chart 3: Gas composition bar chart
     fig2, ax2 = plt.subplots(figsize=(5, 4))
-    results["gas_composition_molar"].plot(kind='bar', ax=ax2, legend=False)
+    results["gas_composition_molar"].plot(kind='bar', ax=ax2, legend=False, color='#1ABC9C')
     plt.title("Dry Gas Composition (Molar %)")
     plt.ylabel("Molar %")
     plt.xticks(rotation=0)
