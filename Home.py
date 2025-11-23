@@ -355,7 +355,7 @@ def calculate_thermal_balance(p, results):
         'thermal_efficiency': energy_yield 
     }
 
-# --- 5. Sensitivity Analysis (Fixed NameError and Logic) ---
+# --- 5. Sensitivity Analysis ---
 @st.cache_data
 def run_sensitivity_analysis(biomass, moisture, size, initial_mass_kg, reactor_type):
     T_range = np.linspace(220, 320, 10)
@@ -428,7 +428,7 @@ def mock_ai_response(prompt, results, thermal_results, finance_results):
     return summary
 
 
-# --- 7. Main Streamlit App (Now defined after all dependencies) ---
+# --- 7. Main Streamlit App (Defined after all dependencies) ---
 def main():
     st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
@@ -493,7 +493,7 @@ def main():
         game_mode = st.checkbox("Activate Plant Manager Challenge", value=False)
 
 
-    # Input validation (Kept as is)
+    # Input validation 
     if moisture_content / 100 + BIOMASS_COMPOSITION[biomass_type]["Ash"] > 1:
         st.error("**Input Error:** Moisture and Ash content exceed 100%. Adjust inputs.")
         return 
@@ -509,7 +509,7 @@ def main():
     st.title("CHEMISCO: Advanced Torrefaction Dashboard 🌙")
     st.subheader("Integrated Simulation, Analysis, and Optimization Platform")
     
-    # 1. Block Flow Diagram (BFD) - Added Diagram for context 
+    # 1. Block Flow Diagram (BFD)
     st.markdown("---")
     st.subheader("Process Flow Overview")
     
@@ -538,10 +538,6 @@ def main():
     </div>
     """
     st.markdown(bfd_html, unsafe_allow_html=True)
-    
-
-[Image of Block Flow Diagram symbols]
-
     st.markdown("---")
 
     # 2. Results Dashboard (KPIs)
@@ -581,7 +577,7 @@ def main():
     # 3. Detailed Tabs
     tab1, tab2, tab3, tab4, tab_ai, tab_game = st.tabs(["Mass Balance & Quality", "Advanced Kinetics & Sensitivity", "Energy & Economics", "PDF Report", "🤖 AI Expert Analysis", "🎮 Plant Manager Challenge"])
     
-    # --- Tab 1: Mass Balance & Quality (Kept as is) ---
+    # --- Tab 1: Mass Balance & Quality ---
     with tab1:
         st.subheader("Mass Distribution and Product Quality")
         col_t1, col_t2 = st.columns(2)
@@ -610,13 +606,12 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-    # --- Tab 2: Advanced Kinetics & Sensitivity (Now the function is defined above main) ---
+    # --- Tab 2: Advanced Kinetics & Sensitivity ---
     with tab2:
         st.subheader("Dynamic Simulation and Sensitivity Analysis")
         col_t2_1, col_t2_2 = st.columns(2)
 
         with st.spinner("Running Sensitivity Analysis..."):
-            # Now run_sensitivity_analysis is defined before main()
             df_T, df_D = run_sensitivity_analysis(biomass_type, moisture_content, particle_size, initial_mass_kg, reactor_type)
 
         with col_t2_1:
@@ -636,7 +631,6 @@ def main():
 
         with col_t2_2:
             st.markdown("##### Multi-Component Kinetic Rates")
-            # Adjusted calculation to use temperature + 273.15 
             T_K_local = temperature + 273.15
             
             kinetics_data = {
@@ -654,7 +648,7 @@ def main():
 
             st.info(f"Avg. Devol Rate: **{results['avg_devol_rate']:.4f} $\\text{{min}}^{-1}$**. Particle size **{particle_size}** acts as a physical barrier to reaction.")
 
-    # --- Tab 3: Energy & Economics (Fixed KeyError) ---
+    # --- Tab 3: Energy & Economics ---
     with tab3:
         st.subheader("Energy and Economic Performance")
         col_e1, col_e2 = st.columns(2)
@@ -707,7 +701,7 @@ def main():
             
             st.metric("📊 Return on Investment (ROI)", f"{(finance_results['Net Profit'] / finance_results['Total Cost']) * 100:.1f} %" if finance_results['Total Cost'] > 0 else "N/A")
 
-    # --- Tab 4: PDF Report (Placeholder) ---
+    # --- Tab 4: PDF Report ---
     with tab4:
         st.subheader("📥 Generate Professional Report (Dark Mode Ready)")
         st.info("The full PDF report includes all charts, tables, and a summary of the KPIs.")
@@ -745,7 +739,7 @@ def main():
                 st.markdown(ai_response)
                 st.session_state.messages.append({"role": "assistant", "content": ai_response})
     
-    # --- Tab 6: Game Mode (Kept as is) ---
+    # --- Tab 6: Game Mode ---
     with tab_game:
         if game_mode:
             st.header("🎮 Plant Manager Challenge")
