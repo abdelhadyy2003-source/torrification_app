@@ -1,14 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-CHEMISCO OS v10 - THE INDUSTRIAL MONOLITH
-=========================================
-Type:        Full-Stack Single-File Application
-License:     Enterprise / Mission Critical
-Description: A complete Operating System simulation for Biorefineries.
-             Features IoT simulation, Rankine Cycle Thermodynamics, 
-             Internal Email System, RBAC Security, and Automated Unit Testing.
-
-AUTHOR: Chemisco Elite Dev Team
+CHEMISCO ENTERPRISE: Integrated Biorefinery Simulation Platform
+---------------------------------------------------------------
+Version: 10.0 (Stable Final Release)
+Author: Chemisco Development Team
 """
 
 import streamlit as st
@@ -16,529 +11,426 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from scipy.integrate import odeint
-from scipy.optimize import minimize
-import sqlite3
-import hashlib
-import time
-import datetime
+from io import BytesIO
+import base64
+import os
 import random
-import io
-import math
-import uuid
-from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Optional, Tuple, Union, Any
-from enum import Enum
+import matplotlib.pyplot as plt
+
+# --- Libraries for PDF Report ---
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportImage, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.lib import colors
 
 # ==============================================================================
-# 0. KERNEL CONFIGURATION & CONSTANTS
+# 1. CONFIGURATION & CONSTANTS
 # ==============================================================================
 
-st.set_page_config(
-    page_title="Chemisco OS",
-    page_icon="☢️",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="Chemisco Enterprise", layout="wide", page_icon="🏭")
 
-class SystemConstants:
-    # Thermodynamics
-    R_GAS = 8.314          # J/(mol.K)
-    STD_TEMP = 298.15      # K
-    STD_PRESS = 101325     # Pa
-    WATER_CP = 4.18        # kJ/kg.K
-    STEAM_ENTHALPY = 2676  # kJ/kg (Sat. Steam @ 100C)
-    
-    # Economics
-    ELEC_PRICE = 0.12      # $/kWh
-    CARBON_CREDIT = 30.0   # $/ton CO2
-    
-    # UI Theme (Cyber-Industrial)
-    HEX_PRIMARY = "#00F0FF"    # Neon Cyan
-    HEX_SECONDARY = "#7000FF"  # Neon Purple
-    HEX_BG = "#050505"         # Void Black
-    HEX_PANEL = "#111111"      # Panel Gray
-    HEX_TEXT = "#E0E0E0"
-    HEX_SUCCESS = "#00FF41"    # Matrix Green
-    HEX_DANGER = "#FF003C"     # Cyber Red
+# Physical Constants
+R_GAS = 8.314
 
-# ==============================================================================
-# 1. VISUALIZATION ENGINE (CSS INJECTION)
-# ==============================================================================
-
-class UIKernel:
-    @staticmethod
-    def boot():
-        st.markdown(f"""
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
-            
-            :root {{
-                --neon-cyan: {SystemConstants.HEX_PRIMARY};
-                --neon-purple: {SystemConstants.HEX_SECONDARY};
-                --bg-color: {SystemConstants.HEX_BG};
-            }}
-
-            /* BASE STYLES */
-            .stApp {{
-                background-color: var(--bg-color);
-                font-family: 'Share Tech Mono', monospace;
-                background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000 100%);
-            }}
-            
-            h1, h2, h3 {{
-                font-family: 'Orbitron', sans-serif;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                color: #fff;
-                text-shadow: 0 0 10px var(--neon-cyan);
-            }}
-
-            /* CYBER CARDS */
-            .cyber-card {{
-                background: rgba(10, 10, 10, 0.8);
-                border: 1px solid #333;
-                border-left: 4px solid var(--neon-cyan);
-                padding: 20px;
-                margin-bottom: 15px;
-                position: relative;
-                overflow: hidden;
-                box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
-            }}
-            .cyber-card::before {{
-                content: '';
-                position: absolute; top: 0; right: 0;
-                width: 20px; height: 20px;
-                background: linear-gradient(135deg, transparent 50%, var(--neon-cyan) 50%);
-            }}
-            
-            /* METRICS */
-            .metric-val {{ font-size: 2.5rem; font-weight: bold; color: #fff; }}
-            .metric-label {{ color: var(--neon-cyan); font-size: 0.8rem; }}
-            
-            /* TERMINAL LOGS */
-            .terminal-window {{
-                background: #000;
-                border: 1px solid #333;
-                padding: 10px;
-                font-family: 'Share Tech Mono', monospace;
-                color: #0f0;
-                height: 200px;
-                overflow-y: auto;
-                box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
-            }}
-            .log-line {{ border-bottom: 1px solid #111; padding: 2px 0; }}
-            .log-time {{ color: #666; }}
-            
-            /* BUTTONS */
-            .stButton > button {{
-                background: transparent;
-                border: 1px solid var(--neon-cyan);
-                color: var(--neon-cyan);
-                font-family: 'Orbitron', sans-serif;
-                transition: all 0.3s;
-                border-radius: 0;
-            }}
-            .stButton > button:hover {{
-                background: var(--neon-cyan);
-                color: #000;
-                box-shadow: 0 0 20px var(--neon-cyan);
-            }}
-            
-            /* SIDEBAR */
-            [data-testid="stSidebar"] {{
-                background-color: #080808;
-                border-right: 1px solid #333;
-            }}
-        </style>
-        """, unsafe_allow_html=True)
-
-# ==============================================================================
-# 2. PERSISTENCE LAYER (SQLITE ORM)
-# ==============================================================================
-
-class DatabaseEngine:
-    """Enterprise Singleton for Data Management."""
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(DatabaseEngine, cls).__new__(cls)
-            cls._instance.conn = sqlite3.connect("chemisco_os.db", check_same_thread=False)
-            cls._instance.setup_tables()
-        return cls._instance
-    
-    def setup_tables(self):
-        c = self.conn.cursor()
-        
-        # Users
-        c.execute("""CREATE TABLE IF NOT EXISTS users 
-                     (id INTEGER PRIMARY KEY, username TEXT, role TEXT, password TEXT, xp INTEGER)""")
-        
-        # Emails (Inbox System)
-        c.execute("""CREATE TABLE IF NOT EXISTS emails 
-                     (id INTEGER PRIMARY KEY, recipient TEXT, sender TEXT, subject TEXT, body TEXT, read INT)""")
-        
-        # Simulation Logs
-        c.execute("""CREATE TABLE IF NOT EXISTS logs 
-                     (id INTEGER PRIMARY KEY, timestamp DATETIME, user TEXT, action TEXT, status TEXT)""")
-                     
-        # Seed Data (Admin)
-        try:
-            c.execute("INSERT OR IGNORE INTO users (id, username, role, password, xp) VALUES (1, 'admin', 'CEO', 'admin', 9999)")
-        except: pass
-        self.conn.commit()
-
-    def send_system_email(self, to_user, subject, body):
-        self.conn.execute("INSERT INTO emails (recipient, sender, subject, body, read) VALUES (?, 'SYSTEM', ?, ?, 0)", 
-                          (to_user, subject, body))
-        self.conn.commit()
-
-    def get_inbox(self, username):
-        return pd.read_sql(f"SELECT * FROM emails WHERE recipient='{username}' ORDER BY id DESC", self.conn)
-
-# ==============================================================================
-# 3. DOMAIN MODELS (PHYSICS & ENGINEERING)
-# ==============================================================================
-
-@dataclass
-class Feedstock:
-    id: str
-    name: str
-    c: float; h: float; o: float; n: float; s: float # Elemental %
-    moisture: float
-    ash: float
-    hhv: float # MJ/kg
-
-    @property
-    def chemical_formula(self):
-        return f"C{self.c:.1f}H{self.h:.1f}O{self.o:.1f}N{self.n:.2f}"
-
-FEEDSTOCKS = {
-    "wood": Feedstock("wood", "Pine Wood", 50.0, 6.0, 43.0, 0.1, 0.0, 15.0, 1.0, 19.5),
-    "straw": Feedstock("straw", "Wheat Straw", 45.0, 5.5, 40.0, 0.5, 0.1, 12.0, 6.0, 17.0),
-    "sludge": Feedstock("sludge", "Dried Sludge", 35.0, 4.0, 25.0, 5.0, 1.0, 20.0, 30.0, 14.0),
+# Empirical Database for Biomass
+EMPIRICAL_DATA = {
+    "Wood Chips": {"A": 2.5e10, "Ea": 135000, "k_drying_base": 0.05, "Ash": 0.01, "Gas_Factor": 0.35, "HHV_raw": 19.0},
+    "Wheat Straw": {"A": 5.0e11, "Ea": 150000, "k_drying_base": 0.07, "Ash": 0.08, "Gas_Factor": 0.45, "HHV_raw": 17.0},
+    "Sewage Sludge": {"A": 1.0e12, "Ea": 165000, "k_drying_base": 0.10, "Ash": 0.25, "Gas_Factor": 0.55, "HHV_raw": 14.0},
+    "Olive Pits": {"A": 3.0e10, "Ea": 130000, "k_drying_base": 0.04, "Ash": 0.03, "Gas_Factor": 0.30, "HHV_raw": 20.0}
 }
 
-class ThermodynamicsEngine:
-    """Calculates Rankine Cycle for Heat Recovery."""
-    
-    @staticmethod
-    def calculate_rankine_cycle(heat_source_kw, efficiency=0.85):
-        """
-        Simulates an Organic Rankine Cycle (ORC) attached to the reactor.
-        Inputs: Heat source in kW (from reactor waste heat).
-        Returns: Electricity generated (kW).
-        """
-        # Assumptions for a basic steam cycle
-        boiler_eff = 0.90
-        turbine_eff = 0.85
-        generator_eff = 0.95
-        
-        heat_input = heat_source_kw * boiler_eff
-        
-        # Thermodynamics (Simplified Isentropic expansion)
-        # T1 (Boiler) -> T2 (Condenser)
-        t_high = 300 + 273.15 # K
-        t_low = 40 + 273.15   # K
-        carnot_eff = 1 - (t_low / t_high)
-        
-        real_cycle_eff = carnot_eff * 0.45 # Factor for real world losses
-        
-        work_out = heat_input * real_cycle_eff * turbine_eff * generator_eff
-        return work_out, real_cycle_eff
+SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 
-class KineticsEngine:
-    """Advanced Multi-Reaction Model."""
-    
-    @staticmethod
-    def simulate_batch(feedstock: Feedstock, T_C, t_min):
-        T_K = T_C + 273.15
-        
-        # Devolatilization Kinetics (Arrhenius)
-        # k = A * exp(-E/RT)
-        A = 1e6; E = 80000 
-        k = A * np.exp(-E / (SystemConstants.R_GAS * T_K))
-        
-        # Mass Loss Model: M(t) = M_final + (M_init - M_final) * exp(-k*t)
-        # Target solid yield depends on Temp (Empirical Correlation)
-        target_yield = 1.0 - (0.0025 * (T_C - 200)) # Simple linear degradation model
-        target_yield = max(0.3, target_yield)
-        
-        time_points = np.linspace(0, t_min, 100)
-        mass_profile = target_yield + (1.0 - target_yield) * np.exp(-k * (time_points * 60))
-        
-        # Stoichiometry Balancing (Mass Balance)
-        final_mass_yield = mass_profile[-1]
-        volatiles_yield = 1.0 - final_mass_yield
-        
-        # Energy Densification
-        energy_yield = final_mass_yield * (1 + volatiles_yield) # HHV increases as mass drops
-        
-        return time_points, mass_profile, final_mass_yield, energy_yield
+# --- Helper: Image Handling ---
+LOGO_PATH = "chemisco_logo.png" # Ensure this file exists or code handles it gracefully
+
+@st.cache_data
+def get_image_base64(path):
+    """Safe image loading to Base64"""
+    try:
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+    except:
+        return None
+    return None
+
+LOGO_B64 = get_image_base64(LOGO_PATH)
 
 # ==============================================================================
-# 4. IOT & SENSOR SIMULATION (THE "ALIVE" FACTORY)
+# 2. CSS STYLING (High-End UI)
 # ==============================================================================
 
-class IoTSimulator:
-    """Simulates real-time data from factory sensors."""
+STYLING = """
+<style>
+    /* Main Layout */
+    .stApp { background-color: #F4F7F6; color: #333; }
     
-    @staticmethod
-    def read_sensors():
-        # Adds noise to simulate real sensors
-        return {
-            "reactor_t_1": round(random.gauss(275, 2.5), 1),
-            "reactor_p_1": round(random.gauss(1.2, 0.05), 2),
-            "auger_rpm": int(random.gauss(1200, 50)),
-            "power_draw": round(random.gauss(450, 10), 1),
-            "emission_co": round(random.gauss(15, 2), 1)
+    /* Headers */
+    h1, h2, h3 { color: #2C3E50; font-family: 'Segoe UI', sans-serif; }
+    
+    /* Custom Banner */
+    .hero-banner {
+        background: linear-gradient(120deg, #16a085, #2980b9);
+        padding: 40px;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        margin-bottom: 30px;
+    }
+    .hero-banner h1 { color: white !important; margin: 0; font-size: 3em; font-weight: 800; }
+    .hero-banner p { font-size: 1.2em; opacity: 0.9; }
+
+    /* Metrics Cards */
+    div[data-testid="stMetric"] {
+        background-color: white;
+        border: 1px solid #E0E0E0;
+        padding: 15px 25px;
+        border-radius: 10px;
+        border-left: 5px solid #2980b9;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        transition: transform 0.2s;
+    }
+    div[data-testid="stMetric"]:hover { transform: translateY(-5px); }
+    
+    /* BFD Diagram Container */
+    .bfd-wrap {
+        display: flex; justify-content: center; align-items: center;
+        margin: 30px 0; font-family: monospace;
+    }
+    .bfd-box {
+        background: white; padding: 15px; border: 2px solid #2980b9;
+        border-radius: 8px; text-align: center; min-width: 140px;
+        box-shadow: 0 4px 10px rgba(41, 128, 185, 0.1);
+        color: #2c3e50; font-weight: bold;
+    }
+    .bfd-arrow { color: #2980b9; font-size: 24px; margin: 0 10px; }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 16px; font-weight: bold;
+    }
+</style>
+"""
+st.markdown(STYLING, unsafe_allow_html=True)
+
+# ==============================================================================
+# 3. CORE SIMULATION ENGINE
+# ==============================================================================
+
+@st.cache_data
+def run_simulation(biomass, moisture, temp_C, duration_min, size, initial_mass):
+    # 1. Setup Parameters
+    props = EMPIRICAL_DATA[biomass]
+    temp_K = temp_C + 273.15
+    
+    # Severity Index Calculation (R0)
+    # Log(R0) = Log(t * exp((T-100)/14.75))
+    severity = np.log10(duration_min * np.exp((temp_C - 100) / 14.75))
+    
+    # 2. Kinetic Model (Arrhenius)
+    k_base = props["A"] * np.exp(-props["Ea"] / (R_GAS * temp_K))
+    k_eff = k_base * SIZE_FACTOR[size]
+    k_dry = props["k_drying_base"]
+    
+    # Initial Fractions
+    f_moist = moisture / 100.0
+    f_ash = props["Ash"]
+    f_vol = 1.0 - f_moist - f_ash
+    
+    # ODE System
+    def model(y, t):
+        m, v = y
+        dm = -k_dry * m if m > 0.001 else 0
+        dv = -k_eff * v
+        return [dm, dv]
+    
+    t = np.linspace(0, duration_min, 100)
+    sol = odeint(model, [f_moist, f_vol], t)
+    
+    # 3. Mass Balance Results
+    final_moist = sol[-1, 0]
+    final_vol = sol[-1, 1]
+    
+    # Fixed Carbon is assumed relatively stable in Torrefaction range, 
+    # simplified assumption: FC stays, Volatiles leave.
+    # More accurately: Solid = FC + Ash + Remaining Volatiles + Remaining Moisture
+    
+    # Calculate losses
+    lost_moist = f_moist - final_moist
+    lost_vol = f_vol - final_vol
+    
+    mass_solid_frac = 1.0 - lost_moist - lost_vol
+    mass_solid_kg = mass_solid_frac * initial_mass
+    
+    # Ash Concentration Effect
+    final_ash_frac = (f_ash * initial_mass) / mass_solid_kg
+    
+    # 4. Energy Balance (Advanced)
+    # Energy Densification Ratio (EDR) = HHV_char / HHV_raw
+    # Mass Yield (MY) = Solid_Out / Feed_In
+    # Energy Yield (EY) = MY * EDR
+    
+    my = mass_solid_frac
+    # Empirical correlation for EDR based on Mass Yield (MY)
+    edr = 1 + (1 - my)**0.5 # EDR increases as mass is lost
+    edr = min(edr, 1.4) # Physical cap
+    
+    hhv_in = props["HHV_raw"]
+    hhv_out = hhv_in * edr
+    ey = my * edr
+    
+    total_energy_in_mj = initial_mass * hhv_in
+    total_energy_out_mj = mass_solid_kg * hhv_out
+    
+    # Thermal Load (Input Heat Required)
+    q_sensible = initial_mass * 1.5 * (temp_C - 25) # Heating biomass
+    q_latent = (lost_moist * initial_mass) * 2260 # Evaporating water
+    q_reaction = (1-my) * initial_mass * 200 # Endothermic estimate
+    total_heat_req_mj = (q_sensible + q_latent + q_reaction) / 1000
+    
+    return {
+        "t": t,
+        "profiles": sol * initial_mass, # Scale to kg
+        "mass_yield_pct": my * 100,
+        "energy_yield_pct": ey * 100,
+        "final_mass_kg": mass_solid_kg,
+        "final_ash_pct": final_ash_frac * 100,
+        "severity": severity,
+        "hhv_out": hhv_out,
+        "energy_data": {
+            "Input": total_energy_in_mj,
+            "Output": total_energy_out_mj,
+            "Process_Heat": total_heat_req_mj,
+            "Loss_Volatiles": total_energy_in_mj - total_energy_out_mj
+        },
+        "params": {
+            "bio": biomass, "temp": temp_C, "time": duration_min, "mass": initial_mass
         }
+    }
 
 # ==============================================================================
-# 5. APPLICATION CONTROLLERS (MVC ARCHITECTURE)
+# 4. PDF REPORT GENERATOR
 # ==============================================================================
 
-def dashboard_view(user):
-    st.title("COMMAND CENTER // DASHBOARD")
-    st.markdown("---")
+def create_pdf(res):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
     
-    # IoT Live Feed
-    st.subheader("📡 Live Sensor Telemetry")
-    sensors = IoTSimulator.read_sensors()
+    # Title
+    elements.append(Paragraph("CHEMISCO SIMULATION REPORT", styles['Title']))
+    elements.append(Spacer(1, 0.2*inch))
     
-    k1, k2, k3, k4, k5 = st.columns(5)
-    with k1: st.metric("Core Temp", f"{sensors['reactor_t_1']}°C", "0.5°C")
-    with k2: st.metric("Pressure", f"{sensors['reactor_p_1']} Bar", "-0.01")
-    with k3: st.metric("Motor RPM", sensors['auger_rpm'], "Stable")
-    with k4: st.metric("Grid Load", f"{sensors['power_draw']} kW", "+2%")
-    with k5: st.metric("CO Emissions", f"{sensors['emission_co']} ppm", "Safe")
+    # Summary Table
+    data = [
+        ["Parameter", "Value"],
+        ["Biomass Type", res['params']['bio']],
+        ["Temperature", f"{res['params']['temp']} °C"],
+        ["Duration", f"{res['params']['time']} min"],
+        ["Mass Yield", f"{res['mass_yield_pct']:.2f}%"],
+        ["Energy Yield", f"{res['energy_yield_pct']:.2f}%"],
+        ["Final HHV", f"{res['hhv_out']:.2f} MJ/kg"]
+    ]
+    t = Table(data)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2980b9")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 0.5*inch))
     
-    # Real-time Chart
-    chart_data = pd.DataFrame(
-        np.random.randn(20, 3) + [275, 270, 280],
-        columns=['Zone A', 'Zone B', 'Zone C']
-    )
-    st.line_chart(chart_data, height=200)
+    # Graph Image (Mass Profile)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(res['t'], res['profiles'][:, 1], label='Volatiles')
+    ax.set_title("Devolatilization Profile")
+    ax.set_xlabel("Time (min)")
+    ax.set_ylabel("Mass (kg)")
+    ax.grid(True)
+    
+    img_buf = BytesIO()
+    plt.savefig(img_buf, format='png', dpi=100)
+    img_buf.seek(0)
+    elements.append(ReportImage(img_buf, width=5*inch, height=3.5*inch))
+    plt.close(fig)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
 
-    # Inbox System
-    st.markdown("### 📨 Internal Inbox")
-    db = DatabaseEngine()
-    msgs = db.get_inbox(user)
-    
-    if msgs.empty:
-        st.info("No new messages.")
-    else:
-        for index, row in msgs.iterrows():
-            with st.expander(f"FROM: {row['sender']} | RE: {row['subject']}"):
-                st.write(row['body'])
-                if st.button("Mark Read", key=f"read_{index}"): pass # Logic to mark read
+# ==============================================================================
+# 5. MAIN APP UI
+# ==============================================================================
 
-def simulation_lab_view():
-    st.title("R&D SIMULATION LAB")
-    
-    c_side, c_main = st.columns([1, 3])
-    
-    with c_side:
-        st.markdown("### Configuration")
-        with st.form("sim_config"):
-            feed = st.selectbox("Feedstock", list(FEEDSTOCKS.keys()))
-            mass = st.number_input("Batch Size (kg)", 1000, 10000, 5000)
-            temp = st.slider("Temperature (°C)", 200, 350, 280)
-            time_m = st.slider("Time (min)", 15, 120, 45)
-            
-            run = st.form_submit_button("INITIATE SEQUENCE")
-    
-    with c_main:
-        if run:
-            with st.status("Running Physics Kernels...", expanded=True):
-                st.write("Initializing Reaction Matrix...")
-                time.sleep(0.5)
-                st.write("Solving Differential Equations...")
-                
-                # Physics Run
-                mat = FEEDSTOCKS[feed]
-                t, m_prof, y_m, y_e = KineticsEngine.simulate_batch(mat, temp, time_m)
-                
-                # Rankine Cycle Calculation
-                waste_heat_kw = (mass * 1.2 * (temp-25)) / (time_m * 60) # Rough estimate
-                elec_gen, cycle_eff = ThermodynamicsEngine.calculate_rankine_cycle(waste_heat_kw)
-                
-                st.write("Optimizing Energy Recovery...")
-                time.sleep(0.5)
-                
-            # Results
-            st.success("SIMULATION COMPLETED")
-            
-            # KPI Grid
-            k1, k2, k3, k4 = st.columns(4)
-            k1.markdown(f"<div class='cyber-card'><div class='metric-label'>Mass Yield</div><div class='metric-val'>{y_m*100:.1f}%</div></div>", unsafe_allow_html=True)
-            k2.markdown(f"<div class='cyber-card'><div class='metric-label'>Energy Yield</div><div class='metric-val'>{y_e*100:.1f}%</div></div>", unsafe_allow_html=True)
-            k3.markdown(f"<div class='cyber-card'><div class='metric-label'>Power Gen</div><div class='metric-val'>{elec_gen:.1f} kW</div></div>", unsafe_allow_html=True)
-            k4.markdown(f"<div class='cyber-card'><div class='metric-label'>Cycle Eff</div><div class='metric-val'>{cycle_eff*100:.1f}%</div></div>", unsafe_allow_html=True)
-            
-            # Advanced Charts
-            tab1, tab2 = st.tabs(["Reaction Profile", "Energy Sankey"])
-            
-            with tab1:
-                df = pd.DataFrame({"Time": t, "Mass Fraction": m_prof})
-                fig = px.line(df, x="Time", y="Mass Fraction", title="Solid Mass Decomposition")
-                fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with tab2:
-                # Sankey Diagram for Energy Balance
-                energy_in = mass * mat.hhv
-                energy_char = energy_in * y_e
-                energy_gas = energy_in * (1 - y_e)
-                
-                fig_sankey = go.Figure(go.Sankey(
-                    node = dict(
-                        pad = 15, thickness = 20, line = dict(color = "black", width = 0.5),
-                        label = ["Biomass Input", "Pyrolysis Reactor", "Biochar", "Syngas/Volatiles", "Process Heat", "Losses"],
-                        color = SystemConstants.HEX_PRIMARY
-                    ),
-                    link = dict(
-                        source = [0, 1, 1, 3, 3],
-                        target = [1, 2, 3, 4, 5],
-                        value = [energy_in, energy_char, energy_gas, energy_gas*0.8, energy_gas*0.2]
-                    )
-                ))
-                fig_sankey.update_layout(title="Energy Flow (MJ)", template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig_sankey, use_container_width=True)
+def main():
+    # --- Session State ---
+    if 'baseline' not in st.session_state: st.session_state.baseline = None
+    if 'price' not in st.session_state: st.session_state.price = 1.5
+    if 'capex' not in st.session_state: st.session_state.capex = 1000000.0
 
-def finance_hq_view():
-    st.title("FINANCIAL HEADQUARTERS")
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("### CAPEX/OPEX Modeler")
-        capex = st.number_input("Capital Expenditure ($)", 1_000_000, 10_000_000, 2_500_000)
-        opex_monthly = st.number_input("Monthly OPEX ($)", 10_000, 500_000, 50_000)
-    with c2:
-        st.markdown("### Market Assumptions")
-        price = st.slider("Biochar Price ($/ton)", 300, 2000, 800)
-        prod = st.slider("Production (tons/month)", 50, 500, 200)
+    # --- Sidebar ---
+    with st.sidebar:
+        if LOGO_B64:
+            st.markdown(f'<img src="data:image/png;base64,{LOGO_B64}" style="width:100px; display:block; margin:auto;">', unsafe_allow_html=True)
         
-    # Analysis
-    revenue_monthly = price * prod
-    net_monthly = revenue_monthly - opex_monthly
-    roi_months = capex / net_monthly if net_monthly > 0 else 999
-    
-    st.markdown("---")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Monthly Revenue", f"${revenue_monthly:,.0f}")
-    m2.metric("Net Income", f"${net_monthly:,.0f}", delta_color="normal" if net_monthly>0 else "inverse")
-    m3.metric("ROI Period", f"{roi_months:.1f} Months")
-    
-    # Monte Carlo Sim
-    if st.button("Run Risk Analysis (Monte Carlo)"):
-        with st.spinner("Simulating 1000 market scenarios..."):
-            sims = []
-            for _ in range(1000):
-                p_var = random.gauss(price, price*0.1) # 10% volatility
-                c_var = random.gauss(opex_monthly, opex_monthly*0.05)
-                sims.append((p_var * prod) - c_var)
-            
-            fig = px.histogram(sims, nbins=50, title="Profitability Probability Distribution", labels={'value': 'Monthly Profit'})
-            fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig, use_container_width=True)
-
-# ==============================================================================
-# 6. SYSTEM UTILITIES (UNIT TESTING & DEBUG)
-# ==============================================================================
-
-class SystemDiagnostic:
-    @staticmethod
-    def run_tests():
-        tests = {
-            "DB Connection": False,
-            "Physics Engine": False,
-            "UI Rendering": False
-        }
+        st.title("⚙️ Control Panel")
         
-        # Test DB
-        try:
-            db = DatabaseEngine()
-            tests["DB Connection"] = True
-        except: pass
+        # 1. Feedstock
+        st.subheader("1. Feedstock")
+        b_type = st.selectbox("Biomass", list(EMPIRICAL_DATA.keys()))
+        mass_in = st.number_input("Batch Mass (kg)", 100.0, 10000.0, 1000.0)
+        moist = st.slider("Moisture %", 0, 60, 15)
+        size = st.select_slider("Particle Size", options=list(SIZE_FACTOR.keys()))
         
-        # Test Physics
-        try:
-            res = KineticsEngine.simulate_batch(FEEDSTOCKS['wood'], 300, 30)
-            if res[2] > 0: tests["Physics Engine"] = True
-        except: pass
+        # 2. Process
+        st.subheader("2. Process")
+        temp = st.slider("Temperature (°C)", 200, 350, 275)
+        dur = st.slider("Duration (min)", 10, 180, 45)
         
-        return tests
+        # 3. Economics
+        st.subheader("3. Economics")
+        price = st.number_input("Biochar Price ($/kg)", value=st.session_state.price)
+        capex = st.number_input("CAPEX ($)", value=st.session_state.capex)
+        
+        st.divider()
+        if st.button("💾 Save as Baseline"):
+            st.session_state.calc_flag = True # Trigger calc to save
+            st.toast("Baseline Scenario Saved!", icon="✅")
 
-# ==============================================================================
-# 7. MAIN BOOTLOADER
-# ==============================================================================
+    # --- Main Hero Section ---
+    st.markdown("""
+    <div class="hero-banner">
+        <h1>CHEMISCO ENTERPRISE</h1>
+        <p>Advanced Torrefaction & Biorefinery Simulation Platform</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-def boot_os():
-    UIKernel.boot()
+    # --- Calculation ---
+    res = run_simulation(b_type, moist, temp, dur, size, mass_in)
     
-    # Session State Init
-    if 'user' not in st.session_state: st.session_state.user = None
+    # Save baseline logic
+    if st.session_state.get('calc_flag', False):
+        st.session_state.baseline = res
+        st.session_state.calc_flag = False
+
+    # --- BFD ---
+    st.markdown(f"""
+    <div class="bfd-wrap">
+        <div class="bfd-box" style="border-color:#27ae60">INPUT<br>{mass_in} kg</div>
+        <div class="bfd-arrow">➜</div>
+        <div class="bfd-box" style="border-color:#e67e22">DRYER<br>- H₂O</div>
+        <div class="bfd-arrow">➜</div>
+        <div class="bfd-box" style="border-color:#c0392b">REACTOR<br>{temp}°C</div>
+        <div class="bfd-arrow">➜</div>
+        <div class="bfd-box" style="border-color:#2980b9">PRODUCT<br>{res['final_mass_kg']:.1f} kg</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- KPIs with Delta ---
+    st.subheader("📊 Key Performance Indicators")
     
-    # Login Flow
-    if not st.session_state.user:
-        c1, c2, c3 = st.columns([1, 1, 1])
-        with c2:
-            st.markdown("<br><br><br>", unsafe_allow_html=True)
-            st.markdown("<div class='cyber-card' style='text-align:center'><h2>CHEMISCO OS v10</h2><p>SECURE TERMINAL ACCESS</p></div>", unsafe_allow_html=True)
-            
-            uid = st.text_input("USER IDENTITY")
-            pwd = st.text_input("ACCESS CODE", type="password")
-            
-            if st.button("CONNECT"):
-                if uid == "admin" and pwd == "admin":
-                    st.session_state.user = "admin"
-                    st.toast("Connection Established...", icon="🟢")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("ACCESS DENIED")
-    else:
-        # Main OS Interface
-        with st.sidebar:
-            st.title("💠 SYSTEM MENU")
-            st.write(f"USER: {st.session_state.user}")
-            st.markdown("---")
-            app_mode = st.radio("MODULE SELECTOR", 
-                ["COMMAND DASHBOARD", "SIMULATION LAB", "FINANCE HQ", "SYSTEM DIAGNOSTICS"])
-            
-            st.markdown("---")
-            if st.button("DISCONNECT"):
-                st.session_state.user = None
-                st.rerun()
+    d_mass = None
+    d_energy = None
+    if st.session_state.baseline:
+        d_mass = res['mass_yield_pct'] - st.session_state.baseline['mass_yield_pct']
+        d_energy = res['energy_yield_pct'] - st.session_state.baseline['energy_yield_pct']
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Mass Yield", f"{res['mass_yield_pct']:.1f}%", delta=f"{d_mass:.1f}%" if d_mass is not None else None)
+    k2.metric("Energy Yield", f"{res['energy_yield_pct']:.1f}%", delta=f"{d_energy:.1f}%" if d_energy is not None else None)
+    k3.metric("Severity Index", f"{res['severity']:.2f}", help="Reaction Severity R0")
+    k4.metric("Biochar HHV", f"{res['hhv_out']:.1f} MJ/kg", delta="Enhanced")
+
+    # --- Tabs ---
+    t1, t2, t3, t4, t5 = st.tabs(["📈 Dynamics", "⚡ Energy", "💰 Economics", "🤖 AI Expert", "📑 Report"])
+
+    with t1:
+        st.subheader("Reaction Kinetics Profile")
+        df_prof = pd.DataFrame(res['profiles'], columns=['Moisture', 'Volatiles'])
+        df_prof['Time'] = res['t']
+        df_prof['Solid'] = (res['final_mass_kg'] / mass_in) * mass_in # Simplified line for solid
         
-        # Routing
-        if app_mode == "COMMAND DASHBOARD":
-            dashboard_view(st.session_state.user)
-        elif app_mode == "SIMULATION LAB":
-            simulation_lab_view()
-        elif app_mode == "FINANCE HQ":
-            finance_hq_view()
-        elif app_mode == "SYSTEM DIAGNOSTICS":
-            st.title("SYSTEM DIAGNOSTICS")
-            if st.button("RUN SELF-TEST"):
-                results = SystemDiagnostic.run_tests()
-                for test, passed in results.items():
-                    if passed: st.success(f"{test}: ONLINE")
-                    else: st.error(f"{test}: FAIL")
-                
-                # Show logs
-                st.markdown("### TERMINAL LOGS")
-                logs = f"""
-                [BOOT] System kernel loaded.
-                [NET] IoT Gateway connected (Port 8080).
-                [DB] SQLite integrity check passed.
-                [USER] Admin session active.
-                [TIME] {datetime.datetime.now()}
-                """
-                st.code(logs, language='bash')
+        fig = px.line(df_prof, x='Time', y=['Moisture', 'Volatiles'], 
+                      title="Component Loss Over Time",
+                      labels={"value": "Mass (kg)"})
+        st.plotly_chart(fig, use_container_width=True)
+
+    with t2:
+        st.subheader("Energy Balance Waterfall")
+        e = res['energy_data']
+        
+        fig_water = go.Figure(go.Waterfall(
+            name = "Energy", orientation = "v",
+            measure = ["relative", "relative", "relative", "total"],
+            x = ["Input Feedstock", "Volatile Loss", "Heat Loss", "Biochar Energy"],
+            textposition = "outside",
+            y = [e['Input'], -e['Loss_Volatiles'], -e['Input']*0.05, e['Output']],
+            connector = {"line":{"color":"rgb(63, 63, 63)"}},
+        ))
+        fig_water.update_layout(title = "Energy Flow (MJ)", showlegend = False)
+        st.plotly_chart(fig_water, use_container_width=True)
+        
+        st.info(f"Process Heat Required: {e['Process_Heat']:.1f} MJ (Ideally supplied by burning volatiles)")
+
+    with t3:
+        st.subheader("Financial Analysis")
+        revenue = res['final_mass_kg'] * price
+        ops_cost = (res['params']['time']/60) * 50 # Assuming $50/hr ops cost
+        feed_cost = (mass_in/1000) * 30 # Assuming $30/ton
+        profit = revenue - (ops_cost + feed_cost)
+        
+        col_eco1, col_eco2 = st.columns(2)
+        with col_eco1:
+            st.write(f"**Revenue:** ${revenue:,.2f}")
+            st.write(f"**OPEX:** ${ops_cost+feed_cost:,.2f}")
+            st.metric("Net Profit (Batch)", f"${profit:,.2f}")
+        
+        with col_eco2:
+            # Simple ROI chart
+            fig_pie = px.pie(names=['Feedstock', 'Operations', 'Profit'], 
+                             values=[feed_cost, ops_cost, max(0, profit)], 
+                             title="Cost vs Profit Breakdown")
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+    with t4:
+        st.subheader("🤖 Intelligent Process Consultant")
+        
+        my = res['mass_yield_pct']
+        temp_curr = res['params']['temp']
+        
+        # Rule-based Logic
+        if my < 60:
+            st.error("⚠️ **Yield Alert:** Mass yield is critically low (<60%).")
+            st.write(f"**Diagnosis:** Temperature ({temp_curr}°C) is too high for standard torrefaction.")
+            st.write("**Recommendation:** Reduce temperature by 10-20°C to preserve solid mass.")
+        elif my > 90:
+            st.warning("⚠️ **Quality Alert:** Mass yield is very high (>90%).")
+            st.write("**Diagnosis:** Biomass is likely under-torrefied (Raw).")
+            st.write("**Recommendation:** Increase residence time or temperature to ensure hydrophobicity.")
+        else:
+            st.success("✅ **Optimal Operation:** Process parameters are within the industrial sweet spot.")
+            st.write("The balance between mass loss and energy densification is ideal.")
+
+    with t5:
+        st.subheader("Download Professional Report")
+        st.write("Generate a PDF document containing all simulation parameters, results, and charts.")
+        
+        if st.button("📄 Generate PDF"):
+            pdf_bytes = create_pdf(res)
+            st.download_button(
+                label="⬇️ Download PDF Report",
+                data=pdf_bytes,
+                file_name="Chemisco_Report.pdf",
+                mime="application/pdf"
+            )
 
 if __name__ == "__main__":
-    boot_os()
+    main()
