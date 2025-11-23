@@ -4,13 +4,16 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy.integrate import odeint
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportImage, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 import base64
-import os
-import random
-import time
+import os 
+import random 
+import time 
 
 # --- 1. Chemical and Kinetic Constants ---
 R_GAS = 8.314  # J/(mol.K)
@@ -38,7 +41,7 @@ DRYING_RATE_CONST = 0.05
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 BASE_FC_FACTOR = 0.20
 
-# --- Utility Functions (Keep as is) ---
+# --- Utility Functions ---
 LOGO_PATH = "chemisco_logo.png"
 
 def _get_image_base64(image_path):
@@ -186,12 +189,9 @@ GLOBAL_CSS = """
 </style>
 """
 
-# --- 3. Simulation Core Logic ---
-# (Unchanged simulate_torrefaction function for kinetics, but it returns all necessary parameters)
+# --- 3. Simulation Core Logic (Functions defined first) ---
+
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"):
-    # ... (Keep the content of your original simulate_torrefaction function here) ...
-    # The return dictionary remains the same structure as in your original file.
-    
     temp_K = temp_C + 273.15
     comp = BIOMASS_COMPOSITION.get(biomass)
     R_GAS_LOCAL = R_GAS 
@@ -217,6 +217,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     # ODE System
     def model(y, t, k_dry, kh, kc, kl):
         m_moist, m_h, m_c, m_l = y
+        # Drying rate only applies if moisture is present
         d_moist = -k_dry * m_moist if m_moist > 0.001 else 0 
         d_h = -kh * m_h
         d_c = -kc * m_c
@@ -229,6 +230,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     sol = odeint(model, y0, t, args=(k_drying, k_h_eff, k_c_eff, k_l_eff))
     sol[sol < 0] = 0
     
+    final_moisture_remaining = sol[:, 0][-1]
     final_h_remaining = sol[:, 1][-1]
     final_c_remaining = sol[:, 2][-1]
     final_l_remaining = sol[:, 3][-1]
@@ -246,16 +248,45 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     mass_biochar_total = mass_fixed_carbon_kg + mass_remaining_components + mass_ash_kg
     final_solid_yield_percent = (mass_biochar_total / initial_mass_kg) * 100
     
-    mass_moisture_loss_kg = (initial_moisture_frac - sol[:, 0][-1]) * initial_mass_kg
+    mass_moisture_loss_kg = (initial_moisture_frac - final_moisture_remaining) * initial_mass_kg
     mass_non_condensable_gas_kg = total_volatiles_lost_frac * initial_mass_kg * comp["Gas_Factor"] 
     mass_bio_oil_kg = total_volatiles_lost_frac * initial_mass_kg * (1 - comp["Gas_Factor"]) 
+
+    # DataFrames for Display
+    yields_percent = pd.DataFrame({
+        "Yield (%)": [
+            final_solid_yield_percent,
+            (mass_moisture_loss_kg / initial_mass_kg) * 100,
+            (mass_bio_oil_kg / initial_mass_kg) * 100,
+            (mass_non_condensable_gas_kg / initial_mass_kg) * 100
+        ]
+    }, index=["Biochar (Solid Product)", "Water Vapor", "Bio-Oil (Condensable)", "Non-Condensable Gas"])
+    
+    yields_mass = pd.DataFrame({
+        "Mass (kg)": [
+            mass_biochar_total,
+            mass_moisture_loss_kg,
+            mass_bio_oil_kg,
+            mass_non_condensable_gas_kg
+        ]
+    }, index=["Biochar (Solid Product)", "Water Vapor", "Bio-Oil (Condensable)", "Non-Condensable Gas"])
+
+    solid_composition = pd.DataFrame({
+        "Mass (kg)": [
+            mass_fixed_carbon_kg,
+            mass_remaining_components,
+            mass_ash_kg
+        ]
+    }, index=["Fixed Carbon", "Volatile Matter Remaining", "Ash"])
+
 
     # Final Ash Concentration
     final_ash_percent = (mass_ash_kg / mass_biochar_total) * 100
 
     # Energy & Sustainability Metrics
     initial_hhv_mj_kg = HHV_INITIAL.get(biomass, 17.0) 
-    biochar_hhv_mj_kg = initial_hhv_mj_kg * HHV_ENRICHMENT_FACTOR
+    # Simplified assumption for biochar HHV enrichment
+    biochar_hhv_mj_kg = initial_hhv_mj_kg * HHV_ENRICHMENT_FACTOR 
     
     initial_energy_mj = initial_mass_kg * initial_hhv_mj_kg * (1 - initial_moisture_frac)
     final_biochar_energy_mj = mass_biochar_total * biochar_hhv_mj_kg
@@ -265,6 +296,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     
     avg_devol_rate = (k_h_eff + k_c_eff + k_l_eff) / 3
     
+    # Final Results Dictionary
     return {
         "yields_percent": yields_percent, "yields_mass": yields_mass, "solid_composition": solid_composition,
         "final_ash_percent": final_ash_percent, "initial_hhv": initial_hhv_mj_kg,
@@ -276,13 +308,13 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
             "reactor": reactor_type
         },
         "mass_profile_final": sol[:, 1] + sol[:, 2] + sol[:, 3] + initial_mass_fixed_carbon_daf + initial_ash_frac,
-        "mass_moisture_loss_kg": mass_moisture_loss_kg, # New key added
-        "mass_dry_biomass_kg": initial_mass_kg * daf_frac, # New key added
-        "mass_biochar_total": mass_biochar_total # New key added
+        "mass_moisture_loss_kg": mass_moisture_loss_kg,
+        "mass_dry_biomass_kg": initial_mass_kg * daf_frac, 
+        "mass_biochar_total": mass_biochar_total
     }
 
 
-# --- 4. Thermal Balance Calculation (New Function) ---
+# --- 4. Thermal Balance Calculation ---
 def calculate_thermal_balance(p, results):
     # p: parameters dictionary from results
     # results: full results dictionary from simulate_torrefaction
@@ -320,7 +352,7 @@ def calculate_thermal_balance(p, results):
         'Q_torrefaction': Q_torrefaction,
         'Q_total_required_kJ': Q_total_required_kJ,
         'Q_total_per_kg': Q_total_per_kg,
-        'thermal_efficiency': energy_yield # Kept the original energy yield for consistency
+        'thermal_efficiency': energy_yield 
     }
 
 # --- 5. Sensitivity Analysis (Fixed NameError and Logic) ---
@@ -355,9 +387,9 @@ def run_sensitivity_analysis(biomass, moisture, size, initial_mass_kg, reactor_t
     return pd.DataFrame(results_T, columns=["Temperature (°C)", "Yield (%)", "Energy Yield (%)"]), \
            pd.DataFrame(results_D, columns=["Duration (min)", "Yield (%)", "Energy Yield (%)"])
 
-# --- 6. AI Chatbot Logic (Fixed Initialization) ---
-def mock_ai_response(prompt, results, thermal_results, finance_results): # Added thermal & finance results
-    p = results["parameters"]
+# --- 6. AI Chatbot Logic ---
+def mock_ai_response(prompt, results, thermal_results, finance_results): 
+    p = results.get("parameters", {})
     prompt_lower = prompt.lower()
     
     # Safety checks for default values
@@ -383,7 +415,6 @@ def mock_ai_response(prompt, results, thermal_results, finance_results): # Added
     هل تود المزيد من التحليل حول **الربحية**، **الحركية الكيميائية**، أو **تحسين الظروف**؟
     """
     
-    # Rest of AI responses (omitted for brevity, assume they handle the dark mode text color automatically)
     if "optimize" in prompt_lower or "تحسين" in prompt_lower or "ربحية" in prompt_lower:
         # Simplified optimization feedback (needs optimization logic in a real app)
         recommendation = "لتحسين الربحية، قم بموازنة **HHV** (حرارة أعلى) مع **المردود الكتلي** (حرارة أقل)."
@@ -394,18 +425,17 @@ def mock_ai_response(prompt, results, thermal_results, finance_results): # Added
         * **الطاقة الحرارية المطلوبة:** {thermal_results.get('Q_total_per_kg', 0.0):.2f} $\\text{{kJ/kg}}$
         * **توصية التحسين:** {recommendation}
         """
-    # ... (other conditional responses remain the same, using safety checks if necessary)
     return summary
 
 
-# --- 7. Main Streamlit App ---
+# --- 7. Main Streamlit App (Now defined after all dependencies) ---
 def main():
     st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
-    # Initialize session state (Fixed initial dummy data structure)
+    # Initialize session state 
     if "messages" not in st.session_state:
-        # Dummy data structure for AI initialization
+        # Initializing data structure for AI expert
         dummy_results = {"parameters": {}, "yields_percent": pd.DataFrame({"Yield (%)": [0]}, index=["Biochar (Solid Product)"]), "energy_yield_percent": 0, "final_ash_percent": 0, "initial_hhv": 0, "biochar_hhv": 0}
         dummy_thermal = {'Q_total_per_kg': 0.0}
         dummy_finance = {'Net Profit': 0.0}
@@ -469,14 +499,18 @@ def main():
         return 
         
     # --- Run Simulation and Thermal Analysis ---
-    results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
-    thermal_results = calculate_thermal_balance(results['parameters'], results) # NEW: Calculate thermal balance
+    with st.spinner("Running complex kinetic and thermal simulations..."):
+        # The simulate_torrefaction function MUST return a dictionary with a 'parameters' key
+        results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
+        # thermal_results depends on results, and calculates thermal balance
+        thermal_results = calculate_thermal_balance(results['parameters'], results) 
 
     # --- Main Content ---
     st.title("CHEMISCO: Advanced Torrefaction Dashboard 🌙")
     st.subheader("Integrated Simulation, Analysis, and Optimization Platform")
     
-    # 1. Block Flow Diagram (BFD) - Added Diagram for context     st.markdown("---")
+    # 1. Block Flow Diagram (BFD) - Added Diagram for context 
+    st.markdown("---")
     st.subheader("Process Flow Overview")
     
     # --- BFD Structure (Improved for clarity) ---
@@ -504,6 +538,10 @@ def main():
     </div>
     """
     st.markdown(bfd_html, unsafe_allow_html=True)
+    
+
+[Image of Block Flow Diagram symbols]
+
     st.markdown("---")
 
     # 2. Results Dashboard (KPIs)
@@ -572,15 +610,17 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-    # --- Tab 2: Advanced Kinetics & Sensitivity (Fixed NameError) ---
+    # --- Tab 2: Advanced Kinetics & Sensitivity (Now the function is defined above main) ---
     with tab2:
         st.subheader("Dynamic Simulation and Sensitivity Analysis")
         col_t2_1, col_t2_2 = st.columns(2)
 
+        with st.spinner("Running Sensitivity Analysis..."):
+            # Now run_sensitivity_analysis is defined before main()
+            df_T, df_D = run_sensitivity_analysis(biomass_type, moisture_content, particle_size, initial_mass_kg, reactor_type)
+
         with col_t2_1:
             st.markdown("##### Sensitivity to Temperature and Duration")
-            # This is where the NameError occurred, now fixed by calculating thermal_results
-            df_T, df_D = run_sensitivity_analysis(biomass_type, moisture_content, particle_size, initial_mass_kg, reactor_type)
 
             fig_sens = go.Figure()
             fig_sens.add_trace(go.Scatter(x=df_T["Temperature (°C)"], y=df_T["Yield (%)"], name='Yield vs. Temp.', mode='lines+markers', line=dict(color='#FF5252')))
@@ -596,7 +636,7 @@ def main():
 
         with col_t2_2:
             st.markdown("##### Multi-Component Kinetic Rates")
-            # Adjusted calculation to use temperature + 273.15 instead of thermal_results which caused the error
+            # Adjusted calculation to use temperature + 273.15 
             T_K_local = temperature + 273.15
             
             kinetics_data = {
@@ -628,7 +668,7 @@ def main():
                 "Heat Component": ["Q_Sensible_Biomass", "Q_Sensible_Water", "Q_Latent_Water", "Q_Torrefaction"],
                 "Value (kJ)": [
                     thermal_results.get('Q_sensible_biomass', 0.0),
-                    thermal_results.get('Q_sensible_water', 0.0),    # <--- Fixed the KeyError risk here
+                    thermal_results.get('Q_sensible_water', 0.0),    
                     thermal_results.get('Q_latent_water', 0.0),
                     thermal_results.get('Q_torrefaction', 0.0)
                 ]
@@ -668,7 +708,6 @@ def main():
             st.metric("📊 Return on Investment (ROI)", f"{(finance_results['Net Profit'] / finance_results['Total Cost']) * 100:.1f} %" if finance_results['Total Cost'] > 0 else "N/A")
 
     # --- Tab 4: PDF Report (Placeholder) ---
-    # ... (Kept as is)
     with tab4:
         st.subheader("📥 Generate Professional Report (Dark Mode Ready)")
         st.info("The full PDF report includes all charts, tables, and a summary of the KPIs.")
@@ -680,7 +719,7 @@ def main():
             mime="application/pdf"
         )
         
-    # --- Tab 5: AI Expert Analysis (Fixed Logic to pass new data) ---
+    # --- Tab 5: AI Expert Analysis ---
     with tab_ai:
         st.header("🤖 AI Expert: Strategic Analysis")
         st.info("الذكاء الاصطناعي يقدم ملخصاً تنفيذياً وتحليلاً معمقاً لنتائجك. اسأل عن التحسين، الحركية، أو الربحية.")
