@@ -1,434 +1,799 @@
-# -*- coding: utf-8 -*-
-"""
-CHEMISCO ENTERPRISE: Integrated Biorefinery Simulation Platform
----------------------------------------------------------------
-Version: 11.0 (Final Stable Release)
-Description: Advanced Torrefaction Simulation with Physics, Economics, PDF Reporting, and Gamification.
-"""
-
 import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy.integrate import odeint
-from io import BytesIO
-import base64
-import os
-import random
-import time
-import matplotlib.pyplot as plt # Used for static plots in PDF
-
-# --- Libraries for PDF Report ---
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportImage, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
 from reportlab.lib.units import inch
 from reportlab.lib import colors
+import matplotlib.pyplot as plt 
+import base64
+import os 
+import random 
+import time 
 
-# ==============================================================================
-# 1. SYSTEM CONFIGURATION & CONSTANTS
-# ==============================================================================
-
-st.set_page_config(
-    page_title="Chemisco Enterprise", 
-    layout="wide", 
-    page_icon="🏭",
-    initial_sidebar_state="expanded"
-)
-
-# Thermodynamics Constants
+# --- 1. Chemical and Empirical Constants ---
 R_GAS = 8.314
-
-# Biomass Database (Pre-defined properties)
 EMPIRICAL_DATA = {
-    "Wood": {"A": 2.5e10, "Ea": 135000, "k_drying_base": 0.05, "Ash": 0.02, "Gas_Factor": 0.35, "HHV": 19.0},
-    "Agricultural Waste": {"A": 5.0e11, "Ea": 150000, "k_drying_base": 0.07, "Ash": 0.08, "Gas_Factor": 0.45, "HHV": 17.0},
-    "Municipal Waste": {"A": 1.0e12, "Ea": 165000, "k_drying_base": 0.10, "Ash": 0.15, "Gas_Factor": 0.55, "HHV": 15.0},
-    "Olive Pits": {"A": 3.0e10, "Ea": 132000, "k_drying_base": 0.04, "Ash": 0.03, "Gas_Factor": 0.30, "HHV": 20.5}
+    "Wood": {"A": 2.5e10, "Ea": 135000, "k_drying_base": 0.05, "Ash": 0.02, "Gas_Factor": 0.35},
+    "Agricultural Waste": {"A": 5.0e11, "Ea": 150000, "k_drying_base": 0.07, "Ash": 0.08, "Gas_Factor": 0.45},
+    "Municipal Waste": {"A": 1.0e12, "Ea": 165000, "k_drying_base": 0.10, "Ash": 0.15, "Gas_Factor": 0.55}
 }
-
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
+BASE_FC_DRY_ASH_FREE = 0.20 # Assumed fixed carbon fraction for mass balance
 
-# Image Helper
+# --- Base64 Utility for Robust Image Embedding ---
 LOGO_PATH = "chemisco_logo.png"
 
-@st.cache_data
-def get_img_as_base64(file_path):
+def _get_image_base64(image_path):
+    """Encodes an image to Base64 string for safe embedding in HTML/Markdown."""
     try:
-        with open(file_path, "rb") as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
-    except:
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
+        else:
+            return None
+    except Exception as e:
         return None
 
-logo_b64 = get_img_as_base64(LOGO_PATH)
+LOGO_BASE64_STRING = _get_image_base64(LOGO_PATH)
 
-# ==============================================================================
-# 2. ADVANCED STYLING (CSS)
-# ==============================================================================
 
-st.markdown("""
+# --- 2. Global CSS ---
+GLOBAL_CSS = """
 <style>
-    /* Main App Background */
-    .stApp {
-        background-color: #F8F9FA;
-    }
-    
-    /* Cards & Containers */
-    .css-1r6slb0 {
-        background-color: white;
-        border-radius: 15px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    }
-    
-    /* Hero Banner */
-    .hero-section {
-        background: linear-gradient(135deg, #00695c 0%, #004d40 100%);
-        color: white;
-        padding: 40px;
-        border-radius: 15px;
+    .stApp { padding-top: 20px; }
+    .main-banner {
+        background-color: #388E3C; /* Dark Green */
+        padding: 30px;
+        border-radius: 12px;
         text-align: center;
         margin-bottom: 30px;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
     }
-    .hero-section h1 { color: white !important; font-size: 3em; font-weight: 700; }
-    .hero-section p { font-size: 1.2em; opacity: 0.9; }
+    .main-banner h1 { color: #FFFFFF; margin: 0; font-size: 3em; font-weight: 800; letter-spacing: 2px;}
     
-    /* KPI Metrics */
-    div[data-testid="stMetric"] {
-        background-color: #FFFFFF;
-        border: 1px solid #E0E0E0;
-        border-left: 5px solid #00695c;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
-        transition: transform 0.2s;
-    }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-3px);
+    /* NEW BANNER/TAGLINE STYLE */
+    .banner-tagline { 
+        color: #FFFFFF; 
+        font-size: 1.4em; 
+        font-weight: 500;
+        margin: 10px 0 20px 0;
+        padding: 5px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.5);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.5);
     }
     
-    /* BFD Diagram */
-    .bfd-container {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 20px; overflow-x: auto;
+    .main-banner p { color: #C8E6C9; margin-top: 5px; font-size: 1.2em; }
+    .dedication { 
+        color: #FFEB3B; /* Yellow */
+        font-weight: bold; 
+        font-size: 1.1em; 
+        margin-top: 15px; 
+        padding-top: 10px;
+        border-top: 1px solid rgba(255,255,255,0.3);
     }
-    .bfd-box {
-        background: white; color: #333; padding: 15px; border-radius: 8px;
-        border: 2px solid #004d40; text-align: center; min-width: 120px;
-        font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .bfd-arrow { font-size: 24px; color: #00695c; margin: 0 10px; }
     
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] { gap: 5px; }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px; white-space: pre-wrap;
-        background-color: #FFFFFF; border-radius: 5px;
-        color: #333; border: 1px solid #DDD;
+    /* Metrics Style */
+    [data-testid="stMetricValue"] { font-size: 28px; color: #388E3C; }
+    
+    /* Custom classes for logo sizing in main banner (INCREASED SIZE) */
+    .main-banner-logo-container {
+        display: block;
+        margin: 0 auto 15px auto; 
+        width: 220px; 
     }
-    .stTabs [aria-selected="true"] {
-        background-color: #00695c; color: white;
+
+    /* Sidebar Logo Adjustment */
+    .sidebar-logo-container {
+        padding: 10px;
+        border-radius: 8px;
+        background-color: white;
+        margin-bottom: 15px;
     }
+
+    /* BFD Styles */
+    .bfd-container { display: flex; justify-content: center; align-items: center; margin: 30px 0 60px 0; position: relative; }
+    .bfd-block { padding: 15px 25px; border: 3px solid #4CAF50; border-radius: 6px; text-align: center; background-color: #E8F5E9; box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); font-weight: bold; color: #1B5E20; position: relative; min-width: 180px; }
+    .bfd-block p { margin: 5px 0 0; font-size: 12px; font-weight: normal; }
+    .bfd-stream { width: 70px; height: 3px; background-color: #4CAF50; position: relative; }
+    .bfd-stream::before { content: ''; position: absolute; right: -10px; top: -5px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 10px solid #4CAF50; }
+    .side-stream { position: absolute; left: 50%; transform: translateX(-50%); width: 3px; height: 40px; background-color: #FF9800; bottom: -40px; }
+    .side-stream-label { position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; color: #FF9800; }
 </style>
-""", unsafe_allow_html=True)
+"""
 
-# ==============================================================================
-# 3. PHYSICS ENGINE
-# ==============================================================================
-
-@st.cache_data
-def run_simulation_engine(biomass_type, moisture, temp_C, duration_min, size, initial_mass):
-    # Parameters
-    data = EMPIRICAL_DATA[biomass_type]
+# --- 3. Simulation Core Logic ---
+def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"): 
     temp_K = temp_C + 273.15
+    data = EMPIRICAL_DATA.get(biomass)
+    R_GAS_LOCAL = R_GAS 
     
-    # Severity Factor (R0)
-    severity = np.log10(duration_min * np.exp((temp_C - 100) / 14.75))
+    # Arrhenius equation for Devolatilization Rate Constant
+    k_devol_arrhenius = data["A"] * np.exp(-data["Ea"] / (R_GAS_LOCAL * temp_K))
+    k_devol_eff = k_devol_arrhenius * SIZE_FACTOR.get(size)
+    k_drying = data["k_drying_base"] 
     
-    # Kinetic Rates
-    k_rxn = data["A"] * np.exp(-data["Ea"] / (R_GAS * temp_K)) * SIZE_FACTOR[size]
-    k_dry = data["k_drying_base"]
+    initial_moisture_frac = moisture / 100
+    initial_ash_frac = data["Ash"]
     
-    # Initial State
-    f_moist = moisture / 100.0
-    f_ash = data["Ash"]
-    f_vol = 1.0 - f_moist - f_ash
+    dry_ash_free_frac = 1.0 - initial_moisture_frac - initial_ash_frac
+    fixed_carbon_frac_initial = dry_ash_free_frac * BASE_FC_DRY_ASH_FREE
+    initial_volatiles_frac = dry_ash_free_frac * (1 - BASE_FC_DRY_ASH_FREE)
+
+    mass_ash_kg = initial_mass_kg * initial_ash_frac
+    mass_fixed_carbon_kg = initial_mass_kg * fixed_carbon_frac_initial
     
-    # ODE Solver
-    def model(y, t):
-        m, v = y
-        dm = -k_dry * m if m > 0.001 else 0
-        dv = -k_rxn * v
-        return [dm, dv]
+    # ODE System (Differential Equations for mass fractions)
+    def model(y, t, k1, k2):
+        m_moist, m_vol = y
+        d_moist = -k1 * m_moist if m_moist > 0.001 else 0 # Drying
+        d_vol = -k2 * m_vol                               # Devolatilization
+        return [d_moist, d_vol]
     
     t = np.linspace(0, duration_min, 100)
-    y0 = [f_moist, f_vol]
-    sol = odeint(model, y0, t)
+    y0 = [initial_moisture_frac, initial_volatiles_frac]
+    sol = odeint(model, y0, t, args=(k_drying, k_devol_eff))
+    sol[sol < 0] = 0
     
-    # Mass Balance
-    final_moist = sol[-1, 0]
-    final_vol = sol[-1, 1]
+    moisture_curve = sol[:, 0] 
+    volatiles_curve = sol[:, 1]
     
-    mass_lost_water = (f_moist - final_moist) * initial_mass
-    mass_lost_vol = (f_vol - final_vol) * initial_mass
-    mass_solid_out = initial_mass - mass_lost_water - mass_lost_vol
+    # Final Mass Balance
+    final_moisture_remaining = moisture_curve[-1]
+    final_volatiles_remaining = volatiles_curve[-1]
     
-    # Yields
-    mass_yield = (mass_solid_out / initial_mass) * 100
+    final_moisture_loss = initial_moisture_frac - final_moisture_remaining
+    final_volatiles_lost = initial_volatiles_frac - final_volatiles_remaining
     
-    # Energy Balance
-    # Energy Densification Ratio (EDR) approx correlation
-    edr = 1 + (1 - (mass_yield/100)) * 0.6
-    hhv_out = data["HHV"] * edr
-    energy_yield = mass_yield * edr
+    # Final Solid Product Mass (Fixed Carbon + Remaining Volatiles + Ash)
+    mass_volatiles_remaining = final_volatiles_remaining * initial_mass_kg
+    mass_biochar_total = mass_fixed_carbon_kg + mass_volatiles_remaining + mass_ash_kg
     
-    total_energy_in = initial_mass * data["HHV"]
-    total_energy_out = mass_solid_out * hhv_out
+    final_solid_fraction = mass_biochar_total / initial_mass_kg
     
-    # Thermal Load (Input Heat)
-    q_sensible = initial_mass * 1.4 * (temp_C - 25)
-    q_latent = mass_lost_water * 2260
-    q_rxn = (initial_mass - mass_solid_out) * 200 # Endothermic heat
-    q_total = (q_sensible + q_latent + q_rxn) / 1000 # MJ
+    final_ash_percent = (mass_ash_kg / mass_biochar_total) * 100
+
+    # Output DataFrames
+    yields_percent = pd.DataFrame({
+        "Yield (%)": [final_solid_fraction * 100, final_volatiles_lost * 100, final_moisture_loss * 100, initial_ash_frac * 100]},
+        index=["Biochar (Solid Product)", "Non-Condensable Gases", "Moisture Loss (Water Vapor)", "Original Ash Content"]
+    )
+    
+    yields_mass = yields_percent.copy()
+    yields_mass["Mass (kg)"] = yields_percent["Yield (%)"] * initial_mass_kg / 100
+    yields_mass.drop(columns=["Yield (%)"], inplace=True)
+    
+    solid_composition = pd.DataFrame({
+        "Mass (kg)": [mass_fixed_carbon_kg, mass_volatiles_remaining, mass_ash_kg]
+    }, index=["Fixed Carbon", "Remaining Volatiles", "Ash"])
+
+    # Gas Composition (same empirical ratios)
+    gas_comp_mass_fractions = {"CO2": 0.45, "CO": 0.35, "CH4": 0.15, "H2": 0.05}
+    gas_composition_molar_data = {}
+    total_volatiles_lost_mass = final_volatiles_lost * initial_mass_kg
+    
+    if total_volatiles_lost_mass > 0.001:
+        for gas, fraction in gas_comp_mass_fractions.items():
+            gas_composition_molar_data[gas] = fraction * 100 
+    
+    gas_composition_molar = pd.DataFrame.from_dict(
+        gas_composition_molar_data, 
+        orient="index", columns=["Molar % in Dry Gas"]
+    ).fillna(0)
+    if not gas_composition_molar.empty and gas_composition_molar["Molar % in Dry Gas"].sum() > 0:
+        gas_composition_molar = gas_composition_molar / gas_composition_molar["Molar % in Dry Gas"].sum() * 100 
+    else:
+        gas_composition_molar = pd.DataFrame(0, index=["CO2", "CO", "CH4", "H2"], columns=["Molar % in Dry Gas"])
+
+
+    # Mass Profile for the chart
+    current_solid_mass_fraction_curve = volatiles_curve + fixed_carbon_frac_initial + initial_ash_frac
+    ash_concentration_percent = (initial_ash_frac / current_solid_mass_fraction_curve) * 100
+    
+    mass_profile = pd.DataFrame({
+        "Time (min)": t,
+        "Total Mass Yield (%)": current_solid_mass_fraction_curve * 100,
+        "Ash Concentration in Solid (%)": ash_concentration_percent
+    }).set_index("Time (min)")
     
     return {
-        "t": t,
-        "profile_moist": sol[:, 0] * initial_mass,
-        "profile_vol": sol[:, 1] * initial_mass,
-        "mass_out": mass_solid_out,
-        "mass_yield": mass_yield,
-        "energy_yield": energy_yield,
-        "hhv_out": hhv_out,
-        "severity": severity,
-        "energy_data": {
-            "Q_Sensible": q_sensible/1000,
-            "Q_Latent": q_latent/1000,
-            "Q_Reaction": q_rxn/1000,
-            "Total_MJ": q_total,
-            "Energy_In": total_energy_in,
-            "Energy_Out": total_energy_out
-        },
-        "params": {
-            "bio": biomass_type, "temp": temp_C, "time": duration_min, "mass": initial_mass
+        "yields_percent": yields_percent,
+        "yields_mass": yields_mass,
+        "solid_composition": solid_composition,
+        "final_ash_percent": final_ash_percent,
+        "gas_composition_molar": gas_composition_molar,
+        "mass_profile": mass_profile,
+        "k_devol_eff": k_devol_eff,
+        "parameters": {
+            "biomass": biomass, "moisture": moisture, "temperature": temp_C, 
+            "duration": duration_min, "size": size, "initial_mass": initial_mass_kg,
+            "reactor": reactor_type
         }
     }
 
-# ==============================================================================
-# 4. PDF REPORTING ENGINE
-# ==============================================================================
-
-def generate_pdf(res):
+# --- 4. PDF Report Generation Function ---
+def generate_pdf_report(results):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     styles = getSampleStyleSheet()
-    story = []
+    elements = []
     
-    # Header
-    story.append(Paragraph("<b>CHEMISCO TECHNICAL REPORT</b>", styles['Title']))
-    story.append(Spacer(1, 0.2*inch))
-    story.append(Paragraph(f"Date: {pd.Timestamp.now()}", styles['Normal']))
-    story.append(Spacer(1, 0.3*inch))
+    # -- Styles --
+    title_style = styles["Title"]
+    title_style.textColor = colors.HexColor("#388E3C")
+    heading_style = styles["Heading2"]
+    heading_style.textColor = colors.HexColor("#2E7D32")
+    normal_style = styles["Normal"]
     
-    # 1. Summary Table
-    story.append(Paragraph("1. Process Summary", styles['Heading2']))
-    data = [
+    # -- 1. Header with Logo (for PDF) --
+    elements.append(Paragraph("CHEMISCO TORREFACTION REPORT", title_style))
+    elements.append(Paragraph("Project presented to: Dr. Amr El Refaey", styles["Heading3"])) 
+    
+    try:
+        img_path = LOGO_PATH 
+        logo_pdf = ReportImage(img_path, width=1.5*inch, height=1.5*inch)
+        logo_pdf.hAlign = 'CENTER'
+        elements.append(logo_pdf)
+    except FileNotFoundError:
+        elements.append(Paragraph("CHEMISCO (Logo Failed to Load)", title_style)) 
+        
+    elements.append(Paragraph(f"Report Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", normal_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # -- 2. Parameters Table --
+    elements.append(Paragraph("1. Simulation Parameters & Kinetics", heading_style))
+    p = results["parameters"]
+    param_data = [
         ["Parameter", "Value"],
-        ["Feedstock", res['params']['bio']],
-        ["Temperature", f"{res['params']['temp']} °C"],
-        ["Duration", f"{res['params']['time']} min"],
-        ["Mass Yield", f"{res['mass_yield']:.2f}%"],
-        ["Energy Yield", f"{res['energy_yield']:.2f}%"],
-        ["Product HHV", f"{res['hhv_out']:.2f} MJ/kg"]
+        ["Biomass Type", p['biomass']],
+        ["Reactor Type", p['reactor']],
+        ["Initial Mass", f"{p['initial_mass']} kg"],
+        ["Moisture Content", f"{p['moisture']}%"],
+        ["Temperature", f"{p['temperature']} °C"],
+        ["Duration", f"{p['duration']} min"],
+        ["Particle Size", p["size"]],
+        ["Eff. Devol Rate", f"{results['k_devol_eff']:.4f} min-1"]
     ]
-    t = Table(data, colWidths=[3*inch, 2.5*inch])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#00695c")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+    
+    t_param = Table(param_data, colWidths=[3*inch, 3*inch])
+    t_param.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#E8F5E9")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('GRID', (0,0), (-1,-1), 1, colors.black)
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('GRID', (0,0), (-1,-1), 1, colors.grey),
     ]))
-    story.append(t)
-    story.append(Spacer(1, 0.3*inch))
+    elements.append(t_param)
+    elements.append(Spacer(1, 0.2*inch))
     
-    # 2. Chart Image (Matplotlib)
-    story.append(Paragraph("2. Kinetic Profile", styles['Heading2']))
-    fig, ax = plt.subplots(figsize=(6, 3.5))
-    ax.plot(res['t'], res['profile_vol'], label='Volatiles', color='orange')
-    ax.plot(res['t'], res['profile_moist'], label='Moisture', color='blue')
-    ax.set_xlabel('Time (min)')
-    ax.set_ylabel('Mass (kg)')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    # -- 3. Yields Table --
+    elements.append(Paragraph("2. Product Yields (Mass Balance)", heading_style))
+    yield_data = [["Component", "Mass (kg)", "Yield (%)"]]
+    for idx, row in results["yields_percent"].iterrows():
+        mass = results["yields_mass"].loc[idx, "Mass (kg)"]
+        yield_data.append([idx, f"{mass:.2f}", f"{row['Yield (%)']:.2f}"])
+        
+    t_yield = Table(yield_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+    t_yield.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#E8F5E9")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('GRID', (0,0), (-1,-1), 1, colors.grey),
+        ('ALIGN', (1,0), (-1,-1), 'CENTER'),
+    ]))
+    elements.append(t_yield)
+    elements.append(Spacer(1, 0.1*inch))
     
-    img_buf = BytesIO()
-    plt.savefig(img_buf, format='png', dpi=150)
-    img_buf.seek(0)
-    story.append(ReportImage(img_buf, width=5*inch, height=3*inch))
-    plt.close(fig)
+    elements.append(Paragraph(f"<b>Final Ash Concentration:</b> {results['final_ash_percent']:.2f}%", normal_style))
+    elements.append(Spacer(1, 0.2*inch))
     
-    doc.build(story)
+    # -- 4. Visualizations (Matplotlib for Report) --
+    def get_image_bytes(fig):
+        img_buf = BytesIO()
+        fig.savefig(img_buf, format='png', bbox_inches='tight', dpi=150, transparent=True)
+        img_buf.seek(0)
+        return img_buf
+
+    elements.append(Paragraph("3. Results Visualization", heading_style))
+
+    # A. Two Pie Charts Side-by-Side 
+    fig_pie1, ax_pie1 = plt.subplots(figsize=(4.5, 4.5)) 
+    colors_solid_pdf = ['#6A1B9A', '#AB47BC', '#BDBDBD'] 
+    ax_pie1.pie(results["solid_composition"]["Mass (kg)"], labels=results["solid_composition"].index, 
+                autopct='%1.1f%%', colors=colors_solid_pdf, startangle=140, pctdistance=0.85, 
+                textprops={'fontsize': 8})
+    ax_pie1.set_title("Solid Product Composition", fontsize=10, weight='bold')
+    img1 = ReportImage(get_image_bytes(fig_pie1), width=3.25*inch, height=3.25*inch) 
+    
+    # Chart 2: Global Balance
+    fig_pie2, ax_pie2 = plt.subplots(figsize=(4.5, 4.5))
+    filtered_yields = results["yields_percent"].iloc[[0, 1, 2]]
+    colors_global_pdf = ['#388E3C', '#7CB342', '#C5E1A5'] 
+    ax_pie2.pie(filtered_yields["Yield (%)"], labels=filtered_yields.index, 
+                autopct='%1.1f%%', colors=colors_global_pdf, startangle=90, pctdistance=0.85,
+                textprops={'fontsize': 8})
+    ax_pie2.set_title("Global Mass Balance", fontsize=10, weight='bold')
+    img2 = ReportImage(get_image_bytes(fig_pie2), width=3.25*inch, height=3.25*inch)
+    
+    t_pies = Table([[img1, img2]], colWidths=[3.7*inch, 3.7*inch])
+    elements.append(t_pies)
+    
+    plt.close(fig_pie1)
+    plt.close(fig_pie2)
+    
+    elements.append(Spacer(1, 0.2*inch)) 
+    
+    # B. Dual Axis Line Chart
+    fig_line, ax1 = plt.subplots(figsize=(8, 4))
+    
+    color_mass = '#388E3C' 
+    ax1.set_xlabel('Time (min)')
+    ax1.set_ylabel('Total Mass Remaining (%)', color=color_mass, weight='bold')
+    ax1.plot(results["mass_profile"].index, results["mass_profile"]["Total Mass Yield (%)"], color=color_mass, linewidth=2)
+    ax1.tick_params(axis='y', labelcolor=color_mass)
+    ax1.grid(True, alpha=0.4, linestyle='--', color='lightgrey') 
+    
+    ax2 = ax1.twinx()
+    color_ash = '#D32F2F' 
+    ax2.set_ylabel('Ash Concentration (%)', color=color_ash, weight='bold')
+    ax2.plot(results["mass_profile"].index, results["mass_profile"]["Ash Concentration in Solid (%)"], color=color_ash, linewidth=2, linestyle='--')
+    ax2.tick_params(axis='y', labelcolor=color_ash)
+    
+    plt.title("Mass Depletion vs. Ash Enrichment", fontsize=12)
+    img_line = ReportImage(get_image_bytes(fig_line), width=6.5*inch, height=3.25*inch)
+    elements.append(img_line)
+    elements.append(Spacer(1, 0.1*inch))
+    plt.close(fig_line)
+
+    # C. Bar Chart (Gas)
+    fig_bar, ax_bar = plt.subplots(figsize=(8, 3))
+    results["gas_composition_molar"].plot(kind='bar', ax=ax_bar, legend=False, color='#1565C0') 
+    ax_bar.set_title("Dry Gas Composition (Molar %)", fontsize=12)
+    ax_bar.set_ylabel("Molar %")
+    plt.xticks(rotation=0)
+    ax_bar.grid(axis='y', alpha=0.4, linestyle='--', color='lightgrey')
+    
+    img_bar = ReportImage(get_image_bytes(fig_bar), width=6.5*inch, height=2.5*inch)
+    elements.append(img_bar)
+    plt.close(fig_bar)
+    
+    # Build
+    doc.build(elements)
     buffer.seek(0)
     return buffer
 
-# ==============================================================================
-# 5. MAIN APPLICATION CONTROLLER
-# ==============================================================================
+# --- 5. AI Chatbot Logic (MOCK FUNCTION) ---
+def mock_ai_response(prompt, results):
+    """
+    MOCK AI function: Provides simulated responses based on keywords.
+    In a real app, this function would call a service like Gemini or OpenAI.
+    """
+    p = results["parameters"]
+    
+    if "optimize" in prompt.lower() or "increase yield" in prompt.lower() or "best conditions" in prompt.lower():
+        # High Yield/Low Ash Suggestion
+        return f"""To achieve higher **Biochar Yield** and lower **Ash Concentration** for {p['biomass']}, consider the following:
+        1. **Lower Temperature:** Try reducing the temperature to around **250 °C** to minimize volatile losses.
+        2. **Shorter Duration:** Use a duration of **30-40 minutes**.
+        3. **Current Results:** Your current yield is {results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]:.1f}% with {results['final_ash_percent']:.1f}% ash. For optimization, the solid mass yield is the most crucial metric to maximize."""
+    
+    if "ash" in prompt.lower() or "ash concentration" in prompt.lower() or "inerts" in prompt.lower():
+        return f"""Ash concentration increases because the inert ash remains while other components (moisture and volatiles) are removed. 
+        Current Ash Concentration: **{results['final_ash_percent']:.2f}%**. 
+        This is an **enrichment factor** of {(results['final_ash_percent'] / (p['initial_mass'] * EMPIRICAL_DATA[p['biomass']]["Ash"] * 100 / (results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"])):.2f} compared to the initial biomass. Lowering the initial ash content in the feedstock is the only way to reduce this value, as ash is not consumed during torrefaction."""
 
+    if "reactor" in prompt.lower() or "type" in prompt.lower():
+        return f"""You are currently simulating a **{p['reactor']}**. The choice of reactor affects heat transfer and mixing. **Fluidized Bed Reactors** provide excellent heat transfer but have high operating costs, while **Rotary Drum Reactors** are often preferred for continuous, large-scale production."""
+
+    if "gas" in prompt.lower() or "composition" in prompt.lower() or "volatiles" in prompt.lower():
+        gas_total = results["yields_mass"].loc["Non-Condensable Gases", "Mass (kg)"]
+        return f"""The main gaseous components are CO2, CO, CH4, and H2. The total mass of non-condensable gases produced is **{gas_total:.2f} kg**. This gas is rich in energy and can be combusted to provide the heat required for the torrefaction process itself (autothermal operation), thus lowering your operational cost."""
+
+    if "torrefaction" in prompt.lower() or "process" in prompt.lower() or "what is" in prompt.lower():
+        return "Torrefaction is a mild pyrolysis process conducted typically between $200^\circ C$ and $300^\circ C$ in an inert or low-oxygen atmosphere. It removes moisture and volatile organic compounds, resulting in a hydrophobic, brittle, and energy-dense solid product called **biochar** (or torrefied biomass)."
+
+    # Default/General response
+    return "I am the Chemisco AI Assistant. I can help explain the torrefaction process kinetics, analyze the results, or suggest optimized parameters based on your current inputs. Try asking about the **gas composition** or how to **optimize the yield**."
+
+# --- 6. Main Streamlit App ---
 def main():
-    # --- Session State Init ---
-    if 'target_yield' not in st.session_state: st.session_state.target_yield = 75
-    if 'budget' not in st.session_state: st.session_state.budget = 50000
+    st.set_page_config(page_title="Chemisco Torrefaction Simulator", layout="wide", initial_sidebar_state="expanded")
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+    
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = [{"role": "assistant", "content": "Welcome! I am the Chemisco AI Assistant. How can I help you analyze your torrefaction simulation?"}]
     
     # --- Sidebar ---
     with st.sidebar:
-        if logo_b64:
-            st.markdown(f'<img src="data:image/png;base64,{logo_b64}" style="width:80px; margin:0 auto; display:block">', unsafe_allow_html=True)
+        if LOGO_BASE64_STRING:
+            st.markdown(f"""
+                <div class="sidebar-logo-container">
+                    <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 80%; display: block; margin: 0 auto;">
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("## Chemisco")
+            st.warning("⚠️ Logo file not found.")
+
+        st.markdown(f"""
+            <div style='text-align: center; padding: 15px; border-radius: 8px; background-color: #1B5E20; margin-top: 15px;'>
+                <h1 style='color: white; margin: 0; font-size: 2.2em; letter-spacing: 1px;'>CHEMISCO</h1>
+                <p style='color: #A5D6A7; margin: 0; font-size: 0.9em;'>Torrefaction Process Simulator</p>
+                <hr style='margin: 10px 0; border-color: #4CAF50;'>
+                <p style='color: #C8E6C9; font-size: 0.85em;'>Project presented to:</p>
+                <h3 style='color: #FFF176; margin: 0;'>Dr. Amr El Refaey</h3> </div>
+            """, unsafe_allow_html=True)
         
-        st.title("Control Center")
+        st.header("⚙️ Input Parameters")
+        
+        reactor_type = st.selectbox("Reactor Type", 
+            ["Rotary Drum Reactor", "Fluidized Bed Reactor", "Auger/Screw Reactor", "Fixed Bed Reactor"])
+        
+        with st.expander("🌲 Biomass Properties", expanded=True):
+            initial_mass_kg = st.number_input("Initial Biomass Mass (kg)", min_value=1.0, value=100.0, step=10.0)
+            biomass_type = st.selectbox("Biomass Type", list(EMPIRICAL_DATA.keys()))
+            moisture_content = st.slider("Initial Moisture Content (%)", 0.0, 50.0, 10.0, step=1.0)
+            particle_size = st.selectbox("Particle Size", list(SIZE_FACTOR.keys()))
+            
+        with st.expander("🌡️ Process Conditions", expanded=True):
+            temperature = st.slider("Torrefaction Temperature (°C)", 200, 350, 275, step=5)
+            duration = st.slider("Process Duration (min)", 10, 120, 45, step=5)
+            ash_percent_init = EMPIRICAL_DATA[biomass_type]["Ash"] * 100
+            st.info(f"Initial Ash Content: **{ash_percent_init:.1f}%**")
+            
+        with st.expander("💰 Cost Management", expanded=False):
+            st.caption("Economic Feasibility Parameters")
+            cost_biomass_per_ton = st.number_input("Biomass Feedstock Cost ($/ton)", min_value=0.0, value=30.0, step=5.0)
+            cost_energy_per_hour = st.number_input("Operational/Energy Cost ($/hour)", min_value=0.0, value=5.0, step=0.5, help="Total cost of electricity + labor per hour of operation")
+            price_biochar_per_kg = st.number_input("Biochar Selling Price ($/kg)", min_value=0.0, value=1.20, step=0.1)
+            
+        st.markdown("---")
+        st.subheader("🎮 Gamification")
+        game_mode = st.checkbox("Activate 'Plant Manager Challenge'", value=False)
+
+
+    # --- Main Banner ---
+    if LOGO_BASE64_STRING:
+        st.markdown(f"""
+            <div class="main-banner">
+                <div class="main-banner-logo-container">
+                    <img src="data:image/png;base64,{LOGO_BASE64_STRING}" style="width: 100%; height: auto; border-radius: 8px;">
+                </div>
+                <h1>CHEMISCO</h1> 
+                <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
+                <div class="dedication">Project presented to Dr. Amr El Refaey</div> 
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <div class="main-banner">
+                <h1>CHEMISCO</h1> 
+                <p class="banner-tagline">Optimizing Biochar Production through Advanced Modeling</p> <p>Advanced Torrefaction Simulator</p>
+                <div class="dedication">Project presented to Dr. Amr El Refaey</div> 
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # BFD (Block Flow Diagram)
+    bfd_html = f"""
+    <div class="bfd-container">
+        <div class="bfd-block">
+            FEED PREPARATION
+            <p style="color: #1565C0;">Mass: {initial_mass_kg:.0f} kg</p>
+            <p style="color: #0277BD;">Moist: {moisture_content:.1f}%</p>
+        </div>
+        <div class="bfd-stream"></div>
+        <div class="bfd-block">
+            DRYING & PREHEATING
+            <p>100 °C - 200 °C</p>
+            <div class="side-stream"></div>
+            <div class="side-stream-label">Water Vapor</div>
+        </div>
+        <div class="bfd-stream"></div>
+        <div class="bfd-block" style="border-color: #D32F2F; background-color: #FFCDD2; color: #B71C1C;">
+            {reactor_type.upper()}
+            <p style="color: #B71C1C;">Temp: {temperature} °C</p>
+            <p style="color: #B71C1C;">Duration: {duration} min</p>
+            <div class="side-stream" style="background-color: #FFC107;"></div>
+            <div class="side-stream-label" style="color: #FFC107;">Volatile Gases</div>
+        </div>
+        <div class="bfd-stream"></div>
+        <div class="bfd-block" style="border-color: #388E3C; background-color: #C8E6C9; color: #1B5E20;">
+            COOLING & PRODUCT
+            <p>Torrefied Biochar</p>
+        </div>
+    </div>
+    <div style="height: 40px;"></div>
+    """
+    st.subheader("Process Flow Block Diagram (BFD)")
+    st.markdown(bfd_html, unsafe_allow_html=True)
+    
+    # Input validation
+    if moisture_content / 100 + EMPIRICAL_DATA[biomass_type]["Ash"] > 1:
+        st.error("**Input Error:** Initial Moisture and Ash content exceed 100%. Please adjust input parameters.")
+        return 
+        
+    # Run Simulation
+    results = simulate_torrefaction(biomass_type, moisture_content, temperature, duration, particle_size, initial_mass_kg, reactor_type)
+    
+    # --- GAME LOGIC SECTION ---
+    if game_mode:
+        st.markdown("---")
+        st.markdown("""
+        <div style="background-color: #E8F5E9; padding: 20px; border-radius: 10px; border-left: 6px solid #2E7D32; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="color: #1B5E20; margin-top:0;">🏭 Plant Manager Challenge</h3>
+            <p style="color: #388E3C; font-size: 1.1em;">The client has sent specific requirements for the Biochar. Adjust <b>Temperature</b> and <b>Duration</b> to match them!</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if 'target_yield' not in st.session_state:
+            st.session_state.target_yield = random.randint(60, 85)
+            st.session_state.target_ash = round(random.uniform(ash_percent_init + 1.0, ash_percent_init + 5.0), 1)
+            st.session_state.has_won = False
+
+        col_g1, col_g2, col_g3 = st.columns([1.5, 2, 1])
+        
+        with col_g1:
+            st.info(f"📋 **CLIENT ORDER:**\n\n🎯 Target Yield: **{st.session_state.target_yield}%**\n\n🎯 Max Ash: **{st.session_state.target_ash}%**")
+            
+        with col_g2:
+            curr_yield = results["yields_percent"].loc["Biochar (Solid Product)", "Yield (%)"]
+            curr_ash = results["final_ash_percent"]
+            diff_yield = abs(curr_yield - st.session_state.target_yield)
+            diff_ash = abs(curr_ash - st.session_state.target_ash)
+            score = max(0, 100 - (diff_yield * 2 + diff_ash * 5))
+            st.metric("🏆 Your Efficiency Score", f"{score:.1f} / 100")
+            
+            if score >= 90:
+                st.success("🌟 PERFECT MATCH! Order fulfilled successfully.")
+                if not st.session_state.has_won:
+                    st.session_state.has_won = True
+            elif score >= 70:
+                st.warning("⚠️ Acceptable, but try to optimize further.")
+            else:
+                st.error("❌ Specification mismatch. Quality too low.")
+                
+        with col_g3:
+            st.write("###") 
+            if st.button("🔄 New Client Order"):
+                del st.session_state['target_yield']
+                del st.session_state['target_ash']
+                st.session_state.has_won = False
+                st.experimental_rerun()
+        st.markdown("---")
+    # --------------------------
+
+    # --- Display Results ---
+    st.header("📊 Simulation Results & Analysis")
+    # AI Assistant Tab Added Here
+    tab1, tab2, tab3, tab4, tab5, tab_ai = st.tabs(["Yields & Ash Enrichment", "Ash & Mass Kinetics", "Gas Composition", "💰 Cost Analysis", "PDF Report", "🤖 AI Assistant"])
+    
+    with tab1:
+        st.subheader(f"Product Yields & Ash Enrichment")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        
+        biochar_mass = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
+        col_m1.metric("⚖️ Total Biochar Mass", f"{biochar_mass:.2f} kg")
+        
+        final_ash = results["final_ash_percent"]
+        ash_increase = final_ash - ash_percent_init
+        col_m2.metric("⚗️ Final Ash Concentration", f"{final_ash:.2f} %", delta=f"+{ash_increase:.2f}% (Enrichment)")
+        
+        moisture_loss = results["yields_mass"].loc["Moisture Loss (Water Vapor)", "Mass (kg)"]
+        col_m3.metric("💧 Moisture Removed", f"{moisture_loss:.2f} kg")
+
         st.markdown("---")
         
-        st.subheader("1. Feedstock")
-        b_type = st.selectbox("Biomass", list(EMPIRICAL_DATA.keys()))
-        mass = st.number_input("Mass (kg)", 100.0, 10000.0, 1000.0)
-        moist = st.slider("Moisture %", 0, 60, 15)
-        size = st.select_slider("Size", options=list(SIZE_FACTOR.keys()))
+        col_t1, col_t2 = st.columns(2)
         
-        st.subheader("2. Reactor")
-        temp = st.slider("Temp (°C)", 200, 350, 275)
-        time_min = st.slider("Time (min)", 15, 180, 45)
-        
-        st.subheader("3. Economics")
-        price = st.number_input("Price ($/kg)", 0.5, 5.0, 1.5)
-        capex = st.number_input("CAPEX ($)", 100000, 5000000, 1000000)
-        
-        run = st.button("🚀 RUN SIMULATION", type="primary")
-
-    # --- Hero Section ---
-    st.markdown("""
-    <div class="hero-section">
-        <h1>CHEMISCO ENTERPRISE</h1>
-        <p>High-Fidelity Process Simulation & Analysis Platform</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # --- Simulation Trigger ---
-    res = run_simulation_engine(b_type, moist, temp, time_min, size, mass)
-    
-    # --- BFD Diagram ---
-    st.markdown(f"""
-    <div class="bfd-container">
-        <div class="bfd-box" style="border-color:#2ecc71">FEED<br>{mass:.0f} kg</div>
-        <div class="bfd-arrow">➜</div>
-        <div class="bfd-box" style="border-color:#f1c40f">DRYER<br>-H₂O</div>
-        <div class="bfd-arrow">➜</div>
-        <div class="bfd-box" style="border-color:#e74c3c">REACTOR<br>{temp}°C</div>
-        <div class="bfd-arrow">➜</div>
-        <div class="bfd-box" style="border-color:#3498db">CHAR<br>{res['mass_out']:.1f} kg</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # --- KPIs ---
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Mass Yield", f"{res['mass_yield']:.1f}%", delta="- Loss")
-    c2.metric("Energy Yield", f"{res['energy_yield']:.1f}%", delta="+ HHV")
-    c3.metric("Severity Index", f"{res['severity']:.2f}")
-    c4.metric("Heat Req", f"{res['energy_data']['Total_MJ']:.1f} MJ")
-
-    # --- Advanced Tabs ---
-    tabs = st.tabs(["📈 Dynamics", "🔥 Thermal", "💰 Economics", "🎮 Game Mode", "📄 Report"])
-
-    # 1. Dynamics
-    with tabs[0]:
-        st.subheader("Reaction Kinetics")
-        df = pd.DataFrame({
-            "Time": res['t'],
-            "Moisture": res['profile_moist'],
-            "Volatiles": res['profile_vol']
-        })
-        fig = px.line(df, x="Time", y=["Moisture", "Volatiles"], title="Component Mass Loss")
-        st.plotly_chart(fig, use_container_width=True)
-
-    # 2. Thermal (Energy Balance)
-    with tabs[1]:
-        st.subheader("Energy Waterfall")
-        e = res['energy_data']
-        
-        # Waterfall Chart
-        fig_w = go.Figure(go.Waterfall(
-            orientation="v",
-            measure=["relative", "relative", "relative", "total"],
-            x=["Sensible Heat", "Latent Heat", "Reaction Heat", "Total Required"],
-            y=[e['Q_Sensible'], e['Q_Latent'], e['Q_Reaction'], 0],
-            text=[f"{v:.1f}" for v in [e['Q_Sensible'], e['Q_Latent'], e['Q_Reaction'], e['Total_MJ']]],
-            connector={"line": {"color": "rgb(63, 63, 63)"}},
-        ))
-        # Manually set the total bar value
-        fig_w.data[0].y[3] = e['Total_MJ']
-        fig_w.update_layout(title="Process Heat Breakdown (MJ)", showlegend=False)
-        st.plotly_chart(fig_w, use_container_width=True)
-
-    # 3. Economics
-    with tabs[2]:
-        st.subheader("Cash Flow Analysis")
-        
-        revenue = res['mass_out'] * price
-        opex = (res['params']['time']/60) * 20 + (mass/1000)*30 # Fake OPEX model
-        profit = revenue - opex
-        
-        col_e1, col_e2 = st.columns(2)
-        with col_e1:
-            st.metric("Batch Revenue", f"${revenue:,.2f}")
-            st.metric("Batch OPEX", f"${opex:,.2f}")
-            st.metric("Net Profit", f"${profit:,.2f}", delta_color="normal")
-        
-        with col_e2:
-            # ROI calculation
-            annual_profit = profit * (24*300 / (time_min/60)) # 300 days
-            payback = capex / annual_profit if annual_profit > 0 else 99
-            st.info(f"Estimated Payback Period: {payback:.1f} Years")
-            st.progress(min(1.0, max(0.0, 1/payback if payback > 0 else 0)))
-
-    # 4. Game Mode
-    with tabs[3]:
-        st.subheader("🎯 Factory Manager Challenge")
-        target = st.session_state.target_yield
-        st.info(f"**Mission:** Optimize the reactor to hit exactly **{target}% Mass Yield** (+/- 1%).")
-        
-        curr = res['mass_yield']
-        diff = abs(curr - target)
-        
-        c_g1, c_g2 = st.columns(2)
-        c_g1.metric("Current", f"{curr:.1f}%")
-        c_g2.metric("Target", f"{target}%")
-        
-        if diff <= 1.0:
-            st.balloons()
-            st.success("🎉 PERFECT MATCH! You are a Master Engineer.")
-            if st.button("Next Level"):
-                st.session_state.target_yield = random.randint(50, 85)
-                st.experimental_rerun()
-        elif diff <= 5.0:
-            st.warning("So close! Adjust temperature slightly.")
-        else:
-            st.error("Way off target. Try changing residence time.")
-
-    # 5. Report
-    with tabs[4]:
-        st.subheader("Professional Documentation")
-        st.markdown("Generate a compliant PDF report for stakeholders.")
-        
-        if st.button("📄 Generate PDF Report"):
-            pdf_file = generate_pdf(res)
-            st.download_button(
-                label="Download PDF",
-                data=pdf_file,
-                file_name="Chemisco_Report.pdf",
-                mime="application/pdf"
+        # --- PLOTLY PIE CHARTS ---
+        with col_t1:
+            st.markdown("##### Final Biochar Composition")
+            st.caption("Solid Product Breakdown")
+            
+            df_solid = results["solid_composition"].reset_index()
+            df_solid.columns = ["Component", "Mass (kg)"]
+            
+            fig1 = px.pie(df_solid, values='Mass (kg)', names='Component', hole=0.5,
+                            color='Component',
+                            color_discrete_map={
+                                "Fixed Carbon": "#6A1B9A", 
+                                "Remaining Volatiles": "#AB47BC", 
+                                "Ash": "#BDBDBD" 
+                            })
+            
+            fig1.update_layout(
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                margin=dict(t=20, b=50, l=10, r=10),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
             )
+            fig1.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig1, use_container_width=True)
 
+        with col_t2:
+            st.markdown("##### Global Mass Balance")
+            st.caption("Initial Input vs. Final Output (Excluding Initial Ash)")
+            
+            filtered_yields = results["yields_percent"].iloc[[0, 1, 2]].reset_index()
+            filtered_yields.columns = ["Component", "Yield (%)"]
+            
+            fig2 = px.pie(filtered_yields, values='Yield (%)', names='Component', hole=0.5,
+                            color='Component',
+                            color_discrete_map={
+                                "Biochar (Solid Product)": "#388E3C", 
+                                "Non-Condensable Gases": "#7CB342", 
+                                "Moisture Loss (Water Vapor)": "#C5E1A5" 
+                            })
+            
+            fig2.update_layout(
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                margin=dict(t=20, b=50, l=10, r=10),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
+            fig2.update_traces(textposition='inside', textinfo='percent')
+            st.plotly_chart(fig2, use_container_width=True)
+
+    with tab2:
+        st.subheader("Ash Concentration & Mass Depletion Kinetics")
+        
+        # --- PLOTLY DUAL-AXIS CHART ---
+        fig_dual = go.Figure()
+
+        # Line 1: Total Mass (Left Axis)
+        fig_dual.add_trace(go.Scatter(
+            x=results["mass_profile"].index,
+            y=results["mass_profile"]["Total Mass Yield (%)"],
+            name="Total Mass %",
+            line=dict(color="#4CAF50", width=3), 
+            yaxis="y1"
+        ))
+
+        # Line 2: Ash Concentration (Right Axis)
+        fig_dual.add_trace(go.Scatter(
+            x=results["mass_profile"].index,
+            y=results["mass_profile"]["Ash Concentration in Solid (%)"],
+            name="Ash Concentration %",
+            line=dict(color="#D32F2F", width=3, dash='dot'), 
+            yaxis="y2"
+        ))
+
+        fig_dual.update_layout(
+            title="Dynamic Ash Enrichment Logic",
+            xaxis=dict(title="Time (min)", showgrid=False),
+            
+            # Left Axis (Primary)
+            yaxis=dict(
+                title=dict(text="Total Mass Remaining (%)", font=dict(color="#4CAF50")),
+                tickfont=dict(color="#4CAF50"),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='rgba(0,0,0,0.1)'
+            ),
+            
+            # Right Axis (Secondary)
+            yaxis2=dict(
+                title=dict(text="Ash Concentration (%)", font=dict(color="#D32F2F")),
+                tickfont=dict(color="#D32F2F"),
+                overlaying="y",
+                side="right",
+                showgrid=False
+            ),
+            
+            legend=dict(x=0.1, y=1.1, orientation="h"),
+            hovermode="x unified",
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=450
+        )
+
+        st.plotly_chart(fig_dual, use_container_width=True)
+        
+        st.info("""
+        **Logic Explanation:** The green line drops as moisture and volatiles leave the biomass.
+        Since Ash is inert (does not react), its *concentration* (Red Dotted Line) must mathematically increase as the total mass decreases.
+        """)
+
+    with tab3:
+        st.subheader("Gas Composition")
+        st.bar_chart(results["gas_composition_molar"])
+
+    with tab4:
+        st.subheader("💰 Economic Feasibility Analysis")
+        cost_feedstock_total = (initial_mass_kg / 1000) * cost_biomass_per_ton
+        hours = duration / 60
+        cost_operations_total = hours * cost_energy_per_hour
+        total_cost = cost_feedstock_total + cost_operations_total
+        biochar_produced_kg = results["yields_mass"].loc["Biochar (Solid Product)", "Mass (kg)"]
+        revenue_total = biochar_produced_kg * price_biochar_per_kg
+        net_profit = revenue_total - total_cost
+        roi = (net_profit / total_cost) * 100 if total_cost > 0 else 0
+        
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        col_c1.metric("📉 Total Cost", f"${total_cost:.2f}")
+        col_c2.metric("📈 Total Revenue", f"${revenue_total:.2f}")
+        col_c3.metric("💵 Net Profit", f"${net_profit:.2f}", delta=f"${abs(net_profit):.2f}", delta_color="normal" if net_profit > 0 else "inverse")
+        col_c4.metric("📊 ROI", f"{roi:.1f}%", delta=f"{abs(roi):.1f}%", delta_color="normal" if roi > 0 else "inverse")
+        
+        st.markdown("---")
+        
+        # Waterfall Chart 
+        fig_waterfall = go.Figure(go.Waterfall(
+            name = "Cash Flow", orientation = "v",
+            measure = ["relative", "relative", "relative", "total"],
+            x = ["Feedstock Cost", "Operational Cost", "Revenue", "Net Profit"],
+            textposition = "outside",
+            y = [-cost_feedstock_total, -cost_operations_total, revenue_total, net_profit],
+            connector = {"line": {"color": "rgb(63, 63, 63)"}},
+            decreasing = {"marker":{"color": "#D32F2F"}}, 
+            increasing = {"marker":{"color": "#388E3C"}}, 
+            totals = {"marker":{"color": "#1565C0", "line":{"width":1, "color":"blue"}}}
+        ))
+
+        fig_waterfall.update_layout(
+            title = "Revenue vs. Cost Breakdown",
+            showlegend = True,
+            margin=dict(t=50, b=50, l=50, r=50),
+            height=450
+        )
+
+        st.plotly_chart(fig_waterfall, use_container_width=True)
+        
+        st.info(f"Total Initial Mass: **{initial_mass_kg:.2f} kg** | Biochar Produced: **{biochar_produced_kg:.2f} kg**")
+
+    with tab5:
+        st.subheader("📥 Generate Report")
+        st.info("Create a comprehensive PDF document of the simulation results, parameters, and visualizations.")
+        
+        pdf_buffer = generate_pdf_report(results)
+        
+        st.download_button(
+            label="⬇️ Download PDF Report",
+            data=pdf_buffer,
+            file_name=f"Chemisco_Torrefaction_Report_{biomass_type}_{temperature}C.pdf",
+            mime="application/pdf"
+        )
+    
+    # --- NEW AI ASSISTANT TAB ---
+    with tab_ai:
+        st.header("🤖 AI Assistant: Torrefaction Expert")
+        st.info("Ask me about process optimization, result analysis, or the chemical kinetics!")
+
+        # Display chat messages from history
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        # Chat input handling
+        if prompt := st.chat_input("Ask a question (e.g., 'How to increase yield?')"):
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            
+            # Display user message
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            # Get and display AI response (with simulation delay)
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing simulation data..."):
+                    time.sleep(1) # Simulate AI thinking time
+                    ai_response = mock_ai_response(prompt, results)
+                
+                st.markdown(ai_response)
+                
+                # Add AI response to chat history
+                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+
+
+# --- Execution Entry Point ---
 if __name__ == "__main__":
     main()
