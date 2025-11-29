@@ -12,7 +12,7 @@ from reportlab.lib import colors
 import streamlit.components.v1 as components
 import os
 
-# --- 0. Disable Developer Hotkeys (Config File) ---
+# --- 0. Disable Developer Hotkeys & Menu ---
 def kill_developer_hotkeys():
     if not os.path.exists(".streamlit"):
         os.makedirs(".streamlit")
@@ -193,46 +193,12 @@ def create_pdf(results, thermal, profit):
     buffer.seek(0)
     return buffer
 
-# --- 4. Botpress Logic (Load on Tab Selection) ---
-def inject_botpress_in_tab():
-    # هذا الكود يقوم بعرض البوت داخل التبويب عن طريق iframe
-    # أو يقوم بحقنه ليعمل عند فتح التبويب
-    
-    # 1. تعريف كود التضمين (Embed Code) الخاص بـ Botpress
-    # هنا نستخدم وضع Embed داخل iframe ليظهر داخل التبويب نفسه وليس عائماً
-    # ملاحظة: بعض إصدارات Botpress الجديدة تفضل العائم، لكن سنجرب التضمين هنا.
-    
-    bot_html = """
-    <div style="height: 600px; width: 100%; display: flex; justify-content: center; align-items: center; background-color: #121212; border-radius: 10px; border: 1px solid #640d14;">
-        <p style="color: white; margin-bottom: 20px;">Initializing AI Expert...</p>
-    </div>
-    
-    <script src="https://cdn.botpress.cloud/webchat/v3.4/inject.js"></script>
-    <script src="https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js" defer></script>
-    
-    <script>
-        // محاولة فتح البوت تلقائياً عند التحميل
-        window.botpressWebChat.onEvent(function (event) {
-            if (event.type === 'LIFECYCLE.LOADED') {
-                window.botpressWebChat.sendEvent({ type: 'show' });
-            }
-        });
-    </script>
-    """
-    
-    # التعليمات للمستخدم
-    st.info("💡 The AI Expert Bot is located at the bottom-right corner of your screen.")
-    st.markdown("Use the floating chat bubble 💬 to ask questions about optimization, chemistry, or finance.")
-    
-    # نقوم بحقن السكربت العام في الصفحة لضمان ظهور الفقاعة
-    # (تم نقل الحقن ليكون عاماً لضمان العمل، لكن الرسالة هنا للتوضيح)
-
 # --- 5. Main App ---
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
-    # *** حقن البوت عالمياً ليظهر دائماً ***
+    # *** Inject Botpress Globally ***
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
@@ -298,8 +264,9 @@ def main():
     
     st.markdown("---")
 
-    # --- TABS CONFIGURATION ---
-    t1, t2, t3, t4, t5 = st.tabs(["📊 Charts", "🌡️ Sensitivity", "📄 Report", "🤖 AI Expert", "🎮 Game"])
+    # --- TABS (Removed AI Expert Tab) ---
+    t1, t2, t3, t4 = st.tabs(["📊 Charts", "🌡️ Sensitivity", "📄 Report", "🎮 Game"])
+    
     color_scale = ["#640d14", "#8c2f39", "#b3525e", "#d97584"]
     plot_bg = '#000000'
     txt_col = '#ffffff'
@@ -336,24 +303,7 @@ def main():
         pdf = create_pdf(res, therm, profit)
         st.download_button("Download PDF", pdf, "report.pdf", "application/pdf")
 
-    # --- TAB 4: REPLACED WITH BOTPRESS INSTRUCTION ---
     with t4:
-        st.markdown("### 🤖 Chemisco AI Assistant")
-        st.markdown("""
-        <div style="background-color: #121212; padding: 20px; border-radius: 10px; border-left: 5px solid #640d14;">
-            <h4 style="color: #ffffff; margin:0;">AI Support Active</h4>
-            <p style="color: #cccccc;">We have integrated the advanced <strong>Botpress AI</strong> directly into Chemisco.</p>
-            <hr style="border-color: #333;">
-            <p style="color: #ffffff; font-weight: bold;">👉 Please look at the bottom-right corner of your screen.</p>
-            <p style="color: #cccccc;">Click on the floating chat icon to start talking with the AI Expert about your simulation results, mass balance, or optimization strategies.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Spacer to push layout
-        st.write("")
-        st.image("https://cdn.botpress.cloud/webchat/v1/botpress-logo.png", width=50)
-
-    with t5:
         if game_mode:
             st.info("🎯 Target: Yield > 80% AND Energy Eff > 90%")
             if res['yields_percent'].iloc[0,0] > 80 and res['energy_yield_percent'] > 90:
