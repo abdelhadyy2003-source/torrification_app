@@ -294,6 +294,14 @@ def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
+    # ------------------ BOTPRESS INJECTION ------------------
+    # تم إضافة السكربتات المطلوبة هنا ليتم تحميلها مع الصفحة
+    st.markdown("""
+        <script src="https://cdn.botpress.cloud/webchat/v3.4/inject.js"></script>
+        <script src="https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js" defer></script>
+    """, unsafe_allow_html=True)
+    # --------------------------------------------------------
+
     if 'target_yield' not in st.session_state: st.session_state.update({'target_yield': 75, 'cost_biomass': 30.0, 'cost_energy': 5.0, 'price_char': 1.20, 'messages': []})
 
     # Sidebar
@@ -394,6 +402,7 @@ def main():
 
     with t4:
         st.write("Ask the AI about your simulation results.")
+        # Internal AI Chat logic (optional if you rely on Botpress)
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.write(m["content"])
         if p := st.chat_input("Ask about yield, profit..."):
