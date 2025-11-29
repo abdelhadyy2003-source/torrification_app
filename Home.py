@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib import colors
 import time
+import streamlit.components.v1 as components  # <--- إضافة مهمة لتشغيل البوت
 
 # --- 1. الثوابت الكيميائية والفيزيائية ---
 R_GAS = 8.314
@@ -39,22 +40,16 @@ BASE_FC_FACTOR = 0.20
 GLOBAL_CSS = """
 <style>
     /* ------------------- THEME COLORS ------------------- */
-    /* Primary (Deep Burgundy): #640d14 */
-    /* Secondary (Beige/Cream): #f0ebd8 */
-    
-    /* Background & Main Text */
     .stApp {
         background-color: #f0ebd8; /* Beige Background */
         color: #640d14; /* Burgundy Text */
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
-    /* Headings */
     h1, h2, h3, h4, h5, h6, .stMarkdown, p, label {
         color: #640d14 !important;
     }
 
-    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
         background-color: #640d14; /* Burgundy Sidebar */
     }
@@ -64,14 +59,12 @@ GLOBAL_CSS = """
     section[data-testid="stSidebar"] p, 
     section[data-testid="stSidebar"] label,
     section[data-testid="stSidebar"] .stMarkdown {
-        color: #f0ebd8 !important; /* Beige Text in Sidebar */
+        color: #f0ebd8 !important; 
     }
     
-    /* Input Widgets (Slider, Selectbox) */
     .stSlider > div > div > div > div { background-color: #640d14 !important; }
     .stSelectbox > div > div { color: #640d14; }
 
-    /* Compact Layout (Tightening) */
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
@@ -82,7 +75,6 @@ GLOBAL_CSS = """
         gap: 0.5rem !important;
     }
     
-    /* Metrics Box Style */
     div[data-testid="stMetric"] {
         background-color: #ffffff;
         border: 2px solid #640d14;
@@ -95,11 +87,10 @@ GLOBAL_CSS = """
         font-size: 24px !important;
     }
     div[data-testid="stMetricLabel"] {
-        color: #8c2f39 !important; /* Lighter Burgundy */
+        color: #8c2f39 !important;
         font-size: 14px !important;
     }
 
-    /* Custom Header Box */
     .header-box {
         background: #640d14;
         padding: 20px;
@@ -112,7 +103,6 @@ GLOBAL_CSS = """
     .header-box h1 { color: #f0ebd8 !important; margin: 0; }
     .header-box p { color: #e6e0cc !important; margin: 0; }
 
-    /* Tabs Styling */
     div[data-testid="stTabs"] button {
         color: #640d14 !important;
         font-weight: bold;
@@ -123,7 +113,6 @@ GLOBAL_CSS = """
         border-bottom: 3px solid #640d14 !important;
     }
 
-    /* Buttons */
     .stButton > button {
         background-color: #640d14 !important;
         color: #f0ebd8 !important;
@@ -134,7 +123,6 @@ GLOBAL_CSS = """
         background-color: #801119 !important;
     }
 
-    /* Process Flow Blocks (BFD) */
     .bfd-block {
         padding: 10px;
         border-radius: 8px;
@@ -152,10 +140,9 @@ GLOBAL_CSS = """
         text-align: center;
     }
     
-    /* Expander styling */
     .streamlit-expanderHeader {
         color: #f0ebd8 !important;
-        background-color: #801119 !important; /* Lighter Burgundy for expanders in sidebar */
+        background-color: #801119 !important;
         border-radius: 5px;
     }
 </style>
@@ -260,7 +247,6 @@ def calculate_thermal_balance(p, results):
     Q_total_required_kJ = Q_sensible_biomass + Q_sensible_water + Q_latent_water + Q_torrefaction
     return {'Q_total_required_kJ': Q_total_required_kJ, 'Q_latent_water': Q_latent_water, 'Q_total_per_kg': Q_total_required_kJ / p['initial_mass']}
 
-# --- 4. Sensitivity & AI ---
 @st.cache_data
 def run_sensitivity_analysis(biomass, moisture, size, initial_mass_kg, reactor_type):
     T_range = np.linspace(220, 320, 8)
@@ -293,14 +279,6 @@ def create_pdf(results, thermal, profit):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
-
-    # ------------------ BOTPRESS INJECTION ------------------
-    # تم إضافة السكربتات المطلوبة هنا ليتم تحميلها مع الصفحة
-    st.markdown("""
-        <script src="https://cdn.botpress.cloud/webchat/v3.4/inject.js"></script>
-        <script src="https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js" defer></script>
-    """, unsafe_allow_html=True)
-    # --------------------------------------------------------
 
     if 'target_yield' not in st.session_state: st.session_state.update({'target_yield': 75, 'cost_biomass': 30.0, 'cost_energy': 5.0, 'price_char': 1.20, 'messages': []})
 
@@ -363,7 +341,6 @@ def main():
     # Tabs
     t1, t2, t3, t4, t5 = st.tabs(["📊 Charts", "🌡️ Sensitivity", "📄 Report", "🤖 AI Expert", "🎮 Game"])
     
-    # Common chart colors to match theme (Burgundy palette)
     color_scale = ["#640d14", "#8c2f39", "#b3525e", "#d97584"]
     
     with t1:
@@ -401,11 +378,11 @@ def main():
         st.download_button("Download PDF", pdf, "report.pdf", "application/pdf")
 
     with t4:
-        st.write("Ask the AI about your simulation results.")
-        # Internal AI Chat logic (optional if you rely on Botpress)
+        st.write("Ask the internal AI logic (Note: Botpress is in the bottom right corner).")
+        # Internal simple logic
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.write(m["content"])
-        if p := st.chat_input("Ask about yield, profit..."):
+        if p := st.chat_input("Ask internal simulation logic..."):
             st.session_state.messages.append({"role": "user", "content": p})
             with st.chat_message("user"): st.write(p)
             resp = mock_ai_response(p, res, therm)
@@ -422,6 +399,22 @@ def main():
                 st.warning(f"Current: Yield {res['yields_percent'].iloc[0,0]:.1f}%, Energy {res['energy_yield_percent']:.1f}%")
         else:
             st.write("Activate Game Mode in Sidebar.")
+
+    # ------------------ BOTPRESS INTEGRATION (CORRECT WAY) ------------------
+    # يتم وضع هذا الكود في النهاية ليتم تحميله
+    # ملاحظة: Streamlit يضع هذا في iframe، لذلك يجب تحديد طول وعرض مناسبين
+    
+    botpress_html = """
+    <script src="https://cdn.botpress.cloud/webchat/v3.4/inject.js"></script>
+    <script src="https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js" defer></script>
+    """
+    
+    # نستخدم مكون HTML بارتفاع كبير ليسمح بظهور نافذة الشات عند فتحها
+    # يوضع في أسفل الصفحة
+    st.markdown("---")
+    st.subheader("💬 AI Support Bot (Botpress)")
+    st.caption("If the bot icon appears below, click it to chat.")
+    components.html(botpress_html, height=700, width=450)
 
 if __name__ == "__main__":
     main()
