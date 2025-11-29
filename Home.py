@@ -10,7 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib import colors
 import time
-import streamlit.components.v1 as components  # <--- إضافة مهمة لتشغيل البوت
+import streamlit.components.v1 as components  # ضروري لتشغيل البوت
 
 # --- 1. الثوابت الكيميائية والفيزيائية ---
 R_GAS = 8.314
@@ -36,7 +36,7 @@ DRYING_RATE_CONST = 0.05
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 BASE_FC_FACTOR = 0.20
 
-# --- 2. التصميم الجديد (عنابي وبيج) ---
+# --- 2. التصميم (عنابي وبيج) ---
 GLOBAL_CSS = """
 <style>
     /* ------------------- THEME COLORS ------------------- */
@@ -275,10 +275,41 @@ def create_pdf(results, thermal, profit):
     buffer.seek(0)
     return buffer
 
+# --- 6. BOTPRESS INJECTION FUNCTION (The Fix) ---
+def inject_botpress():
+    # هذا الكود يستخدم جافا سكريبت للوصول إلى نافذة المتصفح الرئيسية (Parent Window)
+    # وحقن سكربت البوتبريس فيها مباشرة، مما يتجاوز صندوق ستريم لت المعزول
+    js_code = """
+    <script>
+        // دالة للتأكد من عدم تحميل السكربت مرتين
+        if (!window.parent.document.getElementById('botpress-inject')) {
+            
+            // 1. Inject.js
+            var script1 = window.parent.document.createElement('script');
+            script1.id = 'botpress-inject';
+            script1.src = 'https://cdn.botpress.cloud/webchat/v3.4/inject.js';
+            window.parent.document.head.appendChild(script1);
+            
+            // 2. Config Script (ينتظر تحميل الأول)
+            script1.onload = function() {
+                var script2 = window.parent.document.createElement('script');
+                script2.src = 'https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js';
+                script2.defer = true;
+                window.parent.document.body.appendChild(script2);
+            };
+        }
+    </script>
+    """
+    # نستخدم ارتفاع وعرض 0 حتى لا يؤثر على تنسيق الصفحة، لأنه مجرد كود تشغيل
+    components.html(js_code, height=0, width=0)
+
 # --- 5. Main App ---
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+    
+    # *** تشغيل البوت ***
+    inject_botpress()
 
     if 'target_yield' not in st.session_state: st.session_state.update({'target_yield': 75, 'cost_biomass': 30.0, 'cost_energy': 5.0, 'price_char': 1.20, 'messages': []})
 
@@ -378,11 +409,11 @@ def main():
         st.download_button("Download PDF", pdf, "report.pdf", "application/pdf")
 
     with t4:
-        st.write("Ask the internal AI logic (Note: Botpress is in the bottom right corner).")
-        # Internal simple logic
+        st.write("Ask the AI about your simulation results.")
+        # Internal AI Chat logic
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.write(m["content"])
-        if p := st.chat_input("Ask internal simulation logic..."):
+        if p := st.chat_input("Ask about yield, profit..."):
             st.session_state.messages.append({"role": "user", "content": p})
             with st.chat_message("user"): st.write(p)
             resp = mock_ai_response(p, res, therm)
@@ -399,22 +430,6 @@ def main():
                 st.warning(f"Current: Yield {res['yields_percent'].iloc[0,0]:.1f}%, Energy {res['energy_yield_percent']:.1f}%")
         else:
             st.write("Activate Game Mode in Sidebar.")
-
-    # ------------------ BOTPRESS INTEGRATION (CORRECT WAY) ------------------
-    # يتم وضع هذا الكود في النهاية ليتم تحميله
-    # ملاحظة: Streamlit يضع هذا في iframe، لذلك يجب تحديد طول وعرض مناسبين
-    
-    botpress_html = """
-    <script src="https://cdn.botpress.cloud/webchat/v3.4/inject.js"></script>
-    <script src="https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js" defer></script>
-    """
-    
-    # نستخدم مكون HTML بارتفاع كبير ليسمح بظهور نافذة الشات عند فتحها
-    # يوضع في أسفل الصفحة
-    st.markdown("---")
-    st.subheader("💬 AI Support Bot (Botpress)")
-    st.caption("If the bot icon appears below, click it to chat.")
-    components.html(botpress_html, height=700, width=450)
 
 if __name__ == "__main__":
     main()
