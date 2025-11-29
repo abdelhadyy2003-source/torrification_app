@@ -9,7 +9,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib import colors
-import time
 import streamlit.components.v1 as components  # ضروري لتشغيل البوت
 
 # --- 1. الثوابت الكيميائية والفيزيائية ---
@@ -36,7 +35,7 @@ DRYING_RATE_CONST = 0.05
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 BASE_FC_FACTOR = 0.20
 
-# --- 2. التصميم (عنابي وبيج) ---
+# --- 2. التصميم (عنابي وبيج) + إخفاء قوائم المطورين ---
 GLOBAL_CSS = """
 <style>
     /* ------------------- THEME COLORS ------------------- */
@@ -65,6 +64,7 @@ GLOBAL_CSS = """
     .stSlider > div > div > div > div { background-color: #640d14 !important; }
     .stSelectbox > div > div { color: #640d14; }
 
+    /* Compact Layout */
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
@@ -75,6 +75,7 @@ GLOBAL_CSS = """
         gap: 0.5rem !important;
     }
     
+    /* Metrics Box */
     div[data-testid="stMetric"] {
         background-color: #ffffff;
         border: 2px solid #640d14;
@@ -91,6 +92,7 @@ GLOBAL_CSS = """
         font-size: 14px !important;
     }
 
+    /* Header Box */
     .header-box {
         background: #640d14;
         padding: 20px;
@@ -103,6 +105,7 @@ GLOBAL_CSS = """
     .header-box h1 { color: #f0ebd8 !important; margin: 0; }
     .header-box p { color: #e6e0cc !important; margin: 0; }
 
+    /* Tabs */
     div[data-testid="stTabs"] button {
         color: #640d14 !important;
         font-weight: bold;
@@ -113,6 +116,7 @@ GLOBAL_CSS = """
         border-bottom: 3px solid #640d14 !important;
     }
 
+    /* Buttons */
     .stButton > button {
         background-color: #640d14 !important;
         color: #f0ebd8 !important;
@@ -123,6 +127,7 @@ GLOBAL_CSS = """
         background-color: #801119 !important;
     }
 
+    /* BFD Blocks */
     .bfd-block {
         padding: 10px;
         border-radius: 8px;
@@ -145,6 +150,12 @@ GLOBAL_CSS = """
         background-color: #801119 !important;
         border-radius: 5px;
     }
+
+    /* --- إخفاء قوائم المطورين (الحل لمشكلة الكاش) --- */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
 </style>
 """
 
@@ -275,10 +286,10 @@ def create_pdf(results, thermal, profit):
     buffer.seek(0)
     return buffer
 
-# --- 6. BOTPRESS INJECTION FUNCTION (The Fix) ---
+# --- 6. دالة حقن البوتبريس (لتخطي صندوق الحماية) ---
 def inject_botpress():
     # هذا الكود يستخدم جافا سكريبت للوصول إلى نافذة المتصفح الرئيسية (Parent Window)
-    # وحقن سكربت البوتبريس فيها مباشرة، مما يتجاوز صندوق ستريم لت المعزول
+    # وحقن سكربت البوتبريس فيها مباشرة.
     js_code = """
     <script>
         // دالة للتأكد من عدم تحميل السكربت مرتين
@@ -300,7 +311,7 @@ def inject_botpress():
         }
     </script>
     """
-    # نستخدم ارتفاع وعرض 0 حتى لا يؤثر على تنسيق الصفحة، لأنه مجرد كود تشغيل
+    # نستخدم مكون HTML مخفي لتشغيل السكربت
     components.html(js_code, height=0, width=0)
 
 # --- 5. Main App ---
@@ -409,7 +420,7 @@ def main():
         st.download_button("Download PDF", pdf, "report.pdf", "application/pdf")
 
     with t4:
-        st.write("Ask the AI about your simulation results.")
+        st.write("Ask the internal AI logic about the simulation results.")
         # Internal AI Chat logic
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.write(m["content"])
