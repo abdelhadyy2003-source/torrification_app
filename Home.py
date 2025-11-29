@@ -10,6 +10,32 @@ from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib import colors
 import streamlit.components.v1 as components
+import os
+
+# --- 0. الحل الجذري لمشكلة حرف C والقوائم ---
+# هذه الدالة تقوم بإنشاء ملف إعدادات يجبر التطبيق على وضع "المشاهد" فقط
+# مما يلغي اختصارات المطورين (مثل C لـ Clear Cache) نهائياً
+def kill_developer_hotkeys():
+    if not os.path.exists(".streamlit"):
+        os.makedirs(".streamlit")
+    
+    config_content = """
+[client]
+toolbarMode = "viewer"
+showErrorDetails = false
+
+[ui]
+hideTopBar = true
+"""
+    # كتابة الملف فقط إذا لم يكن موجوداً أو مختلفاً
+    try:
+        with open(".streamlit/config.toml", "w") as f:
+            f.write(config_content)
+    except:
+        pass
+
+# استدعاء الدالة قبل أي شيء
+kill_developer_hotkeys()
 
 # --- 1. الثوابت ---
 R_GAS = 8.314
@@ -87,7 +113,7 @@ GLOBAL_CSS = """
     
     .streamlit-expanderHeader { color: #ffffff !important; background-color: #4a090e !important; border-radius: 5px; }
 
-    /* Hide Developer Menu Visually */
+    /* Hide Developer Elements Visually (Extra Safety) */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -198,15 +224,10 @@ def create_pdf(results, thermal, profit):
     buffer.seek(0)
     return buffer
 
-# --- 4. JavaScript Injections (The Fixes) ---
-
-def inject_fixes():
-    # 1. Botpress Injection
-    # 2. Key Listener to KILL the 'C' shortcut
-    
+# --- 4. Botpress Injection Only (No JS Hack needed for C key anymore) ---
+def inject_botpress():
     js_code = """
     <script>
-        // --- 1. Botpress Inject ---
         if (!window.parent.document.getElementById('botpress-inject')) {
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
@@ -220,24 +241,6 @@ def inject_fixes():
                 window.parent.document.body.appendChild(script2);
             };
         }
-
-        // --- 2. Disable 'C' key shortcut ---
-        window.parent.document.addEventListener('keydown', function(e) {
-            // Check if 'C' is pressed
-            if (e.key === 'c' || e.key === 'C') {
-                // Get the active element (what user is typing in)
-                const active = window.parent.document.activeElement;
-                const tagName = active.tagName.toUpperCase();
-                
-                // If user is NOT in an input field or textarea, KILL the event
-                if (tagName !== 'INPUT' && tagName !== 'TEXTAREA') {
-                    e.stopImmediatePropagation();
-                    e.stopPropagation();
-                    e.preventDefault();
-                    console.log("'C' shortcut blocked by Chemisco.");
-                }
-            }
-        }, true); // Use capture phase to intercept before Streamlit
     </script>
     """
     components.html(js_code, height=0, width=0)
@@ -247,8 +250,7 @@ def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
-    # *** تشغيل الإصلاحات (البوت + تعطيل حرف C) ***
-    inject_fixes()
+    inject_botpress()
 
     if 'target_yield' not in st.session_state: st.session_state.update({'target_yield': 75, 'cost_biomass': 30.0, 'cost_energy': 5.0, 'price_char': 1.20, 'messages': []})
 
