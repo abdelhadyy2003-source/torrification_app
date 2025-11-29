@@ -35,22 +35,33 @@ DRYING_RATE_CONST = 0.05
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 BASE_FC_FACTOR = 0.20
 
-# --- 2. التصميم (عنابي وبيج) + إخفاء قوائم المطورين ---
+# --- 2. التصميم (أسود وعنابي) + إخفاء قوائم المطورين ---
 GLOBAL_CSS = """
 <style>
     /* ------------------- THEME COLORS ------------------- */
+    /* Primary: #640d14 (Burgundy) */
+    /* Background: #000000 (Black) */
+    /* Text: #f0f0f0 (White/Silver) */
+
     .stApp {
-        background-color: #f0ebd8; /* Beige Background */
-        color: #640d14; /* Burgundy Text */
+        background-color: #000000; /* Black Background */
+        color: #f0f0f0; /* White Text */
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
-    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label {
-        color: #640d14 !important;
+    /* Headings (White for contrast against Black) */
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+    }
+    
+    /* Paragraphs and Labels */
+    .stMarkdown, p, label {
+        color: #e0e0e0 !important;
     }
 
+    /* Sidebar Styling (Burgundy Background) */
     section[data-testid="stSidebar"] {
-        background-color: #640d14; /* Burgundy Sidebar */
+        background-color: #640d14; 
     }
     section[data-testid="stSidebar"] h1, 
     section[data-testid="stSidebar"] h2, 
@@ -58,11 +69,12 @@ GLOBAL_CSS = """
     section[data-testid="stSidebar"] p, 
     section[data-testid="stSidebar"] label,
     section[data-testid="stSidebar"] .stMarkdown {
-        color: #f0ebd8 !important; 
+        color: #ffffff !important; 
     }
     
+    /* Input Widgets */
     .stSlider > div > div > div > div { background-color: #640d14 !important; }
-    .stSelectbox > div > div { color: #640d14; }
+    .stSelectbox > div > div { color: #ffffff; }
 
     /* Compact Layout */
     .block-container {
@@ -75,52 +87,53 @@ GLOBAL_CSS = """
         gap: 0.5rem !important;
     }
     
-    /* Metrics Box */
+    /* Metrics Box (Black with Burgundy Border) */
     div[data-testid="stMetric"] {
-        background-color: #ffffff;
+        background-color: #121212; /* Very Dark Grey */
         border: 2px solid #640d14;
         border-radius: 8px;
         padding: 10px;
-        box-shadow: 2px 2px 5px rgba(100, 13, 20, 0.2);
+        box-shadow: 0px 4px 10px rgba(100, 13, 20, 0.4);
     }
     div[data-testid="stMetricValue"] {
-        color: #640d14 !important;
+        color: #ffffff !important;
         font-size: 24px !important;
     }
     div[data-testid="stMetricLabel"] {
-        color: #8c2f39 !important;
+        color: #d97584 !important; /* Lighter Burgundy for Label */
         font-size: 14px !important;
     }
 
     /* Header Box */
     .header-box {
-        background: #640d14;
+        background: #000000;
+        border: 1px solid #640d14;
         padding: 20px;
         border-radius: 10px;
-        color: #f0ebd8;
+        color: #ffffff;
         text-align: center;
         margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 6px rgba(100, 13, 20, 0.3);
     }
-    .header-box h1 { color: #f0ebd8 !important; margin: 0; }
-    .header-box p { color: #e6e0cc !important; margin: 0; }
+    .header-box h1 { color: #ffffff !important; margin: 0; }
+    .header-box p { color: #cccccc !important; margin: 0; }
 
     /* Tabs */
     div[data-testid="stTabs"] button {
-        color: #640d14 !important;
+        color: #cccccc !important;
         font-weight: bold;
         background-color: transparent !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] {
-        color: #640d14 !important;
+        color: #ffffff !important;
         border-bottom: 3px solid #640d14 !important;
     }
 
     /* Buttons */
     .stButton > button {
         background-color: #640d14 !important;
-        color: #f0ebd8 !important;
-        border: none;
+        color: #ffffff !important;
+        border: 1px solid #801119;
         border-radius: 6px;
     }
     .stButton > button:hover {
@@ -132,10 +145,11 @@ GLOBAL_CSS = """
         padding: 10px;
         border-radius: 8px;
         text-align: center;
-        background: #640d14;
-        color: #f0ebd8;
+        background: #121212;
+        border: 1px solid #640d14;
+        color: #ffffff;
         font-weight: bold;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
         font-size: 0.9em;
     }
     .bfd-stream {
@@ -146,8 +160,8 @@ GLOBAL_CSS = """
     }
     
     .streamlit-expanderHeader {
-        color: #f0ebd8 !important;
-        background-color: #801119 !important;
+        color: #ffffff !important;
+        background-color: #4a090e !important; /* Dark Burgundy */
         border-radius: 5px;
     }
 
@@ -292,16 +306,12 @@ def inject_botpress():
     # وحقن سكربت البوتبريس فيها مباشرة.
     js_code = """
     <script>
-        // دالة للتأكد من عدم تحميل السكربت مرتين
         if (!window.parent.document.getElementById('botpress-inject')) {
-            
-            // 1. Inject.js
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
             script1.src = 'https://cdn.botpress.cloud/webchat/v3.4/inject.js';
             window.parent.document.head.appendChild(script1);
             
-            // 2. Config Script (ينتظر تحميل الأول)
             script1.onload = function() {
                 var script2 = window.parent.document.createElement('script');
                 script2.src = 'https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js';
@@ -311,7 +321,6 @@ def inject_botpress():
         }
     </script>
     """
-    # نستخدم مكون HTML مخفي لتشغيل السكربت
     components.html(js_code, height=0, width=0)
 
 # --- 5. Main App ---
@@ -383,7 +392,11 @@ def main():
     # Tabs
     t1, t2, t3, t4, t5 = st.tabs(["📊 Charts", "🌡️ Sensitivity", "📄 Report", "🤖 AI Expert", "🎮 Game"])
     
+    # Updated Color Scale for Dark Mode
     color_scale = ["#640d14", "#8c2f39", "#b3525e", "#d97584"]
+    # Black Background for Plots
+    plot_bg_color = '#000000'
+    text_color = '#ffffff'
     
     with t1:
         cc1, cc2 = st.columns(2)
@@ -391,13 +404,13 @@ def main():
             st.subheader("Product Distribution")
             fig = px.pie(res['yields_percent'].reset_index(), values='Yield (%)', names='index', 
                          color_discrete_sequence=color_scale, hole=0.4)
-            fig.update_layout(paper_bgcolor='#f0ebd8', plot_bgcolor='#f0ebd8', font_color='#640d14')
+            fig.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color)
             st.plotly_chart(fig, use_container_width=True)
         with cc2:
             st.subheader("Solid Composition")
             fig2 = px.bar(res['solid_composition'].reset_index(), x='index', y='Mass (kg)', 
                           color='index', color_discrete_sequence=color_scale)
-            fig2.update_layout(paper_bgcolor='#f0ebd8', plot_bgcolor='#f0ebd8', font_color='#640d14', showlegend=False)
+            fig2.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color, showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
 
     with t2:
@@ -405,13 +418,13 @@ def main():
         c_sens1, c_sens2 = st.columns(2)
         with c_sens1:
             fig_t = px.line(df_T, x="Temp", y="Yield", title="Yield vs Temp", markers=True)
-            fig_t.update_traces(line_color="#640d14")
-            fig_t.update_layout(paper_bgcolor='#f0ebd8', plot_bgcolor='#f0ebd8', font_color='#640d14')
+            fig_t.update_traces(line_color="#d97584") # Lighter line for contrast on black
+            fig_t.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color)
             st.plotly_chart(fig_t, use_container_width=True)
         with c_sens2:
             fig_d = px.line(df_D, x="Duration", y="Yield", title="Yield vs Time", markers=True)
-            fig_d.update_traces(line_color="#640d14")
-            fig_d.update_layout(paper_bgcolor='#f0ebd8', plot_bgcolor='#f0ebd8', font_color='#640d14')
+            fig_d.update_traces(line_color="#d97584")
+            fig_d.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color)
             st.plotly_chart(fig_d, use_container_width=True)
 
     with t3:
