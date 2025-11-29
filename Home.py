@@ -12,9 +12,7 @@ from reportlab.lib import colors
 import streamlit.components.v1 as components
 import os
 
-# --- 0. الحل الجذري لمشكلة حرف C والقوائم ---
-# هذه الدالة تقوم بإنشاء ملف إعدادات يجبر التطبيق على وضع "المشاهد" فقط
-# مما يلغي اختصارات المطورين (مثل C لـ Clear Cache) نهائياً
+# --- 0. Disable Developer Hotkeys (Config File) ---
 def kill_developer_hotkeys():
     if not os.path.exists(".streamlit"):
         os.makedirs(".streamlit")
@@ -23,35 +21,26 @@ def kill_developer_hotkeys():
 [client]
 toolbarMode = "viewer"
 showErrorDetails = false
-
 [ui]
 hideTopBar = true
 """
-    # كتابة الملف فقط إذا لم يكن موجوداً أو مختلفاً
     try:
         with open(".streamlit/config.toml", "w") as f:
             f.write(config_content)
     except:
         pass
 
-# استدعاء الدالة قبل أي شيء
 kill_developer_hotkeys()
 
-# --- 1. الثوابت ---
+# --- 1. Constants ---
 R_GAS = 8.314
 CP_BIOMASS = 1300.0
 CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 TEMP_REF_K = 298.15
-
 HHV_INITIAL = {"Wood": 18.0, "Agricultural Waste": 16.5, "Municipal Waste": 15.0}
 HHV_ENRICHMENT_FACTOR = 1.3
-
-KINETICS = {
-    "Hemicellulose": [1.5e10, 110000],
-    "Cellulose": [1.0e12, 130000],
-    "Lignin": [2.0e9, 100000]
-}
+KINETICS = {"Hemicellulose": [1.5e10, 110000], "Cellulose": [1.0e12, 130000], "Lignin": [2.0e9, 100000]}
 BIOMASS_COMPOSITION = {
     "Wood": {"Hemicellulose": 0.35, "Cellulose": 0.45, "Lignin": 0.20, "Ash": 0.02, "Gas_Factor": 0.40},
     "Agricultural Waste": {"Hemicellulose": 0.45, "Cellulose": 0.35, "Lignin": 0.20, "Ash": 0.08, "Gas_Factor": 0.50},
@@ -61,27 +50,20 @@ DRYING_RATE_CONST = 0.05
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 BASE_FC_FACTOR = 0.20
 
-# --- 2. التصميم (أسود وعنابي) ---
+# --- 2. Styles (Black & Burgundy) ---
 GLOBAL_CSS = """
 <style>
-    /* Theme Colors: #640d14 (Burgundy), #000000 (Black), #f0f0f0 (Text) */
-    .stApp { background-color: #000000; color: #f0f0f0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    /* Theme: Black & Burgundy */
+    .stApp { background-color: #000000; color: #f0f0f0; font-family: 'Segoe UI', sans-serif; }
     h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
     .stMarkdown, p, label { color: #e0e0e0 !important; }
     
-    /* Sidebar */
     section[data-testid="stSidebar"] { background-color: #640d14; }
     section[data-testid="stSidebar"] * { color: #ffffff !important; }
     
-    /* Inputs */
     .stSlider > div > div > div > div { background-color: #640d14 !important; }
     .stSelectbox > div > div { color: #ffffff; }
 
-    /* Layout */
-    .block-container { padding: 2rem 3rem !important; }
-    div[data-testid="column"] { gap: 0.5rem !important; }
-    
-    /* Metrics */
     div[data-testid="stMetric"] {
         background-color: #121212; border: 2px solid #640d14;
         border-radius: 8px; padding: 10px; box-shadow: 0px 4px 10px rgba(100, 13, 20, 0.4);
@@ -89,7 +71,6 @@ GLOBAL_CSS = """
     div[data-testid="stMetricValue"] { color: #ffffff !important; font-size: 24px !important; }
     div[data-testid="stMetricLabel"] { color: #d97584 !important; font-size: 14px !important; }
 
-    /* Header Box */
     .header-box {
         background: #000000; border: 1px solid #640d14; padding: 20px;
         border-radius: 10px; color: #ffffff; text-align: center;
@@ -98,13 +79,12 @@ GLOBAL_CSS = """
     .header-box h1 { color: #ffffff !important; margin: 0; }
     .header-box p { color: #cccccc !important; margin: 0; }
 
-    /* Buttons & Tabs */
     div[data-testid="stTabs"] button { color: #cccccc !important; font-weight: bold; background: transparent !important; }
     div[data-testid="stTabs"] button[aria-selected="true"] { color: #ffffff !important; border-bottom: 3px solid #640d14 !important; }
+    
     .stButton > button { background-color: #640d14 !important; color: #ffffff !important; border: 1px solid #801119; border-radius: 6px; }
     .stButton > button:hover { background-color: #801119 !important; }
 
-    /* BFD */
     .bfd-block {
         padding: 10px; border-radius: 8px; text-align: center; background: #121212;
         border: 1px solid #640d14; color: #ffffff; font-weight: bold; font-size: 0.9em;
@@ -113,15 +93,11 @@ GLOBAL_CSS = """
     
     .streamlit-expanderHeader { color: #ffffff !important; background-color: #4a090e !important; border-radius: 5px; }
 
-    /* Hide Developer Elements Visually (Extra Safety) */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .stDeployButton {display:none;}
+    #MainMenu, footer, header, .stDeployButton {visibility: hidden;}
 </style>
 """
 
-# --- 3. الدوال (Simulation + Logic) ---
+# --- 3. Simulation Logic ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"):
     temp_K = temp_C + 273.15
     comp = BIOMASS_COMPOSITION.get(biomass)
@@ -204,13 +180,6 @@ def run_sensitivity_analysis(biomass, moisture, size, initial_mass_kg, reactor_t
     results_D = [simulate_torrefaction(biomass, moisture, 275, D, size, initial_mass_kg, reactor_type)["yields_percent"].iloc[0,0] for D in D_range]
     return pd.DataFrame({"Temp": T_range, "Yield": results_T}), pd.DataFrame({"Duration": D_range, "Yield": results_D})
 
-def mock_ai_response(prompt, results, thermal):
-    p = results['parameters']
-    summary = f"Simulating {p['biomass']} at {p['temperature']}°C. Yield: {results['yields_percent'].iloc[0,0]:.1f}%. Heat Req: {thermal['Q_total_per_kg']:.1f} kJ/kg."
-    if "optimize" in prompt.lower(): return summary + "\n\n💡 **Optimization:** Reduce duration to 40min to save energy without major yield loss."
-    if "profit" in prompt.lower(): return summary + "\n\n💰 **Finance:** Focus on increasing throughput. The energy cost is currently 20% of OpEx."
-    return summary
-
 def create_pdf(results, thermal, profit):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -224,8 +193,46 @@ def create_pdf(results, thermal, profit):
     buffer.seek(0)
     return buffer
 
-# --- 4. Botpress Injection Only (No JS Hack needed for C key anymore) ---
-def inject_botpress():
+# --- 4. Botpress Logic (Load on Tab Selection) ---
+def inject_botpress_in_tab():
+    # هذا الكود يقوم بعرض البوت داخل التبويب عن طريق iframe
+    # أو يقوم بحقنه ليعمل عند فتح التبويب
+    
+    # 1. تعريف كود التضمين (Embed Code) الخاص بـ Botpress
+    # هنا نستخدم وضع Embed داخل iframe ليظهر داخل التبويب نفسه وليس عائماً
+    # ملاحظة: بعض إصدارات Botpress الجديدة تفضل العائم، لكن سنجرب التضمين هنا.
+    
+    bot_html = """
+    <div style="height: 600px; width: 100%; display: flex; justify-content: center; align-items: center; background-color: #121212; border-radius: 10px; border: 1px solid #640d14;">
+        <p style="color: white; margin-bottom: 20px;">Initializing AI Expert...</p>
+    </div>
+    
+    <script src="https://cdn.botpress.cloud/webchat/v3.4/inject.js"></script>
+    <script src="https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js" defer></script>
+    
+    <script>
+        // محاولة فتح البوت تلقائياً عند التحميل
+        window.botpressWebChat.onEvent(function (event) {
+            if (event.type === 'LIFECYCLE.LOADED') {
+                window.botpressWebChat.sendEvent({ type: 'show' });
+            }
+        });
+    </script>
+    """
+    
+    # التعليمات للمستخدم
+    st.info("💡 The AI Expert Bot is located at the bottom-right corner of your screen.")
+    st.markdown("Use the floating chat bubble 💬 to ask questions about optimization, chemistry, or finance.")
+    
+    # نقوم بحقن السكربت العام في الصفحة لضمان ظهور الفقاعة
+    # (تم نقل الحقن ليكون عاماً لضمان العمل، لكن الرسالة هنا للتوضيح)
+
+# --- 5. Main App ---
+def main():
+    st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+    
+    # *** حقن البوت عالمياً ليظهر دائماً ***
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
@@ -245,14 +252,7 @@ def inject_botpress():
     """
     components.html(js_code, height=0, width=0)
 
-# --- 5. Main App ---
-def main():
-    st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
-    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
-    
-    inject_botpress()
-
-    if 'target_yield' not in st.session_state: st.session_state.update({'target_yield': 75, 'cost_biomass': 30.0, 'cost_energy': 5.0, 'price_char': 1.20, 'messages': []})
+    if 'target_yield' not in st.session_state: st.session_state.update({'target_yield': 75, 'cost_biomass': 30.0, 'cost_energy': 5.0, 'price_char': 1.20})
 
     with st.sidebar:
         st.markdown("""<div class="header-box"><h1>CHEMISCO</h1><p>Torrefaction Simulator</p></div>""", unsafe_allow_html=True)
@@ -298,6 +298,7 @@ def main():
     
     st.markdown("---")
 
+    # --- TABS CONFIGURATION ---
     t1, t2, t3, t4, t5 = st.tabs(["📊 Charts", "🌡️ Sensitivity", "📄 Report", "🤖 AI Expert", "🎮 Game"])
     color_scale = ["#640d14", "#8c2f39", "#b3525e", "#d97584"]
     plot_bg = '#000000'
@@ -335,16 +336,22 @@ def main():
         pdf = create_pdf(res, therm, profit)
         st.download_button("Download PDF", pdf, "report.pdf", "application/pdf")
 
+    # --- TAB 4: REPLACED WITH BOTPRESS INSTRUCTION ---
     with t4:
-        st.write("Ask the internal AI logic about results.")
-        for m in st.session_state.messages:
-            with st.chat_message(m["role"]): st.write(m["content"])
-        if p := st.chat_input("Ask about yield, profit..."):
-            st.session_state.messages.append({"role": "user", "content": p})
-            with st.chat_message("user"): st.write(p)
-            resp = mock_ai_response(p, res, therm)
-            with st.chat_message("assistant"): st.write(resp)
-            st.session_state.messages.append({"role": "assistant", "content": resp})
+        st.markdown("### 🤖 Chemisco AI Assistant")
+        st.markdown("""
+        <div style="background-color: #121212; padding: 20px; border-radius: 10px; border-left: 5px solid #640d14;">
+            <h4 style="color: #ffffff; margin:0;">AI Support Active</h4>
+            <p style="color: #cccccc;">We have integrated the advanced <strong>Botpress AI</strong> directly into Chemisco.</p>
+            <hr style="border-color: #333;">
+            <p style="color: #ffffff; font-weight: bold;">👉 Please look at the bottom-right corner of your screen.</p>
+            <p style="color: #cccccc;">Click on the floating chat icon to start talking with the AI Expert about your simulation results, mass balance, or optimization strategies.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Spacer to push layout
+        st.write("")
+        st.image("https://cdn.botpress.cloud/webchat/v1/botpress-logo.png", width=50)
 
     with t5:
         if game_mode:
