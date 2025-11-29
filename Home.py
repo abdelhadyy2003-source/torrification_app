@@ -9,9 +9,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 from reportlab.lib import colors
-import streamlit.components.v1 as components  # ضروري لتشغيل البوت
+import streamlit.components.v1 as components
 
-# --- 1. الثوابت الكيميائية والفيزيائية ---
+# --- 1. الثوابت ---
 R_GAS = 8.314
 CP_BIOMASS = 1300.0
 CP_WATER = 4180.0
@@ -35,137 +35,59 @@ DRYING_RATE_CONST = 0.05
 SIZE_FACTOR = {"Fine (<1mm)": 1.0, "Medium (1-5mm)": 0.85, "Coarse (>5mm)": 0.65}
 BASE_FC_FACTOR = 0.20
 
-# --- 2. التصميم (أسود وعنابي) + إخفاء قوائم المطورين ---
+# --- 2. التصميم (أسود وعنابي) ---
 GLOBAL_CSS = """
 <style>
-    /* ------------------- THEME COLORS ------------------- */
-    /* Primary: #640d14 (Burgundy) */
-    /* Background: #000000 (Black) */
-    /* Text: #f0f0f0 (White/Silver) */
-
-    .stApp {
-        background-color: #000000; /* Black Background */
-        color: #f0f0f0; /* White Text */
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    /* Headings (White for contrast against Black) */
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-    }
+    /* Theme Colors: #640d14 (Burgundy), #000000 (Black), #f0f0f0 (Text) */
+    .stApp { background-color: #000000; color: #f0f0f0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
+    .stMarkdown, p, label { color: #e0e0e0 !important; }
     
-    /* Paragraphs and Labels */
-    .stMarkdown, p, label {
-        color: #e0e0e0 !important;
-    }
-
-    /* Sidebar Styling (Burgundy Background) */
-    section[data-testid="stSidebar"] {
-        background-color: #640d14; 
-    }
-    section[data-testid="stSidebar"] h1, 
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3, 
-    section[data-testid="stSidebar"] p, 
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] .stMarkdown {
-        color: #ffffff !important; 
-    }
+    /* Sidebar */
+    section[data-testid="stSidebar"] { background-color: #640d14; }
+    section[data-testid="stSidebar"] * { color: #ffffff !important; }
     
-    /* Input Widgets */
+    /* Inputs */
     .stSlider > div > div > div > div { background-color: #640d14 !important; }
     .stSelectbox > div > div { color: #ffffff; }
 
-    /* Compact Layout */
-    .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 2rem !important;
-        padding-left: 3rem !important;
-        padding-right: 3rem !important;
-    }
-    div[data-testid="column"] {
-        gap: 0.5rem !important;
-    }
+    /* Layout */
+    .block-container { padding: 2rem 3rem !important; }
+    div[data-testid="column"] { gap: 0.5rem !important; }
     
-    /* Metrics Box (Black with Burgundy Border) */
+    /* Metrics */
     div[data-testid="stMetric"] {
-        background-color: #121212; /* Very Dark Grey */
-        border: 2px solid #640d14;
-        border-radius: 8px;
-        padding: 10px;
-        box-shadow: 0px 4px 10px rgba(100, 13, 20, 0.4);
+        background-color: #121212; border: 2px solid #640d14;
+        border-radius: 8px; padding: 10px; box-shadow: 0px 4px 10px rgba(100, 13, 20, 0.4);
     }
-    div[data-testid="stMetricValue"] {
-        color: #ffffff !important;
-        font-size: 24px !important;
-    }
-    div[data-testid="stMetricLabel"] {
-        color: #d97584 !important; /* Lighter Burgundy for Label */
-        font-size: 14px !important;
-    }
+    div[data-testid="stMetricValue"] { color: #ffffff !important; font-size: 24px !important; }
+    div[data-testid="stMetricLabel"] { color: #d97584 !important; font-size: 14px !important; }
 
     /* Header Box */
     .header-box {
-        background: #000000;
-        border: 1px solid #640d14;
-        padding: 20px;
-        border-radius: 10px;
-        color: #ffffff;
-        text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(100, 13, 20, 0.3);
+        background: #000000; border: 1px solid #640d14; padding: 20px;
+        border-radius: 10px; color: #ffffff; text-align: center;
+        margin-bottom: 20px; box-shadow: 0 4px 6px rgba(100, 13, 20, 0.3);
     }
     .header-box h1 { color: #ffffff !important; margin: 0; }
     .header-box p { color: #cccccc !important; margin: 0; }
 
-    /* Tabs */
-    div[data-testid="stTabs"] button {
-        color: #cccccc !important;
-        font-weight: bold;
-        background-color: transparent !important;
-    }
-    div[data-testid="stTabs"] button[aria-selected="true"] {
-        color: #ffffff !important;
-        border-bottom: 3px solid #640d14 !important;
-    }
+    /* Buttons & Tabs */
+    div[data-testid="stTabs"] button { color: #cccccc !important; font-weight: bold; background: transparent !important; }
+    div[data-testid="stTabs"] button[aria-selected="true"] { color: #ffffff !important; border-bottom: 3px solid #640d14 !important; }
+    .stButton > button { background-color: #640d14 !important; color: #ffffff !important; border: 1px solid #801119; border-radius: 6px; }
+    .stButton > button:hover { background-color: #801119 !important; }
 
-    /* Buttons */
-    .stButton > button {
-        background-color: #640d14 !important;
-        color: #ffffff !important;
-        border: 1px solid #801119;
-        border-radius: 6px;
-    }
-    .stButton > button:hover {
-        background-color: #801119 !important;
-    }
-
-    /* BFD Blocks */
+    /* BFD */
     .bfd-block {
-        padding: 10px;
-        border-radius: 8px;
-        text-align: center;
-        background: #121212;
-        border: 1px solid #640d14;
-        color: #ffffff;
-        font-weight: bold;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-        font-size: 0.9em;
+        padding: 10px; border-radius: 8px; text-align: center; background: #121212;
+        border: 1px solid #640d14; color: #ffffff; font-weight: bold; font-size: 0.9em;
     }
-    .bfd-stream {
-        color: #640d14;
-        font-size: 20px;
-        padding-top: 10px;
-        text-align: center;
-    }
+    .bfd-stream { color: #640d14; font-size: 20px; padding-top: 10px; text-align: center; }
     
-    .streamlit-expanderHeader {
-        color: #ffffff !important;
-        background-color: #4a090e !important; /* Dark Burgundy */
-        border-radius: 5px;
-    }
+    .streamlit-expanderHeader { color: #ffffff !important; background-color: #4a090e !important; border-radius: 5px; }
 
-    /* --- إخفاء قوائم المطورين (الحل لمشكلة الكاش) --- */
+    /* Hide Developer Menu Visually */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -173,24 +95,20 @@ GLOBAL_CSS = """
 </style>
 """
 
-# --- 3. Simulation Logic ---
+# --- 3. الدوال (Simulation + Logic) ---
 def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial_mass_kg, reactor_type="N/A"):
     temp_K = temp_C + 273.15
     comp = BIOMASS_COMPOSITION.get(biomass)
     R_GAS_LOCAL = R_GAS 
-    
     initial_moisture_frac = moisture / 100
     initial_ash_frac = comp["Ash"]
     daf_frac = 1.0 - initial_moisture_frac - initial_ash_frac
-    
     m_h_init = comp["Hemicellulose"] * daf_frac
     m_c_init = comp["Cellulose"] * daf_frac
     m_l_init = comp["Lignin"] * daf_frac
     initial_mass_fixed_carbon_daf = daf_frac * BASE_FC_FACTOR 
-    
     k_drying = DRYING_RATE_CONST * SIZE_FACTOR.get(size)
     size_factor_val = SIZE_FACTOR.get(size)
-    
     k_h_eff = KINETICS["Hemicellulose"][0] * np.exp(-KINETICS["Hemicellulose"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
     k_c_eff = KINETICS["Cellulose"][0] * np.exp(-KINETICS["Cellulose"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
     k_l_eff = KINETICS["Lignin"][0] * np.exp(-KINETICS["Lignin"][1] / (R_GAS_LOCAL * temp_K)) * size_factor_val
@@ -212,44 +130,25 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
     final_h_remaining = sol[:, 1][-1]
     final_c_remaining = sol[:, 2][-1]
     final_l_remaining = sol[:, 3][-1]
-    
     lost_h_frac = m_h_init - final_h_remaining
     lost_c_frac = m_c_init - final_c_remaining
     lost_l_frac = m_l_init - final_l_remaining
     total_volatiles_lost_frac = lost_h_frac + lost_c_frac + lost_l_frac
-
     mass_ash_kg = initial_mass_kg * initial_ash_frac
     mass_fixed_carbon_kg = initial_mass_kg * initial_mass_fixed_carbon_daf
     mass_remaining_components = (final_h_remaining + final_c_remaining + final_l_remaining) * initial_mass_kg
-
     mass_biochar_total = mass_fixed_carbon_kg + mass_remaining_components + mass_ash_kg
     final_solid_yield_percent = (mass_biochar_total / initial_mass_kg) * 100
-    
     mass_moisture_loss_kg = (initial_moisture_frac - final_moisture_remaining) * initial_mass_kg
     mass_non_condensable_gas_kg = total_volatiles_lost_frac * initial_mass_kg * comp["Gas_Factor"] 
     mass_bio_oil_kg = total_volatiles_lost_frac * initial_mass_kg * (1 - comp["Gas_Factor"]) 
 
-    yields_percent = pd.DataFrame({
-        "Yield (%)": [
-            final_solid_yield_percent,
-            (mass_moisture_loss_kg / initial_mass_kg) * 100,
-            (mass_bio_oil_kg / initial_mass_kg) * 100,
-            (mass_non_condensable_gas_kg / initial_mass_kg) * 100
-        ]
-    }, index=["Biochar", "Water Vapor", "Bio-Oil", "Gases"])
-    
-    yields_mass = pd.DataFrame({
-        "Mass (kg)": [mass_biochar_total, mass_moisture_loss_kg, mass_bio_oil_kg, mass_non_condensable_gas_kg]
-    }, index=["Biochar", "Water Vapor", "Bio-Oil", "Gases"])
-
-    solid_composition = pd.DataFrame({
-        "Mass (kg)": [mass_fixed_carbon_kg, mass_remaining_components, mass_ash_kg]
-    }, index=["Fixed Carbon", "Volatile Matter", "Ash"])
-
+    yields_percent = pd.DataFrame({"Yield (%)": [final_solid_yield_percent, (mass_moisture_loss_kg / initial_mass_kg) * 100, (mass_bio_oil_kg / initial_mass_kg) * 100, (mass_non_condensable_gas_kg / initial_mass_kg) * 100]}, index=["Biochar", "Water Vapor", "Bio-Oil", "Gases"])
+    yields_mass = pd.DataFrame({"Mass (kg)": [mass_biochar_total, mass_moisture_loss_kg, mass_bio_oil_kg, mass_non_condensable_gas_kg]}, index=["Biochar", "Water Vapor", "Bio-Oil", "Gases"])
+    solid_composition = pd.DataFrame({"Mass (kg)": [mass_fixed_carbon_kg, mass_remaining_components, mass_ash_kg]}, index=["Fixed Carbon", "Volatile Matter", "Ash"])
     final_ash_percent = (mass_ash_kg / mass_biochar_total) * 100
     initial_hhv_mj_kg = HHV_INITIAL.get(biomass, 17.0) 
     biochar_hhv_mj_kg = initial_hhv_mj_kg * HHV_ENRICHMENT_FACTOR 
-    
     initial_energy_mj = initial_mass_kg * initial_hhv_mj_kg * (1 - initial_moisture_frac)
     final_biochar_energy_mj = mass_biochar_total * biochar_hhv_mj_kg
     energy_yield_percent = (final_biochar_energy_mj / initial_energy_mj) * 100
@@ -259,8 +158,7 @@ def simulate_torrefaction(biomass, moisture, temp_C, duration_min, size, initial
         "final_ash_percent": final_ash_percent, "initial_hhv": initial_hhv_mj_kg,
         "biochar_hhv": biochar_hhv_mj_kg, "energy_yield_percent": energy_yield_percent,
         "parameters": {"biomass": biomass, "moisture": moisture, "temperature": temp_C, "duration": duration_min, "size": size, "initial_mass": initial_mass_kg, "reactor": reactor_type},
-        "mass_moisture_loss_kg": mass_moisture_loss_kg,
-        "mass_dry_biomass_kg": initial_mass_kg * daf_frac, 
+        "mass_moisture_loss_kg": mass_moisture_loss_kg, "mass_dry_biomass_kg": initial_mass_kg * daf_frac, 
     }
 
 def calculate_thermal_balance(p, results):
@@ -300,12 +198,15 @@ def create_pdf(results, thermal, profit):
     buffer.seek(0)
     return buffer
 
-# --- 6. دالة حقن البوتبريس (لتخطي صندوق الحماية) ---
-def inject_botpress():
-    # هذا الكود يستخدم جافا سكريبت للوصول إلى نافذة المتصفح الرئيسية (Parent Window)
-    # وحقن سكربت البوتبريس فيها مباشرة.
+# --- 4. JavaScript Injections (The Fixes) ---
+
+def inject_fixes():
+    # 1. Botpress Injection
+    # 2. Key Listener to KILL the 'C' shortcut
+    
     js_code = """
     <script>
+        // --- 1. Botpress Inject ---
         if (!window.parent.document.getElementById('botpress-inject')) {
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
@@ -319,6 +220,24 @@ def inject_botpress():
                 window.parent.document.body.appendChild(script2);
             };
         }
+
+        // --- 2. Disable 'C' key shortcut ---
+        window.parent.document.addEventListener('keydown', function(e) {
+            // Check if 'C' is pressed
+            if (e.key === 'c' || e.key === 'C') {
+                // Get the active element (what user is typing in)
+                const active = window.parent.document.activeElement;
+                const tagName = active.tagName.toUpperCase();
+                
+                // If user is NOT in an input field or textarea, KILL the event
+                if (tagName !== 'INPUT' && tagName !== 'TEXTAREA') {
+                    e.stopImmediatePropagation();
+                    e.stopPropagation();
+                    e.preventDefault();
+                    console.log("'C' shortcut blocked by Chemisco.");
+                }
+            }
+        }, true); // Use capture phase to intercept before Streamlit
     </script>
     """
     components.html(js_code, height=0, width=0)
@@ -328,49 +247,39 @@ def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     
-    # *** تشغيل البوت ***
-    inject_botpress()
+    # *** تشغيل الإصلاحات (البوت + تعطيل حرف C) ***
+    inject_fixes()
 
     if 'target_yield' not in st.session_state: st.session_state.update({'target_yield': 75, 'cost_biomass': 30.0, 'cost_energy': 5.0, 'price_char': 1.20, 'messages': []})
 
-    # Sidebar
     with st.sidebar:
         st.markdown("""<div class="header-box"><h1>CHEMISCO</h1><p>Torrefaction Simulator</p></div>""", unsafe_allow_html=True)
         st.header("⚙️ Inputs")
         reactor = st.selectbox("Reactor", ["Rotary Drum", "Fluidized Bed", "Screw Reactor", "Fixed Bed"])
-        
         with st.expander("🌲 Feedstock", expanded=True):
             mass = st.number_input("Mass (kg)", 1.0, 1000.0, 100.0, 10.0)
             biomass = st.selectbox("Type", list(BIOMASS_COMPOSITION.keys()))
             moisture = st.slider("Moisture (%)", 0.0, 50.0, 10.0)
             size = st.selectbox("Size", list(SIZE_FACTOR.keys()))
-            
         with st.expander("🔥 Process", expanded=True):
             temp = st.slider("Temp (°C)", 200, 350, 275)
             time_min = st.slider("Time (min)", 10, 120, 45)
-            
         with st.expander("💰 Economics", expanded=False):
             st.session_state.cost_biomass = st.number_input("Feed ($/ton)", value=st.session_state.cost_biomass)
             st.session_state.cost_energy = st.number_input("Energy ($/hr)", value=st.session_state.cost_energy)
             st.session_state.price_char = st.number_input("Price ($/kg)", value=st.session_state.price_char)
-            
         game_mode = st.checkbox("🎮 Plant Manager Mode")
 
-    # Run Simulation
     res = simulate_torrefaction(biomass, moisture, temp, time_min, size, mass, reactor)
     therm = calculate_thermal_balance(res['parameters'], res)
-    
-    # Financials
     cost_feed = (mass/1000)*st.session_state.cost_biomass
     cost_ops = (time_min/60)*st.session_state.cost_energy
     rev = res['yields_mass'].iloc[0,0] * st.session_state.price_char
     profit = rev - (cost_feed + cost_ops)
 
-    # UI Layout
     st.title("CHEMISCO: Advanced Dashboard")
-    
-    # BFD (Process Flow)
     st.markdown("---")
+    
     c1, c2, c3, c4, c5 = st.columns([1.5, 0.5, 1.5, 0.5, 1.5])
     with c1: st.markdown(f'<div class="bfd-block">FEED<br>{mass} kg</div>', unsafe_allow_html=True)
     with c2: st.markdown('<div class="bfd-stream">➜</div>', unsafe_allow_html=True)
@@ -379,8 +288,6 @@ def main():
     with c5: st.markdown(f'<div class="bfd-block">BIOCHAR<br>{res["yields_mass"].iloc[0,0]:.1f} kg</div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    
-    # KPIs
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Mass Yield", f"{res['yields_percent'].iloc[0,0]:.1f}%", f"{res['yields_mass'].iloc[0,0]:.1f} kg")
     k2.metric("Energy Yield", f"{res['energy_yield_percent']:.1f}%", f"HHV: {res['biochar_hhv']:.1f}")
@@ -389,28 +296,22 @@ def main():
     
     st.markdown("---")
 
-    # Tabs
     t1, t2, t3, t4, t5 = st.tabs(["📊 Charts", "🌡️ Sensitivity", "📄 Report", "🤖 AI Expert", "🎮 Game"])
-    
-    # Updated Color Scale for Dark Mode
     color_scale = ["#640d14", "#8c2f39", "#b3525e", "#d97584"]
-    # Black Background for Plots
-    plot_bg_color = '#000000'
-    text_color = '#ffffff'
+    plot_bg = '#000000'
+    txt_col = '#ffffff'
     
     with t1:
         cc1, cc2 = st.columns(2)
         with cc1:
             st.subheader("Product Distribution")
-            fig = px.pie(res['yields_percent'].reset_index(), values='Yield (%)', names='index', 
-                         color_discrete_sequence=color_scale, hole=0.4)
-            fig.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color)
+            fig = px.pie(res['yields_percent'].reset_index(), values='Yield (%)', names='index', color_discrete_sequence=color_scale, hole=0.4)
+            fig.update_layout(paper_bgcolor=plot_bg, plot_bgcolor=plot_bg, font_color=txt_col)
             st.plotly_chart(fig, use_container_width=True)
         with cc2:
             st.subheader("Solid Composition")
-            fig2 = px.bar(res['solid_composition'].reset_index(), x='index', y='Mass (kg)', 
-                          color='index', color_discrete_sequence=color_scale)
-            fig2.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color, showlegend=False)
+            fig2 = px.bar(res['solid_composition'].reset_index(), x='index', y='Mass (kg)', color='index', color_discrete_sequence=color_scale)
+            fig2.update_layout(paper_bgcolor=plot_bg, plot_bgcolor=plot_bg, font_color=txt_col, showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
 
     with t2:
@@ -418,13 +319,13 @@ def main():
         c_sens1, c_sens2 = st.columns(2)
         with c_sens1:
             fig_t = px.line(df_T, x="Temp", y="Yield", title="Yield vs Temp", markers=True)
-            fig_t.update_traces(line_color="#d97584") # Lighter line for contrast on black
-            fig_t.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color)
+            fig_t.update_traces(line_color="#d97584")
+            fig_t.update_layout(paper_bgcolor=plot_bg, plot_bgcolor=plot_bg, font_color=txt_col)
             st.plotly_chart(fig_t, use_container_width=True)
         with c_sens2:
             fig_d = px.line(df_D, x="Duration", y="Yield", title="Yield vs Time", markers=True)
             fig_d.update_traces(line_color="#d97584")
-            fig_d.update_layout(paper_bgcolor=plot_bg_color, plot_bgcolor=plot_bg_color, font_color=text_color)
+            fig_d.update_layout(paper_bgcolor=plot_bg, plot_bgcolor=plot_bg, font_color=txt_col)
             st.plotly_chart(fig_d, use_container_width=True)
 
     with t3:
@@ -433,8 +334,7 @@ def main():
         st.download_button("Download PDF", pdf, "report.pdf", "application/pdf")
 
     with t4:
-        st.write("Ask the internal AI logic about the simulation results.")
-        # Internal AI Chat logic
+        st.write("Ask the internal AI logic about results.")
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.write(m["content"])
         if p := st.chat_input("Ask about yield, profit..."):
