@@ -413,27 +413,13 @@ def main():
         # Fallback if image not found
         st.markdown("<div style='height: 5px; background-color: #00743c; margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
-    # 2. Header Section (Logo + Title) - "Original Place"
-    # --- MODIFICATION: Adjusted Ratio to [0.6, 4] to squeeze logo column and bring text closer ---
-    c_logo, c_title = st.columns([0.6, 4])
-    
-    with c_logo:
-        # Use logo.png if available, else fallback online
-        if os.path.exists("logo.png"):
-            # --- MODIFICATION: Increased width to 300 ---
-            st.image("logo.png", width=300)
-        else:
-            # --- MODIFICATION: Increased width to 300 ---
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=300) 
-        
-    with c_title:
-        # --- MODIFICATION: Increased negative margin to -50px ---
-        st.markdown("""
-            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 15px; margin-left: -50px;">
-                <h1 style="margin-bottom: 0; color: #00743c; font-size: 42px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
-                <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1px;">TORREFACTION SIMULATOR</p>
-            </div>
-        """, unsafe_allow_html=True)
+    # 2. Header Section (Logo + Title) - MODIFIED: Logo Removed, Text Centered
+    st.markdown("""
+        <div style="text-align: center; padding-top: 10px; margin-bottom: 20px;">
+            <h1 style="margin-bottom: 0; color: #00743c; font-size: 48px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
+            <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1.5px;">TORREFACTION SIMULATOR</p>
+        </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
     
