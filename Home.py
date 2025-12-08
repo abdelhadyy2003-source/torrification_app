@@ -9,7 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from io import BytesIO
 from reportlab.lib import colors
-from datetime import datetime
+from datetime import datetime, timedelta # Added timedelta
 import math
 import random 
 import streamlit.components.v1 as components 
@@ -181,7 +181,7 @@ def get_time_series(mass_in, moisture_pct, ash_pct_dry, temp_c, time_min, params
         })
     return pd.DataFrame(data)
 
-# --- 4. Professional PDF Generator (RE-WRITTEN FOR QUALITY) ---
+# --- 4. Professional PDF Generator (FIXED TIME & LABELS) ---
 def create_pdf(res, profit, fig1, fig2):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -193,16 +193,16 @@ def create_pdf(res, profit, fig1, fig2):
     DARK_GREY = colors.HexColor('#333333')
     LIGHT_GREY_BG = colors.HexColor('#f5f5f5')
     
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+    # --- FIX 1: Time Adjustment (Adding 2 hours for Egypt Time / Server Correction) ---
+    current_time = (datetime.utcnow() + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
 
-    # --- 1. PROFESSIONAL HEADER ---
-    # Logo text and Subtitle
+    # --- 1. HEADER ---
     title_style = ParagraphStyle(name='MainTitle', fontName='Helvetica-Bold', fontSize=22, textColor=CHEMISCO_GREEN, alignment=0)
     subtitle_style = ParagraphStyle(name='SubTitle', fontName='Helvetica', fontSize=10, textColor=colors.grey, alignment=0)
     date_style = ParagraphStyle(name='DateText', fontName='Helvetica', fontSize=10, textColor=colors.black, alignment=2)
 
     header_data = [
-        [Paragraph("CHEMISCO", title_style), Paragraph(f"Report Generated: {current_time}", date_style)],
+        [Paragraph("CHEMISCO", title_style), Paragraph(f"Report Date: {current_time}", date_style)],
         [Paragraph("Advanced Torrefaction Simulation Report", subtitle_style), ""]
     ]
     
@@ -215,11 +215,10 @@ def create_pdf(res, profit, fig1, fig2):
     story.append(t_header)
     story.append(Spacer(1, 20))
 
-    # --- 2. EXECUTIVE SUMMARY (RESULTS TABLE) ---
+    # --- 2. RESULTS TABLE ---
     story.append(Paragraph("1. Simulation Results", styles['Heading2']))
     story.append(Spacer(1, 10))
 
-    # Data for the table with clearer labels
     table_data = [
         ["KPI / Metric", "Value", "Unit", "Notes"],
         ["Biochar Yield (Mass)", f"{res['mass_yield_pct']:.1f}", "%", f"{res['char_kg']:.1f} kg recovered"],
@@ -234,33 +233,48 @@ def create_pdf(res, profit, fig1, fig2):
         ('BACKGROUND', (0,0), (-1,0), CHEMISCO_GREEN),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('ALIGN', (1,0), (1,-1), 'CENTER'), # Center values
+        ('ALIGN', (1,0), (1,-1), 'CENTER'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('FONTSIZE', (0,0), (-1,0), 11),
         ('BOTTOMPADDING', (0,0), (-1,0), 10),
         ('TOPPADDING', (0,0), (-1,0), 10),
-        # Alternating Rows
         ('BACKGROUND', (0,1), (-1,-1), colors.white),
         ('ROWBACKGROUNDS', (1, 1), (-1, -1), [colors.white, LIGHT_GREY_BG]),
         ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-        ('FONTNAME', (0,1), (0,-1), 'Helvetica-Bold'), # Bold first column
+        ('FONTNAME', (0,1), (0,-1), 'Helvetica-Bold'),
     ]))
     story.append(t_results)
     story.append(Spacer(1, 25))
 
-    # --- 3. CHARTS VISUALIZATION ---
+    # --- 3. CHARTS ---
     story.append(Paragraph("2. Process Analytics", styles['Heading2']))
     story.append(Spacer(1, 10))
 
     def add_plot_to_pdf(fig, title, width=6*inch, height=3.2*inch):
         try:
-            # Force white background for PDF clarity (regardless of dark mode app)
+            # --- FIX 2: FORCE CHART STYLING FOR PDF (White BG, Black Text) ---
             fig.update_layout(
                 paper_bgcolor="white", 
                 plot_bgcolor="white", 
-                font=dict(color="black", size=14),
-                title=dict(font=dict(color="#00743c"))
+                font=dict(color="black", size=12, family="Helvetica"), # Force black font globally
+                title=dict(font=dict(color="#00743c")),
+                # Explicitly set Axis colors to black to appear on white paper
+                xaxis=dict(
+                    title_font=dict(color="black"), 
+                    tickfont=dict(color="black"),
+                    showgrid=False
+                ),
+                yaxis=dict(
+                    title_font=dict(color="black"), 
+                    tickfont=dict(color="black"),
+                    showgrid=True,
+                    gridcolor="#eeeeee"
+                ),
+                legend=dict(font=dict(color="black"))
             )
+            # Make text on bars black explicitly
+            fig.update_traces(textfont=dict(color="black"))
+            
             img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
             story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
             story.append(Spacer(1, 5))
@@ -269,6 +283,9 @@ def create_pdf(res, profit, fig1, fig2):
         except Exception:
             story.append(Paragraph(f"<font color=red>Image Render Error: {title}. Install 'kaleido'.</font>", styles['Normal']))
 
+    # Update Chart 2 (Bar Chart) specifically to show text values
+    fig2.update_traces(texttemplate='%{y:.1f}', textposition='auto') # Add values on top of bars
+    
     add_plot_to_pdf(fig1, "Figure A: Mass Balance Distribution")
     add_plot_to_pdf(fig2, "Figure B: Solid Composition Analysis")
 
