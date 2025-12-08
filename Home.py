@@ -24,88 +24,80 @@ HHV_DRY_INITIAL_DEFAULT = 18.0
 # --- 2. Styles ---
 GLOBAL_CSS = """
 <style>
-    /* Main Background */
-    .stApp { background-color: #F5F7F8; font-family: 'Segoe UI', sans-serif; }
+    /* Main Background - لون فاتح ونقي */
+    .stApp { background-color: #F1F8E9; font-family: 'Segoe UI', sans-serif; }
     
-    /* --- SIDEBAR STYLING (IMPROVED COORDINATION) --- */
+    /* --- SIDEBAR STYLING (Lighter & Professional Gradient) --- */
     section[data-testid="stSidebar"] { 
-        /* تدرج لوني يعطي فخامة بدلاً من اللون المصمت */
-        background: linear-gradient(180deg, #1A3C34 0%, #0F2822 100%);
-        border-right: 1px solid rgba(255,255,255,0.1);
+        /* تدرج أخضر أفتح وأكثر حيوية (Emerald to Forest Green) */
+        background: linear-gradient(180deg, #43A047 0%, #2E7D32 100%);
+        border-right: 1px solid rgba(255,255,255,0.2);
     }
     
-    /* 1. تنسيق العناوين في السايد بار لتكون بلون التمييز (Teal) */
+    /* تنسيق النصوص في السايد بار */
     section[data-testid="stSidebar"] h1, 
     section[data-testid="stSidebar"] h2, 
     section[data-testid="stSidebar"] h3 { 
-        color: #26A69A !important; 
+        color: #FFFFFF !important; 
         font-weight: 800;
-        letter-spacing: 0.5px;
+        text-shadow: 0px 1px 2px rgba(0,0,0,0.1);
     }
-
-    /* 2. النصوص العادية والـ Labels تظل بيضاء للقراءة */
+    
     section[data-testid="stSidebar"] label, 
     section[data-testid="stSidebar"] .stMarkdown,
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] span,
     section[data-testid="stSidebar"] div[data-testid="stTickBar"] > div,
-    section[data-testid="stSidebar"] div[data-testid="stThumbValue"] { 
+    section[data-testid="stSidebar"] div[data-testid="stThumbValue"],
+    section[data-testid="stSidebar"] .stSlider div { 
         color: #FFFFFF !important; 
     }
 
-    /* 3. تنسيق مربعات الإدخال (أبيض وكتابة سوداء) */
-    section[data-testid="stSidebar"] input {
-        color: #000000 !important;
-        background-color: #ffffff !important;
-        border-radius: 5px;
-    }
+    /* تنسيق القوائم المنسدلة */
     section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
         color: #000000 !important;
         background-color: #ffffff !important;
-        border-radius: 5px;
+        border-radius: 8px;
     }
     
-    /* تنسيق العناوين الفرعية للإكسباندر */
+    /* تنسيق الـ Expanders ليكون شكلها مندمج مع الخلفية الجديدة */
     section[data-testid="stSidebar"] .streamlit-expanderHeader {
+        background-color: rgba(255, 255, 255, 0.15) !important;
         color: #FFFFFF !important;
+        border-radius: 6px;
         font-weight: 600;
-        background-color: rgba(255,255,255,0.05); /* خلفية شفافة خفيفة */
-        border-radius: 5px;
-        margin-bottom: 5px;
     }
 
     /* --- REST OF STYLES --- */
-    h1, h2, h3 { color: #1A3C34 !important; font-weight: 800; }
+    h1, h2, h3 { color: #2E7D32 !important; font-weight: 800; }
     
-    div[data-testid="stTabs"] button { color: #546E7A !important; font-weight: 600; font-size: 16px; }
+    /* Tabs styling */
+    div[data-testid="stTabs"] button { color: #558B2F !important; font-weight: 600; font-size: 16px; }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
-        color: #1A3C34 !important; border-bottom: 3px solid #1A3C34 !important; font-weight: 800;
+        color: #2E7D32 !important; border-bottom: 3px solid #2E7D32 !important; font-weight: 800;
     }
 
-    div[data-testid="stMarkdownContainer"] { color: #333333; }
-    .stAlert { color: #000000 !important; }
-    .stAlert p { color: #000000 !important; }
-
+    /* Metrics Cards */
     div[data-testid="stMetric"] {
         background-color: #FFFFFF !important;
-        border: 1px solid #E0E0E0; 
-        border-left: 5px solid #26A69A;
+        border: 1px solid #C8E6C9; 
+        border-left: 5px solid #43A047;
         border-radius: 10px; 
         padding: 15px; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    div[data-testid="stMetricValue"] { color: #1A3C34 !important; font-weight: bold; }
-    div[data-testid="stMetricLabel"] { color: #546e7a !important; font-weight: 600; }
+    div[data-testid="stMetricValue"] { color: #1B5E20 !important; font-weight: bold; }
+    div[data-testid="stMetricLabel"] { color: #388E3C !important; font-weight: 600; }
 
-    /* Flow Chart Blocks */
+    /* Flow Chart Blocks (Updated Colors) */
     .bfd-block {
         padding: 12px; 
         border-radius: 8px; 
         text-align: center; 
         background: #FFFFFF; 
-        border: 1px solid #B0BEC5; 
-        border-top: 5px solid #1A3C34;
-        color: #1A3C34; 
+        border: 1px solid #A5D6A7; 
+        border-top: 5px solid #2E7D32;
+        color: #1B5E20; 
         font-weight: 700;
         box-shadow: 0 3px 6px rgba(0,0,0,0.05);
         font-size: 14px;
@@ -118,7 +110,7 @@ GLOBAL_CSS = """
     .bfd-sub {
         font-weight: 400;
         font-size: 12px;
-        color: #546E7A;
+        color: #558B2F;
         margin-top: 4px;
     }
     .arrow-container {
@@ -127,14 +119,15 @@ GLOBAL_CSS = """
         justify-content: center;
         height: 100%;
         font-size: 24px;
-        color: #26A69A;
+        color: #43A047;
         font-weight: bold;
     }
     
+    /* Header Box in Sidebar */
     .header-box {
-        background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; 
-        text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        background: rgba(255, 255, 255, 0.2); padding: 15px; border-radius: 8px; 
+        text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
     
     #MainMenu, footer, .stDeployButton {visibility: hidden;}
@@ -215,7 +208,8 @@ def create_pdf(res, profit, fig1, fig2):
     styles = getSampleStyleSheet()
     story = []
     
-    CHEMISCO_GREEN = colors.HexColor('#1A3C34')
+    # Updated PDF Color to match lighter theme
+    CHEMISCO_GREEN = colors.HexColor('#2E7D32')
     
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -275,7 +269,7 @@ def create_pdf(res, profit, fig1, fig2):
     add_plot(fig2, "Figure 2: Solid Composition")
     
     story.append(Spacer(1, 30))
-    story.append(Paragraph("<font color=grey size=8>Chemisco Simulator v3.5</font>", styles['Normal']))
+    story.append(Paragraph("<font color=grey size=8>Chemisco Simulator v3.6</font>", styles['Normal']))
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -309,12 +303,12 @@ def main():
     if 'cost_biomass' not in st.session_state: 
         st.session_state.update({'cost_biomass': 30.0, 'cost_energy': 0.15, 'price_char': 1.20})
 
-    # Sidebar
+    # Sidebar (Everything is a Slider now, Lighter Theme)
     with st.sidebar:
         st.markdown("""
             <div class="header-box">
-                <h1 style="color:white !important;">CHEMISCO</h1>
-                <p style="color:#B2DFDB !important;">TORREFACTION SIMULATOR</p>
+                <h1 style="color:white !important; text-shadow:none;">CHEMISCO</h1>
+                <p style="color:#E8F5E9 !important; font-weight:bold;">TORREFACTION SIMULATOR</p>
             </div>
             """, unsafe_allow_html=True)
         
@@ -322,7 +316,8 @@ def main():
         reactor = st.selectbox("Reactor Type", ["Rotary Drum", "Fluidized Bed", "Screw Reactor"])
         
         with st.expander("🌲 Feedstock", expanded=True):
-            mass = st.number_input("Mass (kg)", 1.0, 10000.0, 100.0, 10.0, key='mass_input')
+            # Converted to Slider
+            mass = st.slider("Mass (kg)", 1.0, 10000.0, 100.0, 10.0, key='mass_input')
             moisture = st.slider("Moisture (%)", 0.0, 60.0, 15.0)
             ash = st.slider("Ash (Dry %)", 0.0, 30.0, 5.0)
             
@@ -331,20 +326,22 @@ def main():
             time_min = st.slider("Time (min)", 10, 120, 30, key='time_input')
 
         with st.expander("🔧 Model Params", expanded=False):
-            p_kf = st.number_input("Drying rate", 0.0, 0.1, 0.02)
-            p_Coil = st.number_input("Max Oil frac", 0.0, 0.5, 0.25)
-            p_Cgas = st.number_input("Max Gas frac", 0.0, 0.5, 0.20)
-            p_a = st.number_input("Solid Yield Factor", 0.1, 0.5, 0.35)
-            p_b = st.number_input("Degradation", 0.001, 0.01, 0.004, format="%.4f")
+            # Converted all to Sliders with precise steps
+            p_kf = st.slider("Drying rate", 0.0, 0.1, 0.02, step=0.001, format="%.3f")
+            p_Coil = st.slider("Max Oil frac", 0.0, 0.5, 0.25, step=0.01)
+            p_Cgas = st.slider("Max Gas frac", 0.0, 0.5, 0.20, step=0.01)
+            p_a = st.slider("Solid Yield Factor", 0.1, 0.5, 0.35, step=0.01)
+            p_b = st.slider("Degradation", 0.001, 0.01, 0.004, step=0.0005, format="%.4f")
             st.markdown("---")
-            p_enh = st.slider("Energy Factor", 0.2, 1.5, 0.85)
+            p_enh = st.slider("Energy Factor", 0.2, 1.5, 0.85, step=0.05)
             
         params = {"k_f": p_kf, "C_oil": p_Coil, "C_gas": p_Cgas, "a_solid": p_a, "b_solid": p_b, "energy_factor": p_enh}
 
         with st.expander("💰 Economics", expanded=False):
-            st.session_state.cost_biomass = st.number_input("Feed ($/ton)", value=st.session_state.cost_biomass)
-            st.session_state.cost_energy = st.number_input("Energy ($/kWh)", value=st.session_state.cost_energy)
-            st.session_state.price_char = st.number_input("Char Price ($/kg)", value=st.session_state.price_char)
+            # Converted all to Sliders
+            st.session_state.cost_biomass = st.slider("Feed ($/ton)", 0.0, 200.0, st.session_state.cost_biomass, step=1.0)
+            st.session_state.cost_energy = st.slider("Energy ($/kWh)", 0.0, 1.0, st.session_state.cost_energy, step=0.01)
+            st.session_state.price_char = st.slider("Char Price ($/kg)", 0.0, 5.0, st.session_state.price_char, step=0.1)
         
         st.markdown("<br>", unsafe_allow_html=True)
         game_mode = st.checkbox("🎮 Optimization Challenge")
@@ -357,10 +354,10 @@ def main():
     revenue = res['char_kg'] * st.session_state.price_char
     profit = revenue - (cost_feed + cost_ops)
 
-    # Visualization
-    APP_TXT_COLOR = "#1A3C34"
-    APP_BG_COLOR = "#F5F7F8"
-    colors_seq = ["#1A3C34", "#26A69A", "#FFB74D", "#EF5350"]
+    # Visualization (Updated Palette)
+    APP_TXT_COLOR = "#1B5E20" # Darker Green text
+    APP_BG_COLOR = "#F1F8E9"  # Very Light Green BG
+    colors_seq = ["#2E7D32", "#43A047", "#66BB6A", "#A5D6A7"] # Emerald Palette
 
     # 1. Pie Chart
     df_pie = pd.DataFrame({
@@ -377,7 +374,7 @@ def main():
         "Type": ["Organic Carbon", "Ash"],
         "Mass (kg)": [organic_char, res['ash_kg']]
     })
-    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#1A3C34', '#90A4AE'], title="Solid Composition")
+    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#2E7D32', '#90A4AE'], title="Solid Composition")
     fig2.update_layout(
         paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14),
         xaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR)),
@@ -389,7 +386,7 @@ def main():
     st.title("CHEMISCO: Process Dashboard")
     st.markdown("---")
     
-    # --- FLOW CHART (Clean Blocks with Drying) ---
+    # --- FLOW CHART ---
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 0.2, 1, 0.2, 1, 0.2, 1])
     
     with c1: 
@@ -424,8 +421,8 @@ def main():
 
     with c7: 
         st.markdown(f'''
-            <div class="bfd-block" style="border-top-color: #26A69A;">
-                <div style="color:#26A69A;">BIOCHAR</div>
+            <div class="bfd-block" style="border-top-color: #43A047;">
+                <div style="color:#2E7D32;">BIOCHAR</div>
                 <div class="bfd-sub" style="font-size:14px; font-weight:bold;">{res["char_kg"]:.1f} kg</div>
             </div>
         ''', unsafe_allow_html=True)
@@ -448,10 +445,10 @@ def main():
     with t2:
         df_time = get_time_series(mass, moisture, ash, temp, time_min, params)
         fig_area = go.Figure()
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#1A3C34')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#26A69A')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#B2DFDB')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#E0F2F1')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#1B5E20')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#43A047')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#A5D6A7')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#C8E6C9')))
         fig_area.update_layout(
             paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, title="Product Evolution", 
             font=dict(color=APP_TXT_COLOR),
