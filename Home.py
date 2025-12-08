@@ -24,83 +24,85 @@ HHV_DRY_INITIAL_DEFAULT = 18.0
 # --- 2. Styles ---
 GLOBAL_CSS = """
 <style>
-    /* Main Background - لون فاتح جداً مريح للعين */
-    .stApp { background-color: #F7F9F8; font-family: 'Segoe UI', sans-serif; }
+    /* 1. Main Background - Clean Professional Grey-White */
+    .stApp { 
+        background-color: #F9FAFA; 
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+    }
     
-    /* --- SIDEBAR STYLING (Updated with #00743c) --- */
+    /* --- SIDEBAR STYLING (UNCHANGED as requested) --- */
     section[data-testid="stSidebar"] { 
-        /* تدرج لوني يعتمد على اللون المطلوب */
         background: linear-gradient(180deg, #00743c 0%, #005029 100%);
         border-right: 1px solid rgba(255,255,255,0.2);
     }
-    
-    /* النصوص بيضاء في السايد بار */
-    section[data-testid="stSidebar"] h1, 
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3 { 
-        color: #FFFFFF !important; 
-        font-weight: 800;
-        text-shadow: 0px 1px 2px rgba(0,0,0,0.1);
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 { 
+        color: #FFFFFF !important; font-weight: 800; text-shadow: 0px 1px 2px rgba(0,0,0,0.1);
     }
-    
-    section[data-testid="stSidebar"] label, 
-    section[data-testid="stSidebar"] .stMarkdown,
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] .stMarkdown,
+    section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span,
     section[data-testid="stSidebar"] div[data-testid="stTickBar"] > div,
     section[data-testid="stSidebar"] div[data-testid="stThumbValue"],
     section[data-testid="stSidebar"] .stSlider div { 
         color: #FFFFFF !important; 
     }
-
-    /* مربعات الإدخال والقوائم */
     section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
-        color: #000000 !important;
-        background-color: #ffffff !important;
-        border-radius: 8px;
+        color: #000000 !important; background-color: #ffffff !important; border-radius: 8px;
     }
-    
-    /* Expanders styling */
     section[data-testid="stSidebar"] .streamlit-expanderHeader {
-        background-color: rgba(255, 255, 255, 0.15) !important;
-        color: #FFFFFF !important;
-        border-radius: 6px;
-        font-weight: 600;
+        background-color: rgba(255, 255, 255, 0.15) !important; color: #FFFFFF !important;
+        border-radius: 6px; font-weight: 600;
     }
 
-    /* --- REST OF STYLES (Using #00743c) --- */
-    h1, h2, h3 { color: #00743c !important; font-weight: 800; }
+    /* --- MAIN CONTENT HARMONIZATION --- */
     
-    /* Tabs styling */
-    div[data-testid="stTabs"] button { color: #507d6a !important; font-weight: 600; font-size: 16px; }
-    div[data-testid="stTabs"] button[aria-selected="true"] { 
-        color: #00743c !important; border-bottom: 3px solid #00743c !important; font-weight: 800;
+    /* Headings - Matching the Sidebar Green */
+    h1, h2, h3 { 
+        color: #005029 !important; /* Slightly darker than sidebar for contrast on white */
+        font-weight: 800; 
+        letter-spacing: -0.5px;
     }
-
-    /* Metrics Cards */
+    
+    /* Metrics Cards - Clean & Professional */
     div[data-testid="stMetric"] {
         background-color: #FFFFFF !important;
-        border: 1px solid #C8E6C9; 
-        border-left: 5px solid #00743c;
-        border-radius: 10px; 
+        border: 1px solid #E0E0E0; 
+        border-left: 5px solid #00743c; /* Accent Color */
+        border-radius: 8px; 
         padding: 15px; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        transition: transform 0.2s;
     }
-    div[data-testid="stMetricValue"] { color: #00743c !important; font-weight: bold; }
-    div[data-testid="stMetricLabel"] { color: #2e5948 !important; font-weight: 600; }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    div[data-testid="stMetricValue"] { color: #00743c !important; font-weight: 800; font-size: 26px !important; }
+    div[data-testid="stMetricLabel"] { color: #546E7A !important; font-weight: 600; font-size: 14px; }
 
-    /* Flow Chart Blocks (Updated Colors) */
+    /* Tabs - Professional Look */
+    div[data-testid="stTabs"] button { 
+        color: #607D8B !important; 
+        font-weight: 600; 
+        font-size: 15px; 
+    }
+    div[data-testid="stTabs"] button[aria-selected="true"] { 
+        color: #00743c !important; 
+        border-bottom: 3px solid #00743c !important; 
+        font-weight: 800;
+    }
+
+    /* Flow Chart Blocks - Harmonized */
     .bfd-block {
-        padding: 12px; 
+        padding: 15px; 
         border-radius: 8px; 
         text-align: center; 
         background: #FFFFFF; 
-        border: 1px solid #A5D6A7; 
+        border: 1px solid #CFD8DC; 
         border-top: 5px solid #00743c;
-        color: #00743c; 
-        font-weight: 700;
-        box-shadow: 0 3px 6px rgba(0,0,0,0.05);
-        font-size: 14px;
+        color: #005029; 
+        font-weight: 800;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        font-size: 15px;
         height: 100%;
         display: flex;
         flex-direction: column;
@@ -108,10 +110,10 @@ GLOBAL_CSS = """
         align-items: center;
     }
     .bfd-sub {
-        font-weight: 400;
-        font-size: 12px;
-        color: #556B2F;
-        margin-top: 4px;
+        font-weight: 500;
+        font-size: 13px;
+        color: #546E7A; /* Blue Grey for subtitle */
+        margin-top: 5px;
     }
     .arrow-container {
         display: flex;
@@ -119,8 +121,22 @@ GLOBAL_CSS = """
         justify-content: center;
         height: 100%;
         font-size: 24px;
-        color: #00743c;
+        color: #00743c; /* Green Arrows */
         font-weight: bold;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background-color: #00743c !important;
+        color: white !important;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 2px 5px rgba(0, 116, 60, 0.2);
+    }
+    .stButton > button:hover {
+        background-color: #005029 !important;
+        box-shadow: 0 4px 8px rgba(0, 116, 60, 0.3);
     }
     
     /* Header Box in Sidebar */
@@ -208,7 +224,6 @@ def create_pdf(res, profit, fig1, fig2):
     styles = getSampleStyleSheet()
     story = []
     
-    # Updated PDF Color to match requested #00743c
     CHEMISCO_GREEN = colors.HexColor('#00743c')
     
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -303,7 +318,7 @@ def main():
     if 'cost_biomass' not in st.session_state: 
         st.session_state.update({'cost_biomass': 30.0, 'cost_energy': 0.15, 'price_char': 1.20})
 
-    # Sidebar (Sliders with new Theme)
+    # Sidebar
     with st.sidebar:
         st.markdown("""
             <div class="header-box">
@@ -351,10 +366,12 @@ def main():
     revenue = res['char_kg'] * st.session_state.price_char
     profit = revenue - (cost_feed + cost_ops)
 
-    # Visualization (Updated Palette with #00743c)
-    APP_TXT_COLOR = "#00743c" 
-    APP_BG_COLOR = "#F7F9F8"  
-    colors_seq = ["#00743c", "#2E8B57", "#3CB371", "#8FBC8F"] # Palette based on #00743c
+    # --- UPDATED COLORS & FONTS ---
+    APP_TXT_COLOR = "#005029"  # Darker shade of #00743c for better readability
+    APP_BG_COLOR = "#F9FAFA"   # Very clean, professional white-grey
+    
+    # Harmonized Palette: #00743c (Primary), #009688 (Teal), #66BB6A (Light Green), #BDBDBD (Grey)
+    colors_seq = ["#00743c", "#26A69A", "#66BB6A", "#B0BEC5"] 
 
     # 1. Pie Chart
     df_pie = pd.DataFrame({
@@ -362,8 +379,17 @@ def main():
         "Mass (kg)": [res['char_kg'], res['water_evap_kg'], res['oil_kg'], res['gas_kg']]
     })
     fig1 = px.pie(df_pie, values='Mass (kg)', names='Component', hole=0.6, color_discrete_sequence=colors_seq, title="Mass Balance")
-    fig1.update_traces(textposition='inside', textinfo='percent+label', textfont_color="white")
-    fig1.update_layout(paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14))
+    fig1.update_traces(
+        textposition='inside', 
+        textinfo='percent+label', 
+        textfont=dict(color='white', size=14, family="Arial", weight="bold")
+    )
+    fig1.update_layout(
+        paper_bgcolor=APP_BG_COLOR, 
+        plot_bgcolor=APP_BG_COLOR, 
+        font=dict(color=APP_TXT_COLOR, size=15, family="Segoe UI"),
+        title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold")
+    )
 
     # 2. Bar Chart
     organic_char = res['char_kg'] - res['ash_kg']
@@ -371,11 +397,14 @@ def main():
         "Type": ["Organic Carbon", "Ash"],
         "Mass (kg)": [organic_char, res['ash_kg']]
     })
-    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#00743c', '#78909C'], title="Solid Composition")
+    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#00743c', '#90A4AE'], title="Solid Composition")
     fig2.update_layout(
-        paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14),
-        xaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR)),
-        yaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR)),
+        paper_bgcolor=APP_BG_COLOR, 
+        plot_bgcolor=APP_BG_COLOR, 
+        font=dict(color=APP_TXT_COLOR, size=14, family="Segoe UI"),
+        title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
+        xaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR, size=12)),
+        yaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR, size=12)),
         showlegend=False
     )
 
@@ -442,15 +471,20 @@ def main():
     with t2:
         df_time = get_time_series(mass, moisture, ash, temp, time_min, params)
         fig_area = go.Figure()
+        # Area chart matching the new green palette
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#00743c')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#2E8B57')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#8FBC8F')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#C8E6C9')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#26A69A')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#81C784')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#E8F5E9')))
+        
         fig_area.update_layout(
-            paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, title="Product Evolution", 
-            font=dict(color=APP_TXT_COLOR),
-            xaxis=dict(title="Time (min)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR)),
-            yaxis=dict(title="Mass (kg)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR))
+            paper_bgcolor=APP_BG_COLOR, 
+            plot_bgcolor=APP_BG_COLOR, 
+            title="Product Evolution", 
+            title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
+            font=dict(color=APP_TXT_COLOR, family="Segoe UI"),
+            xaxis=dict(title="Time (min)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold")),
+            yaxis=dict(title="Mass (kg)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"))
         )
         st.plotly_chart(fig_area, use_container_width=True)
 
