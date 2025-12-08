@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import math
 import random 
 import streamlit.components.v1 as components 
-import os
+import base64
 
 # --- 1. Constants & Defaults ---
 R_GAS = 8.314
@@ -246,16 +246,17 @@ def create_pdf(res, profit, fig1, fig2):
 
     def add_plot_to_pdf(fig, title, width=6*inch, height=3.2*inch):
         try:
+            # Force white background for PDF clarity (regardless of dark mode app)
             fig.update_layout(
                 paper_bgcolor="white", 
                 plot_bgcolor="white", 
-                font=dict(color="black", size=12, family="Helvetica"), 
+                font=dict(color="black", size=12, family="Helvetica"), # Force black font
                 title=dict(font=dict(color="#00743c")),
                 xaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=False),
                 yaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=True, gridcolor="#eeeeee"),
                 legend=dict(font=dict(color="black"))
             )
-            fig.update_traces(textfont=dict(color="black")) 
+            fig.update_traces(textfont=dict(color="black")) # Black text on charts
             
             img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
             story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
@@ -265,10 +266,14 @@ def create_pdf(res, profit, fig1, fig2):
         except Exception:
             story.append(Paragraph(f"<font color=red>Image Render Error: {title}. Install 'kaleido'.</font>", styles['Normal']))
 
+    # Configure Fig 2 for PDF (Bar Labels)
     fig2.update_traces(texttemplate='%{y:.1f}', textposition='auto')
     
     add_plot_to_pdf(fig1, "Figure A: Mass Balance Distribution")
+    
+    # --- PAGE BREAK for Figure 2 ---
     story.append(PageBreak())
+    
     add_plot_to_pdf(fig2, "Figure B: Solid Composition Analysis")
 
     # --- 4. FOOTER ---
@@ -287,7 +292,7 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS ONLY ***
+    # *** 🚀 INJECT BOTPRESS ***
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
@@ -392,23 +397,27 @@ def main():
 
     # Dashboard - Header Section with Logo
     
-    # 1. Image Config (Local File)
-    LOGO_FILE = "#00743c.jpg" 
+    # 1. Embed Image (Base64) - REPLACE WITH YOUR ACTUAL LOGO DATA
+    # To use your logo: 
+    # 1. Put 'logo.png' next to your script.
+    # 2. Uncomment these lines:
+    # with open("logo.png", "rb") as f:
+    #     data = base64.b64encode(f.read()).decode("utf-8")
+    # LOGO_SRC = f"data:image/png;base64,{data}"
+    
+    # Using a placeholder for now (the green leaf from your request)
+    LOGO_SRC = "https://i.imgur.com/7Q2y7Yt.png" # Placeholder for your green leaf logo
+
     
     # 2. Banner Layout (Columns)
     c_logo, c_title = st.columns([1, 5])
     
     with c_logo:
-        # Use the local file #00743c.jpg
-        # If it doesn't exist, show a clean fallback
-        if os.path.exists(LOGO_FILE):
-            st.image(LOGO_FILE, width=130)
-        else:
-            st.warning(f"Logo not found: {LOGO_FILE}")
+        st.image(LOGO_SRC, width=120) # Adjusted width for the banner
         
     with c_title:
         st.markdown("""
-            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 25px;">
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 15px;">
                 <h1 style="margin-bottom: 0; color: #00743c; font-size: 42px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
                 <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1px;">TORREFACTION SIMULATOR</p>
             </div>
