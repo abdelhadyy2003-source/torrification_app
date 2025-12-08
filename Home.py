@@ -328,7 +328,7 @@ def main():
     if 'cost_biomass' not in st.session_state: 
         st.session_state.update({'cost_biomass': 30.0, 'cost_energy': 0.15, 'price_char': 1.20})
 
-    # Sidebar
+    # Sidebar - REVERTED TO ORIGINAL PLACE (Just Text)
     with st.sidebar:
         st.markdown("""
             <div class="header-box">
@@ -406,31 +406,95 @@ def main():
         showlegend=False
     )
 
-    # 1. THE BANNER
-    if os.path.exists("unnamed.jpg"):
-        st.image("unnamed.jpg", use_column_width=True)
-    else:
-        # Fallback if image not found
-        st.markdown("<div style='height: 5px; background-color: #00743c; margin-bottom: 20px;'></div>", unsafe_allow_html=True)
-
-    # 2. Header Section (Logo + Title)
-    c_logo, c_title = st.columns([1.5, 4.5]) # Adjusted ratio for better alignment
+    # --- FACEBOOK-STYLE PROFILE HEADER ---
     
-    with c_logo:
-        # Use logo.png if available, else fallback online
-        if os.path.exists("logo.png"):
-            st.image("logo.png", width=220) # Slightly larger logo
+    # 1. Get Images as Base64 for embedding in HTML
+    def get_image_as_base64(path, url_fallback):
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                data = base64.b64encode(f.read()).decode("utf-8")
+            return data
         else:
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=220) 
-        
-    with c_title:
-        # Title beside logo
-        st.markdown("""
-            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 40px;">
-                <h1 style="margin-bottom: 0; color: #00743c; font-size: 48px; line-height: 1.1; font-weight: 900; letter-spacing: -1px;">CHEMISCO</h1>
-                <p style="margin-top: 5px; font-size: 20px; color: #B0BEC5; font-weight: 600; letter-spacing: 2px;">TORREFACTION SIMULATOR</p>
+            # If using fallback URL, we can't easily get b64 without requests lib which might be slow/restricted.
+            # So we will return None and handle logic in HTML generation to use URL directly.
+            return None
+
+    # Cover Image
+    cover_path = "unnamed.jpg"
+    cover_b64 = get_image_as_base64(cover_path, "")
+    cover_src = f"data:image/jpg;base64,{cover_b64}" if cover_b64 else "https://via.placeholder.com/1200x300/00743c/ffffff?text=CHEMISCO+COVER"
+
+    # Logo Image
+    logo_path = "logo.png"
+    logo_b64 = get_image_as_base64(logo_path, "")
+    logo_src = f"data:image/png;base64,{logo_b64}" if logo_b64 else "https://i.imgur.com/7Q2y7Yt.png"
+
+    # 2. HTML Structure for FB-Style Profile
+    st.markdown(f"""
+        <div style="
+            position: relative; 
+            margin-bottom: 30px; 
+            font-family: 'Segoe UI', sans-serif;
+        ">
+            <div style="
+                width: 100%;
+                height: 250px;
+                background-image: url('{cover_src}');
+                background-size: cover;
+                background-position: center;
+                border-radius: 0 0 10px 10px;
+                border-bottom: 1px solid #333;
+                position: relative;
+            "></div>
+
+            <div style="
+                display: flex; 
+                align-items: flex-end; 
+                padding: 0 30px; 
+                margin-top: -60px; /* Overlap effect */
+                position: relative; 
+                z-index: 10;
+            ">
+                <div style="
+                    width: 168px; 
+                    height: 168px; 
+                    border-radius: 50%; 
+                    border: 5px solid #121212; /* Match App Background */
+                    background-color: #121212;
+                    overflow: hidden;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    flex-shrink: 0;
+                ">
+                    <img src="{logo_src}" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+
+                <div style="
+                    margin-left: 20px; 
+                    margin-bottom: 25px; 
+                    padding-bottom: 0px;
+                ">
+                    <h1 style="
+                        margin: 0; 
+                        color: #FFFFFF; 
+                        font-size: 42px; 
+                        font-weight: 800; 
+                        line-height: 1;
+                        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+                    ">CHEMISCO</h1>
+                    <p style="
+                        margin: 5px 0 0 0; 
+                        color: #B0BEC5; 
+                        font-size: 18px; 
+                        font-weight: 600; 
+                        letter-spacing: 1px;
+                        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+                    ">TORREFACTION SIMULATOR</p>
+                </div>
             </div>
-        """, unsafe_allow_html=True)
+        </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
     
