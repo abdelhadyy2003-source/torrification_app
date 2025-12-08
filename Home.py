@@ -414,8 +414,8 @@ def main():
         st.markdown("<div style='height: 5px; background-color: #00743c; margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
     # 2. Header Section (Logo + Title) - "Original Place"
-    # --- MODIFICATION: Adjusted Ratio to [0.7, 4] to bring text closer ---
-    c_logo, c_title = st.columns([0.7, 4])
+    # --- MODIFICATION: Adjusted Ratio to [0.6, 4] to squeeze logo column and bring text closer ---
+    c_logo, c_title = st.columns([0.6, 4])
     
     with c_logo:
         # Use logo.png if available, else fallback online
@@ -425,9 +425,9 @@ def main():
             st.image("https://i.imgur.com/7Q2y7Yt.png", width=230) 
         
     with c_title:
-        # --- MODIFICATION: Added margin-left: -20px ---
+        # --- MODIFICATION: Increased negative margin to -50px ---
         st.markdown("""
-            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 15px; margin-left: -20px;">
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 15px; margin-left: -50px;">
                 <h1 style="margin-bottom: 0; color: #00743c; font-size: 42px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
                 <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1px;">TORREFACTION SIMULATOR</p>
             </div>
