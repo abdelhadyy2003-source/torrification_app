@@ -30,6 +30,10 @@ GLOBAL_CSS = """
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     }
     
+    /* Hide Header and Footer completely */
+    header[data-testid="stHeader"] { visibility: hidden; height: 0%; }
+    footer { visibility: hidden; height: 0%; }
+    
     /* --- SIDEBAR STYLING --- */
     section[data-testid="stSidebar"] { 
         background: linear-gradient(180deg, #00743c 0%, #004d26 100%);
@@ -54,14 +58,8 @@ GLOBAL_CSS = """
     }
 
     /* --- MAIN CONTENT HARMONIZATION (DARK) --- */
-    h1, h2, h3 { 
-        color: #FFFFFF !important; 
-        font-weight: 800; 
-        letter-spacing: -0.5px;
-    }
-    p, div, li {
-        color: #E0E0E0;
-    }
+    h1, h2, h3 { color: #FFFFFF !important; font-weight: 800; letter-spacing: -0.5px; }
+    p, div, li { color: #E0E0E0; }
     
     div[data-testid="stMetric"] {
         background-color: #1E1E1E !important;
@@ -74,9 +72,7 @@ GLOBAL_CSS = """
     div[data-testid="stMetricValue"] { color: #4ADE80 !important; font-weight: 800; font-size: 26px !important; }
     div[data-testid="stMetricLabel"] { color: #B0BEC5 !important; font-weight: 600; font-size: 14px; }
 
-    div[data-testid="stTabs"] button { 
-        color: #9E9E9E !important; font-weight: 600; font-size: 15px; 
-    }
+    div[data-testid="stTabs"] button { color: #9E9E9E !important; font-weight: 600; font-size: 15px; }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
         color: #4ADE80 !important; border-bottom: 3px solid #4ADE80 !important; font-weight: 800;
     }
@@ -88,9 +84,7 @@ GLOBAL_CSS = """
         font-size: 15px; height: 100%; display: flex; flex-direction: column; 
         justify-content: center; align-items: center;
     }
-    .bfd-sub {
-        font-weight: 500; font-size: 13px; color: #B0BEC5; margin-top: 5px;
-    }
+    .bfd-sub { font-weight: 500; font-size: 13px; color: #B0BEC5; margin-top: 5px; }
     .arrow-container {
         display: flex; align-items: center; justify-content: center; height: 100%;
         font-size: 24px; color: #00743c; font-weight: bold;
@@ -251,17 +245,16 @@ def create_pdf(res, profit, fig1, fig2):
 
     def add_plot_to_pdf(fig, title, width=6*inch, height=3.2*inch):
         try:
-            # Force white background for PDF clarity (regardless of dark mode app)
             fig.update_layout(
                 paper_bgcolor="white", 
                 plot_bgcolor="white", 
-                font=dict(color="black", size=12, family="Helvetica"), # Force black font
+                font=dict(color="black", size=12, family="Helvetica"), 
                 title=dict(font=dict(color="#00743c")),
                 xaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=False),
                 yaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=True, gridcolor="#eeeeee"),
                 legend=dict(font=dict(color="black"))
             )
-            fig.update_traces(textfont=dict(color="black")) # Black text on charts
+            fig.update_traces(textfont=dict(color="black")) 
             
             img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
             story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
@@ -271,14 +264,10 @@ def create_pdf(res, profit, fig1, fig2):
         except Exception:
             story.append(Paragraph(f"<font color=red>Image Render Error: {title}. Install 'kaleido'.</font>", styles['Normal']))
 
-    # Configure Fig 2 for PDF (Bar Labels)
     fig2.update_traces(texttemplate='%{y:.1f}', textposition='auto')
     
     add_plot_to_pdf(fig1, "Figure A: Mass Balance Distribution")
-    
-    # --- PAGE BREAK for Figure 2 ---
     story.append(PageBreak())
-    
     add_plot_to_pdf(fig2, "Figure B: Solid Composition Analysis")
 
     # --- 4. FOOTER ---
@@ -297,9 +286,10 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS ***
+    # *** 🚀 INJECT BOTPRESS & FIX 'C' SHORTCUT ***
     js_code = """
     <script>
+        // 1. Botpress Injection
         if (!window.parent.document.getElementById('botpress-inject')) {
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
@@ -313,6 +303,23 @@ def main():
                 window.parent.document.body.appendChild(script2);
             };
         }
+
+        // 2. AGGRESSIVE FIX: Disable Streamlit 'C' shortcut (Clear Cache)
+        window.parent.document.addEventListener('keydown', function(e) {
+            if (e.key.toLowerCase() === 'c') {
+                var target = e.target;
+                var isInput = (target.tagName === 'INPUT' || 
+                               target.tagName === 'TEXTAREA' || 
+                               target.isContentEditable);
+
+                if (!isInput) {
+                    e.stopImmediatePropagation();
+                    e.stopPropagation();
+                    e.preventDefault();
+                    console.log("Chemisco: Blocked 'C' shortcut to prevent cache clear.");
+                }
+            }
+        }, true);
     </script>
     """
     components.html(js_code, height=0, width=0)
@@ -401,7 +408,7 @@ def main():
     )
 
     # Dashboard
-    st.title("CHEMISCO: Process Dashboard")
+    st.title("CHEMISCO TORREFACTION SIMULATOR")
     st.markdown("---")
     
     # --- FLOW CHART ---
