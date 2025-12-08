@@ -390,14 +390,16 @@ def main():
     )
 
     # Dashboard - Header Section with Logo
+    
+    # 2. Banner Layout (Columns)
     c_logo, c_title = st.columns([1, 5])
     
     with c_logo:
-        # Increased size to 180 as requested
+        # Increased size to 240
         if os.path.exists("logo.png"):
-            st.image("logo.png", width=180)
+            st.image("logo.png", width=240)
         else:
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=180) 
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=240) 
         
     with c_title:
         st.markdown("""
