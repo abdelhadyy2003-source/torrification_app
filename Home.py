@@ -13,40 +13,62 @@ from datetime import datetime
 import math
 import streamlit.components.v1 as components 
 
-# --- 1. Constants & Defaults (لم يتم تغيير المعادلات) ---
+# --- 1. Constants & Defaults ---
 R_GAS = 8.314
 CP_BIOMASS = 1500.0
 CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (تصحيح الألوان والتباين فقط) ---
+# --- 2. Styles (تم إصلاح الألوان والتباين بدقة) ---
 GLOBAL_CSS = """
 <style>
-    /* Main Background - لون رمادي فاتح جداً مريح للعين */
+    /* Main Background */
     .stApp { background-color: #F5F7F8; font-family: 'Segoe UI', sans-serif; }
     
-    /* Sidebar Styles - لون أخضر غامق جداً مع نص أبيض */
+    /* --- SIDEBAR STYLING --- */
     section[data-testid="stSidebar"] { 
         background-color: #1A3C34; 
         border-right: 1px solid rgba(255,255,255,0.1);
     }
-    
-    /* إجبار النصوص في الشريط الجانبي على اللون الأبيض */
-    section[data-testid="stSidebar"] h1, 
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3, 
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] span,
-    section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p { 
-        color: #FFFFFF !important; 
+    /* إجبار النصوص داخل الشريط الجانبي فقط على اللون الأبيض */
+    section[data-testid="stSidebar"] * {
+        color: #FFFFFF !important;
     }
-    
-    /* لون العناوين الرئيسية في الموقع */
+    /* استثناء الحقول البيضاء داخل الشريط الجانبي ليكون النص فيها أسود */
+    section[data-testid="stSidebar"] input {
+        color: #000000 !important;
+    }
+
+    /* --- MAIN CONTENT STYLING --- */
     h1, h2, h3 { color: #1A3C34 !important; font-weight: 800; }
     
-    /* تحسين شكل البطاقات (Metrics) */
+    /* --- TABS CORRECTION (إصلاح اختفاء الكلام) --- */
+    /* التبويبات غير المختارة - لون رمادي غامق واضح */
+    div[data-testid="stTabs"] button {
+        color: #546E7A !important; 
+        font-weight: 600;
+        font-size: 16px;
+    }
+    /* التبويب المختار - لون أخضر */
+    div[data-testid="stTabs"] button[aria-selected="true"] { 
+        color: #1A3C34 !important; 
+        border-bottom: 3px solid #1A3C34 !important; 
+        font-weight: 800;
+    }
+
+    /* --- ALERTS CORRECTION (إصلاح التحذيرات) --- */
+    div[data-testid="stMarkdownContainer"] {
+        color: #333333; /* اللون الافتراضي للنصوص */
+    }
+    .stAlert {
+        color: #000000 !important; /* إجبار النص داخل التنبيهات على اللون الأسود */
+    }
+    .stAlert p {
+        color: #000000 !important;
+    }
+
+    /* --- METRICS & BLOCKS --- */
     div[data-testid="stMetric"] {
         background-color: #FFFFFF !important;
         border: 1px solid #E0E0E0; 
@@ -58,22 +80,6 @@ GLOBAL_CSS = """
     div[data-testid="stMetricValue"] { color: #1A3C34 !important; font-weight: bold; }
     div[data-testid="stMetricLabel"] { color: #546e7a !important; font-weight: 600; }
 
-    /* تحسين الأزرار */
-    .stButton > button { 
-        background-color: #1A3C34 !important; 
-        color: white !important; 
-        border: none; 
-        font-weight: bold; 
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
-        transition: 0.3s;
-    }
-    .stButton > button:hover {
-        background-color: #26A69A !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    /* تحسين مربعات التدفق (Flow Blocks) */
     .bfd-block {
         padding: 15px; 
         border-radius: 8px; 
@@ -96,18 +102,11 @@ GLOBAL_CSS = """
         border: 1px solid rgba(255,255,255,0.2);
     }
     
-    /* Tabs styling */
-    div[data-testid="stTabs"] button[aria-selected="true"] { 
-        color: #1A3C34 !important; 
-        border-bottom: 3px solid #1A3C34 !important; 
-        font-weight: bold;
-    }
-    
     #MainMenu, footer, .stDeployButton {visibility: hidden;}
 </style>
 """
 
-# --- 3. Mathematical Models (لم يتم تغييرها) ---
+# --- 3. Mathematical Models ---
 def moisture_evap_linear(initial_moisture_kg, T_C, t_min, k_f=0.02):
     if T_C <= 100: return 0.0
     evap_kg = k_f * (T_C - 100) * t_min * initial_moisture_kg
@@ -174,7 +173,7 @@ def get_time_series(mass_in, moisture_pct, ash_pct_dry, temp_c, time_min, params
         })
     return pd.DataFrame(data)
 
-# --- 4. PDF Generator (تنسيق الألوان ليتناسب مع الموقع) ---
+# --- 4. PDF Generator ---
 def create_pdf(res, profit, fig1, fig2):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -250,7 +249,7 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS (كود البوت كما هو) ***
+    # *** 🚀 INJECT BOTPRESS ***
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
@@ -275,7 +274,7 @@ def main():
     if 'cost_biomass' not in st.session_state: 
         st.session_state.update({'cost_biomass': 30.0, 'cost_energy': 0.15, 'price_char': 1.20})
 
-    # Sidebar (تحسين التنسيق فقط)
+    # Sidebar
     with st.sidebar:
         st.markdown("""
             <div class="header-box">
@@ -287,14 +286,15 @@ def main():
         st.header("⚙️ Inputs")
         reactor = st.selectbox("Reactor Type", ["Rotary Drum", "Fluidized Bed", "Screw Reactor"])
         
+        # NOTE: Added 'key' to widgets to support Reset functionality
         with st.expander("🌲 Feedstock", expanded=True):
-            mass = st.number_input("Mass (kg)", 1.0, 10000.0, 100.0, 10.0)
+            mass = st.number_input("Mass (kg)", 1.0, 10000.0, 100.0, 10.0, key='mass_input')
             moisture = st.slider("Moisture (%)", 0.0, 60.0, 15.0)
             ash = st.slider("Ash (Dry %)", 0.0, 30.0, 5.0)
             
         with st.expander("🔥 Process", expanded=True):
-            temp = st.slider("Temp (°C)", 150, 350, 275)
-            time_min = st.slider("Time (min)", 10, 120, 30)
+            temp = st.slider("Temp (°C)", 150, 350, 275, key='temp_input')
+            time_min = st.slider("Time (min)", 10, 120, 30, key='time_input')
 
         with st.expander("🔧 Model Params", expanded=False):
             p_kf = st.number_input("Drying rate", 0.0, 0.1, 0.02)
@@ -323,23 +323,19 @@ def main():
     revenue = res['char_kg'] * st.session_state.price_char
     profit = revenue - (cost_feed + cost_ops)
 
-    # Visualization - ضبط الألوان للمخططات لتكون واضحة
-    APP_TXT_COLOR = "#1A3C34" # Dark Green Text
-    APP_BG_COLOR = "#F5F7F8"  # Light Grey Background
+    # Visualization
+    APP_TXT_COLOR = "#1A3C34"
+    APP_BG_COLOR = "#F5F7F8"
     colors_seq = ["#1A3C34", "#26A69A", "#FFB74D", "#EF5350"]
 
-    # 1. Pie Chart - إضافة Label داخلية بيضاء
+    # 1. Pie Chart
     df_pie = pd.DataFrame({
         "Component": ["Biochar", "Water Vapor", "Bio-Oil", "Gases"],
         "Mass (kg)": [res['char_kg'], res['water_evap_kg'], res['oil_kg'], res['gas_kg']]
     })
     fig1 = px.pie(df_pie, values='Mass (kg)', names='Component', hole=0.6, color_discrete_sequence=colors_seq, title="Mass Balance")
     fig1.update_traces(textposition='inside', textinfo='percent+label', textfont_color="white")
-    fig1.update_layout(
-        paper_bgcolor=APP_BG_COLOR, 
-        plot_bgcolor=APP_BG_COLOR, 
-        font=dict(color=APP_TXT_COLOR, size=14)
-    )
+    fig1.update_layout(paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14))
 
     # 2. Bar Chart
     organic_char = res['char_kg'] - res['ash_kg']
@@ -355,11 +351,11 @@ def main():
         showlegend=False
     )
 
-    # Dashboard Layout
+    # Dashboard
     st.title("CHEMISCO: Process Dashboard")
     st.markdown("---")
     
-    # Flow Chart (Blocks)
+    # Flow Chart
     c1, c2, c3, c4, c5 = st.columns([1.5, 0.5, 1.5, 0.5, 1.5])
     with c1: st.markdown(f'<div class="bfd-block">FEED<br><span style="font-weight:normal; font-size:0.9em;">{mass} kg<br>{moisture}% H2O</span></div>', unsafe_allow_html=True)
     with c2: st.markdown('<div class="bfd-stream" style="text-align:center;">➜</div>', unsafe_allow_html=True)
@@ -406,26 +402,34 @@ def main():
         except ImportError:
             st.error("⚠️ Library Missing: Please ensure 'kaleido==0.2.1' is in requirements.txt")
 
-    # --- تحسين اللعبة بشكل كبير (تفاعلية أكثر) ---
+    # --- Game Mode Updates (New Client Button Added) ---
     with t4:
         if game_mode:
             TARGET_HHV, MIN_YIELD, TARGET_PROFIT = 22.0, 55.0, 0.0
             
             st.markdown("### 🎯 Engineering Challenge Console")
+            
+            # --- NEW CLIENT BUTTON ---
+            col_reset, col_title = st.columns([1, 4])
+            with col_reset:
+                if st.button("🔄 New Client", help="Reset all parameters to default"):
+                    # Reset Logic using Session State Keys
+                    st.session_state['mass_input'] = 100.0
+                    st.session_state['temp_input'] = 275
+                    st.session_state['time_input'] = 30
+                    st.rerun()
+
             st.markdown("Optimize the reactor to meet all 3 targets simultaneously!")
             st.markdown("---")
             
-            # حساب نسبة النجاح (Game Score)
             score = 0
             if res['hhv_final'] >= TARGET_HHV: score += 33
             if res['mass_yield_pct'] >= MIN_YIELD: score += 33
             if profit > TARGET_PROFIT: score += 34
             
-            # شريط التقدم
             st.write(f"**Mission Progress: {score}%**")
             st.progress(score)
             
-            # الأعمدة مع التلميحات
             col_g1, col_g2, col_g3 = st.columns(3)
             
             # 1. HHV Target
@@ -457,12 +461,12 @@ def main():
 
             st.markdown("---")
             
-            # حالة الفوز
             if score >= 100:
                 st.balloons()
                 st.success("🏆 **MISSION ACCOMPLISHED!** You have balanced the process perfectly.")
                 st.markdown("**Engineering Certificate Unlocked in 'Export' Tab.**")
             else:
+                # هذا النص الآن سيظهر باللون الأسود بفضل تعديل CSS
                 st.warning("⚠️ Optimization Incomplete. Adjust the sliders in the sidebar.")
                 
         else:
