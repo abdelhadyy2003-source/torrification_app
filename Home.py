@@ -9,7 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from io import BytesIO
 from reportlab.lib import colors
-from datetime import datetime, timedelta # Added timedelta
+from datetime import datetime, timedelta
 import math
 import random 
 import streamlit.components.v1 as components 
@@ -21,7 +21,7 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (DARK MODE - UNCHANGED) ---
+# --- 2. Styles (DARK MODE) ---
 GLOBAL_CSS = """
 <style>
     /* 1. Main Background - Dark Mode */
@@ -181,7 +181,7 @@ def get_time_series(mass_in, moisture_pct, ash_pct_dry, temp_c, time_min, params
         })
     return pd.DataFrame(data)
 
-# --- 4. Professional PDF Generator (FIXED TIME & LABELS) ---
+# --- 4. Professional PDF Generator ---
 def create_pdf(res, profit, fig1, fig2):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -190,10 +190,9 @@ def create_pdf(res, profit, fig1, fig2):
     
     # Theme Colors
     CHEMISCO_GREEN = colors.HexColor('#00743c')
-    DARK_GREY = colors.HexColor('#333333')
     LIGHT_GREY_BG = colors.HexColor('#f5f5f5')
     
-    # --- FIX 1: Time Adjustment (Adding 2 hours for Egypt Time / Server Correction) ---
+    # Time Adjustment
     current_time = (datetime.utcnow() + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
 
     # --- 1. HEADER ---
@@ -252,28 +251,17 @@ def create_pdf(res, profit, fig1, fig2):
 
     def add_plot_to_pdf(fig, title, width=6*inch, height=3.2*inch):
         try:
-            # --- FIX 2: FORCE CHART STYLING FOR PDF (White BG, Black Text) ---
+            # Force white background for PDF clarity (regardless of dark mode app)
             fig.update_layout(
                 paper_bgcolor="white", 
                 plot_bgcolor="white", 
-                font=dict(color="black", size=12, family="Helvetica"), # Force black font globally
+                font=dict(color="black", size=12, family="Helvetica"), # Force black font
                 title=dict(font=dict(color="#00743c")),
-                # Explicitly set Axis colors to black to appear on white paper
-                xaxis=dict(
-                    title_font=dict(color="black"), 
-                    tickfont=dict(color="black"),
-                    showgrid=False
-                ),
-                yaxis=dict(
-                    title_font=dict(color="black"), 
-                    tickfont=dict(color="black"),
-                    showgrid=True,
-                    gridcolor="#eeeeee"
-                ),
+                xaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=False),
+                yaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=True, gridcolor="#eeeeee"),
                 legend=dict(font=dict(color="black"))
             )
-            # Make text on bars black explicitly
-            fig.update_traces(textfont=dict(color="black"))
+            fig.update_traces(textfont=dict(color="black")) # Black text on charts
             
             img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
             story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
@@ -283,10 +271,14 @@ def create_pdf(res, profit, fig1, fig2):
         except Exception:
             story.append(Paragraph(f"<font color=red>Image Render Error: {title}. Install 'kaleido'.</font>", styles['Normal']))
 
-    # Update Chart 2 (Bar Chart) specifically to show text values
-    fig2.update_traces(texttemplate='%{y:.1f}', textposition='auto') # Add values on top of bars
+    # Configure Fig 2 for PDF (Bar Labels)
+    fig2.update_traces(texttemplate='%{y:.1f}', textposition='auto')
     
     add_plot_to_pdf(fig1, "Figure A: Mass Balance Distribution")
+    
+    # --- PAGE BREAK for Figure 2 ---
+    story.append(PageBreak())
+    
     add_plot_to_pdf(fig2, "Figure B: Solid Composition Analysis")
 
     # --- 4. FOOTER ---
@@ -382,7 +374,6 @@ def main():
     APP_TXT_COLOR = "#FFFFFF"   
     APP_BG_COLOR = "#121212"    
     
-    # Palette matching #00743c in Dark Mode
     colors_seq = ["#00743c", "#4CAF50", "#81C784", "#A5D6A7"]
 
     # 1. Pie Chart
@@ -391,18 +382,8 @@ def main():
         "Mass (kg)": [res['char_kg'], res['water_evap_kg'], res['oil_kg'], res['gas_kg']]
     })
     fig1 = px.pie(df_pie, values='Mass (kg)', names='Component', hole=0.6, color_discrete_sequence=colors_seq, title="Mass Balance")
-    fig1.update_traces(
-        textposition='inside', 
-        textinfo='percent+label', 
-        textfont=dict(color='white', size=14, family="Arial", weight="bold")
-    )
-    fig1.update_layout(
-        paper_bgcolor=APP_BG_COLOR, 
-        plot_bgcolor=APP_BG_COLOR, 
-        font=dict(color=APP_TXT_COLOR, size=15, family="Segoe UI"),
-        title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
-        legend=dict(font=dict(color="#E0E0E0"))
-    )
+    fig1.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='white', size=14, family="Arial", weight="bold"))
+    fig1.update_layout(paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=15, family="Segoe UI"), title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"), legend=dict(font=dict(color="#E0E0E0")))
 
     # 2. Bar Chart
     organic_char = res['char_kg'] - res['ash_kg']
@@ -412,9 +393,7 @@ def main():
     })
     fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#00743c', '#90A4AE'], title="Solid Composition")
     fig2.update_layout(
-        paper_bgcolor=APP_BG_COLOR, 
-        plot_bgcolor=APP_BG_COLOR, 
-        font=dict(color=APP_TXT_COLOR, size=14, family="Segoe UI"),
+        paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14, family="Segoe UI"),
         title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
         xaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR, size=12)),
         yaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR, size=12)),
@@ -429,42 +408,16 @@ def main():
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 0.2, 1, 0.2, 1, 0.2, 1])
     
     with c1: 
-        st.markdown(f'''
-            <div class="bfd-block">
-                <div>FEEDSTOCK</div>
-                <div class="bfd-sub">{mass} kg<br>{moisture}% H2O</div>
-            </div>
-        ''', unsafe_allow_html=True)
-        
+        st.markdown(f'''<div class="bfd-block"><div>FEEDSTOCK</div><div class="bfd-sub">{mass} kg<br>{moisture}% H2O</div></div>''', unsafe_allow_html=True)
     with c2: st.markdown('<div class="arrow-container">➜</div>', unsafe_allow_html=True)
-    
     with c3: 
-        st.markdown(f'''
-            <div class="bfd-block">
-                <div>DRYING</div>
-                <div class="bfd-sub">Removing H2O<br>Evap: {res['water_evap_kg']:.1f} kg</div>
-            </div>
-        ''', unsafe_allow_html=True)
-
+        st.markdown(f'''<div class="bfd-block"><div>DRYING</div><div class="bfd-sub">Removing H2O<br>Evap: {res['water_evap_kg']:.1f} kg</div></div>''', unsafe_allow_html=True)
     with c4: st.markdown('<div class="arrow-container">➜</div>', unsafe_allow_html=True)
-
     with c5: 
-        st.markdown(f'''
-            <div class="bfd-block">
-                <div>{reactor.upper().split()[0]}</div>
-                <div class="bfd-sub">{temp}°C | {time_min} min<br>Pyrolysis</div>
-            </div>
-        ''', unsafe_allow_html=True)
-
+        st.markdown(f'''<div class="bfd-block"><div>{reactor.upper().split()[0]}</div><div class="bfd-sub">{temp}°C | {time_min} min<br>Pyrolysis</div></div>''', unsafe_allow_html=True)
     with c6: st.markdown('<div class="arrow-container">➜</div>', unsafe_allow_html=True)
-
     with c7: 
-        st.markdown(f'''
-            <div class="bfd-block" style="border-top-color: #00743c;">
-                <div style="color:#00743c; text-shadow:0px 0px 10px rgba(0,116,60,0.5);">BIOCHAR</div>
-                <div class="bfd-sub" style="font-size:14px; font-weight:bold; color:#FFFFFF;">{res["char_kg"]:.1f} kg</div>
-            </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="bfd-block" style="border-top-color: #00743c;"><div style="color:#00743c; text-shadow:0px 0px 10px rgba(0,116,60,0.5);">BIOCHAR</div><div class="bfd-sub" style="font-size:14px; font-weight:bold; color:#FFFFFF;">{res["char_kg"]:.1f} kg</div></div>''', unsafe_allow_html=True)
     
     st.markdown("---")
     k1, k2, k3, k4 = st.columns(4)
@@ -484,16 +437,13 @@ def main():
     with t2:
         df_time = get_time_series(mass, moisture, ash, temp, time_min, params)
         fig_area = go.Figure()
-        # Area chart with Dark Mode Colors
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#00743c')))
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#2E7D32')))
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#4CAF50')))
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#81C784')))
         
         fig_area.update_layout(
-            paper_bgcolor=APP_BG_COLOR, 
-            plot_bgcolor=APP_BG_COLOR, 
-            title="Product Evolution", 
+            paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, title="Product Evolution", 
             title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
             font=dict(color=APP_TXT_COLOR, family="Segoe UI"),
             xaxis=dict(title="Time (min)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"), gridcolor="#333"),
@@ -511,31 +461,21 @@ def main():
         except ImportError:
             st.error("⚠️ Library Missing: Please ensure 'kaleido==0.2.1' is in requirements.txt")
 
-    # --- Game Mode Updates ---
     with t4:
         if game_mode:
-            # --- Initialize Game State if not present ---
             if 'game_target_hhv' not in st.session_state:
                 st.session_state['game_target_hhv'] = 22.0
                 st.session_state['game_min_yield'] = 55.0
                 st.session_state['game_target_profit'] = 0.0
                 st.session_state['client_name'] = "Default Corp"
 
-            # --- Callback: Generate New Targets (Randomize Challenge) ---
             def generate_new_client():
-                # Randomize targets within realistic bounds to create a "New Client"
-                # HHV: 20 to 24 MJ/kg
                 st.session_state['game_target_hhv'] = round(random.uniform(20.0, 24.0), 1)
-                # Yield: 45% to 65%
                 st.session_state['game_min_yield'] = round(random.uniform(45.0, 65.0), 1)
-                # Profit: $10 to $100
                 st.session_state['game_target_profit'] = round(random.uniform(10.0, 100.0), 1)
-                
-                # Random Client Name
                 companies = ["EcoChar Solutions", "GreenEnergy Inc", "CarbonFix Ltd", "AgriFuel Systems", "Sustainable Tech"]
                 st.session_state['client_name'] = f"{random.choice(companies)} #{random.randint(100, 999)}"
 
-            # --- NEW CLIENT BUTTON (Does NOT reset sliders, only targets) ---
             st.markdown(f"### 🎯 Engineering Challenge: {st.session_state['client_name']}")
             
             col_reset, col_info = st.columns([1, 4])
@@ -546,7 +486,6 @@ def main():
 
             st.markdown("---")
             
-            # Use Session State Targets
             TARGET_HHV = st.session_state['game_target_hhv']
             MIN_YIELD = st.session_state['game_min_yield']
             TARGET_PROFIT = st.session_state['game_target_profit']
@@ -561,32 +500,20 @@ def main():
             
             col_g1, col_g2, col_g3 = st.columns(3)
             
-            # 1. HHV Target
             with col_g1:
                 is_hhv_ok = res['hhv_final'] >= TARGET_HHV
-                st.metric(f"Target HHV (>{TARGET_HHV})", f"{res['hhv_final']:.2f}", 
-                         delta=f"{res['hhv_final'] - TARGET_HHV:.2f}", 
-                         delta_color="normal" if is_hhv_ok else "inverse")
-                if not is_hhv_ok:
-                    st.info("💡 **Hint:** Increase Temperature or Residence Time.")
+                st.metric(f"Target HHV (>{TARGET_HHV})", f"{res['hhv_final']:.2f}", delta=f"{res['hhv_final'] - TARGET_HHV:.2f}", delta_color="normal" if is_hhv_ok else "inverse")
+                if not is_hhv_ok: st.info("💡 **Hint:** Increase Temperature or Residence Time.")
 
-            # 2. Yield Target
             with col_g2:
                 is_yield_ok = res['mass_yield_pct'] >= MIN_YIELD
-                st.metric(f"Target Yield (>{MIN_YIELD}%)", f"{res['mass_yield_pct']:.1f}%", 
-                         delta=f"{res['mass_yield_pct'] - MIN_YIELD:.1f}%", 
-                         delta_color="normal" if is_yield_ok else "inverse")
-                if not is_yield_ok:
-                    st.info("💡 **Hint:** Temperature is too high! Lower it.")
+                st.metric(f"Target Yield (>{MIN_YIELD}%)", f"{res['mass_yield_pct']:.1f}%", delta=f"{res['mass_yield_pct'] - MIN_YIELD:.1f}%", delta_color="normal" if is_yield_ok else "inverse")
+                if not is_yield_ok: st.info("💡 **Hint:** Temperature is too high! Lower it.")
 
-            # 3. Profit Target
             with col_g3:
                 is_profit_ok = profit > TARGET_PROFIT
-                st.metric(f"Target Profit (>${TARGET_PROFIT})", f"${profit:.2f}", 
-                         delta="Net Profit", 
-                         delta_color="normal" if is_profit_ok else "inverse")
-                if not is_profit_ok:
-                    st.info("💡 **Hint:** Reduce Time or Increase Mass.")
+                st.metric(f"Target Profit (>${TARGET_PROFIT})", f"${profit:.2f}", delta="Net Profit", delta_color="normal" if is_profit_ok else "inverse")
+                if not is_profit_ok: st.info("💡 **Hint:** Reduce Time or Increase Mass.")
 
             st.markdown("---")
             
