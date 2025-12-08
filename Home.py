@@ -420,9 +420,11 @@ def main():
     with c_logo:
         # Use logo.png if available, else fallback online
         if os.path.exists("logo.png"):
-            st.image("logo.png", width=230)
+            # --- MODIFICATION: Increased width to 300 ---
+            st.image("logo.png", width=300)
         else:
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=230) 
+            # --- MODIFICATION: Increased width to 300 ---
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=300) 
         
     with c_title:
         # --- MODIFICATION: Increased negative margin to -50px ---
