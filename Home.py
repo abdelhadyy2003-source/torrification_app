@@ -413,45 +413,24 @@ def main():
         # Fallback if image not found
         st.markdown("<div style='height: 5px; background-color: #00743c; margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
-    # 2. HTML Banner with Logo & Text (Replaced column layout with this Flex box)
+    # 2. Header Section (Logo + Title)
+    c_logo, c_title = st.columns([1.5, 4.5]) # Adjusted ratio for better alignment
     
-    # Check for uploaded logo
-    logo_html = ""
-    if os.path.exists("logo.png"):
-        with open("logo.png", "rb") as f:
-            data = base64.b64encode(f.read()).decode("utf-8")
-        logo_html = f'<img src="data:image/png;base64,{data}" style="max-height: 240px; margin-bottom: 15px;">'
-    else:
-        logo_html = '<img src="https://i.imgur.com/7Q2y7Yt.png" style="max-height: 240px; margin-bottom: 15px;">'
-
-    st.markdown(f"""
-        <div style="
-            background: linear-gradient(90deg, #00743c 0%, #004d26 100%);
-            padding: 40px;
-            border-radius: 15px;
-            display: flex;
-            flex-direction: column; 
-            align-items: center;    
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            margin-bottom: 30px;
-            border: 1px solid #00965e;
-            text-align: center;
-        ">
-            {logo_html}
-            <div style="text-align: center;">
-                <p style="
-                    color: #FFFFFF !important; 
-                    margin: 0; 
-                    font-size: 24px; 
-                    letter-spacing: 6px; 
-                    font-weight: 700; 
-                    text-transform: uppercase;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                ">TORREFACTION SIMULATOR</p>
+    with c_logo:
+        # Use logo.png if available, else fallback online
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=220) # Slightly larger logo
+        else:
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=220) 
+        
+    with c_title:
+        # Title beside logo
+        st.markdown("""
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 40px;">
+                <h1 style="margin-bottom: 0; color: #00743c; font-size: 48px; line-height: 1.1; font-weight: 900; letter-spacing: -1px;">CHEMISCO</h1>
+                <p style="margin-top: 5px; font-size: 20px; color: #B0BEC5; font-weight: 600; letter-spacing: 2px;">TORREFACTION SIMULATOR</p>
             </div>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
     
