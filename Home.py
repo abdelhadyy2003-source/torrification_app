@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import math
 import random 
 import streamlit.components.v1 as components 
-import base64
+import os # Import os check file existence
 
 # --- 1. Constants & Defaults ---
 R_GAS = 8.314
@@ -187,7 +187,6 @@ def create_pdf(res, profit, fig1, fig2):
     CHEMISCO_GREEN = colors.HexColor('#00743c')
     LIGHT_GREY_BG = colors.HexColor('#f5f5f5')
     
-    # Time Adjustment
     current_time = (datetime.utcnow() + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
 
     # --- 1. HEADER ---
@@ -246,17 +245,16 @@ def create_pdf(res, profit, fig1, fig2):
 
     def add_plot_to_pdf(fig, title, width=6*inch, height=3.2*inch):
         try:
-            # Force white background for PDF clarity (regardless of dark mode app)
             fig.update_layout(
                 paper_bgcolor="white", 
                 plot_bgcolor="white", 
-                font=dict(color="black", size=12, family="Helvetica"), # Force black font
+                font=dict(color="black", size=12, family="Helvetica"), 
                 title=dict(font=dict(color="#00743c")),
                 xaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=False),
                 yaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=True, gridcolor="#eeeeee"),
                 legend=dict(font=dict(color="black"))
             )
-            fig.update_traces(textfont=dict(color="black")) # Black text on charts
+            fig.update_traces(textfont=dict(color="black")) 
             
             img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
             story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
@@ -266,14 +264,10 @@ def create_pdf(res, profit, fig1, fig2):
         except Exception:
             story.append(Paragraph(f"<font color=red>Image Render Error: {title}. Install 'kaleido'.</font>", styles['Normal']))
 
-    # Configure Fig 2 for PDF (Bar Labels)
     fig2.update_traces(texttemplate='%{y:.1f}', textposition='auto')
     
     add_plot_to_pdf(fig1, "Figure A: Mass Balance Distribution")
-    
-    # --- PAGE BREAK for Figure 2 ---
     story.append(PageBreak())
-    
     add_plot_to_pdf(fig2, "Figure B: Solid Composition Analysis")
 
     # --- 4. FOOTER ---
@@ -292,7 +286,7 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS ***
+    # *** 🚀 INJECT BOTPRESS ONLY ***
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
@@ -397,23 +391,16 @@ def main():
 
     # Dashboard - Header Section with Logo
     
-    # 1. Embed Image (Base64) - REPLACE WITH YOUR ACTUAL LOGO DATA
-    # To use your logo: 
-    # 1. Put 'logo.png' next to your script.
-    # 2. Uncomment these lines:
-    # with open("logo.png", "rb") as f:
-    #     data = base64.b64encode(f.read()).decode("utf-8")
-    # LOGO_SRC = f"data:image/png;base64,{data}"
-    
-    # Using a placeholder for now (the green leaf from your request)
-    LOGO_SRC = "https://i.imgur.com/7Q2y7Yt.png" # Placeholder for your green leaf logo
-
-    
     # 2. Banner Layout (Columns)
     c_logo, c_title = st.columns([1, 5])
     
     with c_logo:
-        st.image(LOGO_SRC, width=120) # Adjusted width for the banner
+        # Check if local logo.png exists, else use placeholder
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=120)
+        else:
+            # Fallback to the requested online image (Green Leaf)
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=120) 
         
     with c_title:
         st.markdown("""
