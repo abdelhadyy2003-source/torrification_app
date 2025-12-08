@@ -288,9 +288,10 @@ def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
     # *** 🚀 INJECT BOTPRESS & FIX 'C' SHORTCUT ***
-    # Updated to Botpress v3.5 and new configuration file
+    # Now using the updated Botpress v3.5 links and improved shortcut blocking
     js_code = """
     <script>
+        // 1. Inject Botpress
         if (!window.parent.document.getElementById('botpress-inject')) {
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
@@ -305,18 +306,16 @@ def main():
             };
         }
 
+        // 2. Fix 'C' Shortcut Conflict
+        // This ensures typing 'C' in the chat works, but Streamlit doesn't see it (preventing the cache clear popup).
         window.parent.document.addEventListener('keydown', function(e) {
             if (e.key.toLowerCase() === 'c') {
-                var target = e.target;
-                var isInput = (target.tagName === 'INPUT' || 
-                               target.tagName === 'TEXTAREA' || 
-                               target.isContentEditable);
-
-                if (!isInput) {
-                    e.stopImmediatePropagation();
-                    e.stopPropagation();
-                    e.preventDefault();
-                    console.log("Chemisco: Blocked 'C' shortcut to prevent cache clear.");
+                // If the user is typing in the bot or any input (target is NOT the body),
+                // we allow the typing to happen, but STOP it from reaching Streamlit.
+                if (e.target.tagName !== 'BODY') {
+                    e.target.addEventListener('keydown', function(ev) {
+                        ev.stopPropagation();
+                    }, { once: true });
                 }
             }
         }, true);
