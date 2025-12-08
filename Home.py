@@ -413,9 +413,9 @@ def main():
         # Fallback if image not found
         st.markdown("<div style='height: 5px; background-color: #00743c; margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
-    # 2. Header Section (Logo + Title) - MODIFIED: Logo Removed, Text Centered
+    # 2. Header Section (Title Only - Left Aligned)
     st.markdown("""
-        <div style="text-align: center; padding-top: 10px; margin-bottom: 20px;">
+        <div style="text-align: left; padding-top: 10px; margin-bottom: 20px;">
             <h1 style="margin-bottom: 0; color: #00743c; font-size: 48px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
             <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1.5px;">TORREFACTION SIMULATOR</p>
         </div>
