@@ -24,17 +24,17 @@ HHV_DRY_INITIAL_DEFAULT = 18.0
 # --- 2. Styles ---
 GLOBAL_CSS = """
 <style>
-    /* Main Background - لون فاتح ونقي */
-    .stApp { background-color: #F1F8E9; font-family: 'Segoe UI', sans-serif; }
+    /* Main Background - لون فاتح جداً مريح للعين */
+    .stApp { background-color: #F7F9F8; font-family: 'Segoe UI', sans-serif; }
     
-    /* --- SIDEBAR STYLING (Lighter & Professional Gradient) --- */
+    /* --- SIDEBAR STYLING (Updated with #00743c) --- */
     section[data-testid="stSidebar"] { 
-        /* تدرج أخضر أفتح وأكثر حيوية (Emerald to Forest Green) */
-        background: linear-gradient(180deg, #43A047 0%, #2E7D32 100%);
+        /* تدرج لوني يعتمد على اللون المطلوب */
+        background: linear-gradient(180deg, #00743c 0%, #005029 100%);
         border-right: 1px solid rgba(255,255,255,0.2);
     }
     
-    /* تنسيق النصوص في السايد بار */
+    /* النصوص بيضاء في السايد بار */
     section[data-testid="stSidebar"] h1, 
     section[data-testid="stSidebar"] h2, 
     section[data-testid="stSidebar"] h3 { 
@@ -53,14 +53,14 @@ GLOBAL_CSS = """
         color: #FFFFFF !important; 
     }
 
-    /* تنسيق القوائم المنسدلة */
+    /* مربعات الإدخال والقوائم */
     section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
         color: #000000 !important;
         background-color: #ffffff !important;
         border-radius: 8px;
     }
     
-    /* تنسيق الـ Expanders ليكون شكلها مندمج مع الخلفية الجديدة */
+    /* Expanders styling */
     section[data-testid="stSidebar"] .streamlit-expanderHeader {
         background-color: rgba(255, 255, 255, 0.15) !important;
         color: #FFFFFF !important;
@@ -68,26 +68,26 @@ GLOBAL_CSS = """
         font-weight: 600;
     }
 
-    /* --- REST OF STYLES --- */
-    h1, h2, h3 { color: #2E7D32 !important; font-weight: 800; }
+    /* --- REST OF STYLES (Using #00743c) --- */
+    h1, h2, h3 { color: #00743c !important; font-weight: 800; }
     
     /* Tabs styling */
-    div[data-testid="stTabs"] button { color: #558B2F !important; font-weight: 600; font-size: 16px; }
+    div[data-testid="stTabs"] button { color: #507d6a !important; font-weight: 600; font-size: 16px; }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
-        color: #2E7D32 !important; border-bottom: 3px solid #2E7D32 !important; font-weight: 800;
+        color: #00743c !important; border-bottom: 3px solid #00743c !important; font-weight: 800;
     }
 
     /* Metrics Cards */
     div[data-testid="stMetric"] {
         background-color: #FFFFFF !important;
         border: 1px solid #C8E6C9; 
-        border-left: 5px solid #43A047;
+        border-left: 5px solid #00743c;
         border-radius: 10px; 
         padding: 15px; 
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    div[data-testid="stMetricValue"] { color: #1B5E20 !important; font-weight: bold; }
-    div[data-testid="stMetricLabel"] { color: #388E3C !important; font-weight: 600; }
+    div[data-testid="stMetricValue"] { color: #00743c !important; font-weight: bold; }
+    div[data-testid="stMetricLabel"] { color: #2e5948 !important; font-weight: 600; }
 
     /* Flow Chart Blocks (Updated Colors) */
     .bfd-block {
@@ -96,8 +96,8 @@ GLOBAL_CSS = """
         text-align: center; 
         background: #FFFFFF; 
         border: 1px solid #A5D6A7; 
-        border-top: 5px solid #2E7D32;
-        color: #1B5E20; 
+        border-top: 5px solid #00743c;
+        color: #00743c; 
         font-weight: 700;
         box-shadow: 0 3px 6px rgba(0,0,0,0.05);
         font-size: 14px;
@@ -110,7 +110,7 @@ GLOBAL_CSS = """
     .bfd-sub {
         font-weight: 400;
         font-size: 12px;
-        color: #558B2F;
+        color: #556B2F;
         margin-top: 4px;
     }
     .arrow-container {
@@ -119,7 +119,7 @@ GLOBAL_CSS = """
         justify-content: center;
         height: 100%;
         font-size: 24px;
-        color: #43A047;
+        color: #00743c;
         font-weight: bold;
     }
     
@@ -208,8 +208,8 @@ def create_pdf(res, profit, fig1, fig2):
     styles = getSampleStyleSheet()
     story = []
     
-    # Updated PDF Color to match lighter theme
-    CHEMISCO_GREEN = colors.HexColor('#2E7D32')
+    # Updated PDF Color to match requested #00743c
+    CHEMISCO_GREEN = colors.HexColor('#00743c')
     
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -303,7 +303,7 @@ def main():
     if 'cost_biomass' not in st.session_state: 
         st.session_state.update({'cost_biomass': 30.0, 'cost_energy': 0.15, 'price_char': 1.20})
 
-    # Sidebar (Everything is a Slider now, Lighter Theme)
+    # Sidebar (Sliders with new Theme)
     with st.sidebar:
         st.markdown("""
             <div class="header-box">
@@ -316,7 +316,6 @@ def main():
         reactor = st.selectbox("Reactor Type", ["Rotary Drum", "Fluidized Bed", "Screw Reactor"])
         
         with st.expander("🌲 Feedstock", expanded=True):
-            # Converted to Slider
             mass = st.slider("Mass (kg)", 1.0, 10000.0, 100.0, 10.0, key='mass_input')
             moisture = st.slider("Moisture (%)", 0.0, 60.0, 15.0)
             ash = st.slider("Ash (Dry %)", 0.0, 30.0, 5.0)
@@ -326,7 +325,6 @@ def main():
             time_min = st.slider("Time (min)", 10, 120, 30, key='time_input')
 
         with st.expander("🔧 Model Params", expanded=False):
-            # Converted all to Sliders with precise steps
             p_kf = st.slider("Drying rate", 0.0, 0.1, 0.02, step=0.001, format="%.3f")
             p_Coil = st.slider("Max Oil frac", 0.0, 0.5, 0.25, step=0.01)
             p_Cgas = st.slider("Max Gas frac", 0.0, 0.5, 0.20, step=0.01)
@@ -338,7 +336,6 @@ def main():
         params = {"k_f": p_kf, "C_oil": p_Coil, "C_gas": p_Cgas, "a_solid": p_a, "b_solid": p_b, "energy_factor": p_enh}
 
         with st.expander("💰 Economics", expanded=False):
-            # Converted all to Sliders
             st.session_state.cost_biomass = st.slider("Feed ($/ton)", 0.0, 200.0, st.session_state.cost_biomass, step=1.0)
             st.session_state.cost_energy = st.slider("Energy ($/kWh)", 0.0, 1.0, st.session_state.cost_energy, step=0.01)
             st.session_state.price_char = st.slider("Char Price ($/kg)", 0.0, 5.0, st.session_state.price_char, step=0.1)
@@ -354,10 +351,10 @@ def main():
     revenue = res['char_kg'] * st.session_state.price_char
     profit = revenue - (cost_feed + cost_ops)
 
-    # Visualization (Updated Palette)
-    APP_TXT_COLOR = "#1B5E20" # Darker Green text
-    APP_BG_COLOR = "#F1F8E9"  # Very Light Green BG
-    colors_seq = ["#2E7D32", "#43A047", "#66BB6A", "#A5D6A7"] # Emerald Palette
+    # Visualization (Updated Palette with #00743c)
+    APP_TXT_COLOR = "#00743c" 
+    APP_BG_COLOR = "#F7F9F8"  
+    colors_seq = ["#00743c", "#2E8B57", "#3CB371", "#8FBC8F"] # Palette based on #00743c
 
     # 1. Pie Chart
     df_pie = pd.DataFrame({
@@ -374,7 +371,7 @@ def main():
         "Type": ["Organic Carbon", "Ash"],
         "Mass (kg)": [organic_char, res['ash_kg']]
     })
-    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#2E7D32', '#90A4AE'], title="Solid Composition")
+    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#00743c', '#78909C'], title="Solid Composition")
     fig2.update_layout(
         paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14),
         xaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR)),
@@ -421,8 +418,8 @@ def main():
 
     with c7: 
         st.markdown(f'''
-            <div class="bfd-block" style="border-top-color: #43A047;">
-                <div style="color:#2E7D32;">BIOCHAR</div>
+            <div class="bfd-block" style="border-top-color: #00743c;">
+                <div style="color:#00743c;">BIOCHAR</div>
                 <div class="bfd-sub" style="font-size:14px; font-weight:bold;">{res["char_kg"]:.1f} kg</div>
             </div>
         ''', unsafe_allow_html=True)
@@ -445,9 +442,9 @@ def main():
     with t2:
         df_time = get_time_series(mass, moisture, ash, temp, time_min, params)
         fig_area = go.Figure()
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#1B5E20')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#43A047')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#A5D6A7')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#00743c')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#2E8B57')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#8FBC8F')))
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#C8E6C9')))
         fig_area.update_layout(
             paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, title="Product Evolution", 
