@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from io import BytesIO
@@ -21,7 +21,7 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (DARK MODE) ---
+# --- 2. Styles (DARK MODE - UNCHANGED) ---
 GLOBAL_CSS = """
 <style>
     /* 1. Main Background - Dark Mode */
@@ -30,7 +30,7 @@ GLOBAL_CSS = """
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     }
     
-    /* --- SIDEBAR STYLING (Kept the Green Gradient, looks great in dark mode) --- */
+    /* --- SIDEBAR STYLING --- */
     section[data-testid="stSidebar"] { 
         background: linear-gradient(180deg, #00743c 0%, #004d26 100%);
         border-right: 1px solid rgba(255,255,255,0.1);
@@ -45,7 +45,6 @@ GLOBAL_CSS = """
     section[data-testid="stSidebar"] .stSlider div { 
         color: #FFFFFF !important; 
     }
-    /* Inputs in sidebar - Darker background for dark mode feel */
     section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
         color: #FFFFFF !important; background-color: #1E1E1E !important; border-radius: 8px; border: 1px solid #333;
     }
@@ -55,92 +54,56 @@ GLOBAL_CSS = """
     }
 
     /* --- MAIN CONTENT HARMONIZATION (DARK) --- */
-    
-    /* Headings - White for readability on dark bg */
     h1, h2, h3 { 
         color: #FFFFFF !important; 
         font-weight: 800; 
         letter-spacing: -0.5px;
     }
-    
-    /* Text - Light Grey */
     p, div, li {
         color: #E0E0E0;
     }
     
-    /* Metrics Cards - Dark Cards */
     div[data-testid="stMetric"] {
         background-color: #1E1E1E !important;
         border: 1px solid #333333; 
-        border-left: 5px solid #00743c; /* Keep the Green Accent */
+        border-left: 5px solid #00743c; 
         border-radius: 8px; 
         padding: 15px; 
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    div[data-testid="stMetricValue"] { color: #4ADE80 !important; font-weight: 800; font-size: 26px !important; } /* Lighter green text for contrast */
+    div[data-testid="stMetricValue"] { color: #4ADE80 !important; font-weight: 800; font-size: 26px !important; }
     div[data-testid="stMetricLabel"] { color: #B0BEC5 !important; font-weight: 600; font-size: 14px; }
 
-    /* Tabs - Dark Mode */
     div[data-testid="stTabs"] button { 
-        color: #9E9E9E !important; 
-        font-weight: 600; 
-        font-size: 15px; 
+        color: #9E9E9E !important; font-weight: 600; font-size: 15px; 
     }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
-        color: #4ADE80 !important; /* Neon/Light Green for selection */
-        border-bottom: 3px solid #4ADE80 !important; 
-        font-weight: 800;
+        color: #4ADE80 !important; border-bottom: 3px solid #4ADE80 !important; font-weight: 800;
     }
 
-    /* Flow Chart Blocks - Dark Mode */
     .bfd-block {
-        padding: 15px; 
-        border-radius: 8px; 
-        text-align: center; 
-        background: #1E1E1E; /* Dark Card */
-        border: 1px solid #333; 
-        border-top: 5px solid #00743c;
-        color: #FFFFFF; 
-        font-weight: 800;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        font-size: 15px;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        padding: 15px; border-radius: 8px; text-align: center; 
+        background: #1E1E1E; border: 1px solid #333; border-top: 5px solid #00743c;
+        color: #FFFFFF; font-weight: 800; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        font-size: 15px; height: 100%; display: flex; flex-direction: column; 
+        justify-content: center; align-items: center;
     }
     .bfd-sub {
-        font-weight: 500;
-        font-size: 13px;
-        color: #B0BEC5; 
-        margin-top: 5px;
+        font-weight: 500; font-size: 13px; color: #B0BEC5; margin-top: 5px;
     }
     .arrow-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        font-size: 24px;
-        color: #00743c; 
-        font-weight: bold;
+        display: flex; align-items: center; justify-content: center; height: 100%;
+        font-size: 24px; color: #00743c; font-weight: bold;
     }
 
-    /* Buttons */
     .stButton > button {
-        background-color: #00743c !important;
-        color: white !important;
-        border-radius: 6px;
-        font-weight: 600;
-        border: none;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        background-color: #00743c !important; color: white !important; border-radius: 6px;
+        font-weight: 600; border: none; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
     }
     .stButton > button:hover {
-        background-color: #00965e !important; /* Slightly lighter on hover */
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+        background-color: #00965e !important; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
     }
     
-    /* Header Box in Sidebar */
     .header-box {
         background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; 
         text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.1);
@@ -218,74 +181,105 @@ def get_time_series(mass_in, moisture_pct, ash_pct_dry, temp_c, time_min, params
         })
     return pd.DataFrame(data)
 
-# --- 4. PDF Generator ---
+# --- 4. Professional PDF Generator (RE-WRITTEN FOR QUALITY) ---
 def create_pdf(res, profit, fig1, fig2):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     styles = getSampleStyleSheet()
     story = []
     
+    # Theme Colors
     CHEMISCO_GREEN = colors.HexColor('#00743c')
+    DARK_GREY = colors.HexColor('#333333')
+    LIGHT_GREY_BG = colors.HexColor('#f5f5f5')
     
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # Header with Logo
-    logo_style = ParagraphStyle(name='LogoText', fontName='Helvetica-Bold', fontSize=18, textColor=colors.white, alignment=1)
-    sub_logo_style = ParagraphStyle(name='SubLogo', fontName='Helvetica', fontSize=8, textColor=colors.whitesmoke, alignment=1)
-    
-    logo_content = [[Paragraph("CHEMISCO", logo_style)], [Paragraph("Torrefaction Simulator", sub_logo_style)]]
-    t_logo = Table(logo_content, colWidths=[2.5*inch])
-    t_logo.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), CHEMISCO_GREEN),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOX', (0,0), (-1,-1), 1, colors.white), ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-    ]))
+    # --- 1. PROFESSIONAL HEADER ---
+    # Logo text and Subtitle
+    title_style = ParagraphStyle(name='MainTitle', fontName='Helvetica-Bold', fontSize=22, textColor=CHEMISCO_GREEN, alignment=0)
+    subtitle_style = ParagraphStyle(name='SubTitle', fontName='Helvetica', fontSize=10, textColor=colors.grey, alignment=0)
+    date_style = ParagraphStyle(name='DateText', fontName='Helvetica', fontSize=10, textColor=colors.black, alignment=2)
 
-    info_text = Paragraph(f"<b>Date:</b> {current_time}<br/><b>Status:</b> Success", styles['Normal'])
-    header_layout = [[t_logo, info_text]]
-    t_header_main = Table(header_layout, colWidths=[3*inch, 3*inch])
-    t_header_main.setStyle(TableStyle([('ALIGN', (0,0), (0,0), 'LEFT'), ('ALIGN', (1,0), (1,0), 'RIGHT'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
+    header_data = [
+        [Paragraph("CHEMISCO", title_style), Paragraph(f"Report Generated: {current_time}", date_style)],
+        [Paragraph("Advanced Torrefaction Simulation Report", subtitle_style), ""]
+    ]
     
-    story.append(t_header_main)
-    story.append(Spacer(1, 25))
-    
-    story.append(Paragraph("Technical Engineering Report", ParagraphStyle(name='Title', parent=styles['Heading2'], textColor=CHEMISCO_GREEN, fontSize=16)))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph("Simulation results based on current reactor parameters.", styles['Normal']))
+    t_header = Table(header_data, colWidths=[4.5*inch, 2.5*inch])
+    t_header.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LINEBELOW', (0,1), (-1,1), 2, CHEMISCO_GREEN),
+        ('BOTTOMPADDING', (0,1), (-1,1), 10),
+    ]))
+    story.append(t_header)
     story.append(Spacer(1, 20))
 
-    data = [
-        ["Metric", "Value"], 
-        ["Mass Yield", f"{res['mass_yield_pct']:.1f} %"], 
-        ["Energy Density (HHV)", f"{res['hhv_final']:.2f} MJ/kg"],
-        ["Energy Yield", f"{res['energy_yield_pct']:.1f} %"],
-        ["Bio-Oil Produced", f"{res['oil_kg']:.2f} kg"],
-        ["Profit Estimate", f"${profit:.2f}"]
+    # --- 2. EXECUTIVE SUMMARY (RESULTS TABLE) ---
+    story.append(Paragraph("1. Simulation Results", styles['Heading2']))
+    story.append(Spacer(1, 10))
+
+    # Data for the table with clearer labels
+    table_data = [
+        ["KPI / Metric", "Value", "Unit", "Notes"],
+        ["Biochar Yield (Mass)", f"{res['mass_yield_pct']:.1f}", "%", f"{res['char_kg']:.1f} kg recovered"],
+        ["Energy Density (HHV)", f"{res['hhv_final']:.2f}", "MJ/kg", f"+{res['hhv_increase_pct']:.1f}% Improvement"],
+        ["Energy Yield", f"{res['energy_yield_pct']:.1f}", "%", "Retained Energy"],
+        ["Bio-Oil Production", f"{res['oil_kg']:.2f}", "kg", "Condensable By-product"],
+        ["Est. Net Profit", f"${profit:.2f}", "USD", "Based on current inputs"]
     ]
-    t = Table(data, colWidths=[3.5*inch, 2.5*inch])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), CHEMISCO_GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12), ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey)
+
+    t_results = Table(table_data, colWidths=[2.5*inch, 1.5*inch, 1*inch, 2*inch])
+    t_results.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), CHEMISCO_GREEN),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'CENTER'), # Center values
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 11),
+        ('BOTTOMPADDING', (0,0), (-1,0), 10),
+        ('TOPPADDING', (0,0), (-1,0), 10),
+        # Alternating Rows
+        ('BACKGROUND', (0,1), (-1,-1), colors.white),
+        ('ROWBACKGROUNDS', (1, 1), (-1, -1), [colors.white, LIGHT_GREY_BG]),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
+        ('FONTNAME', (0,1), (0,-1), 'Helvetica-Bold'), # Bold first column
     ]))
-    story.append(t); story.append(Spacer(1, 30))
+    story.append(t_results)
+    story.append(Spacer(1, 25))
 
-    def add_plot(fig, title):
+    # --- 3. CHARTS VISUALIZATION ---
+    story.append(Paragraph("2. Process Analytics", styles['Heading2']))
+    story.append(Spacer(1, 10))
+
+    def add_plot_to_pdf(fig, title, width=6*inch, height=3.2*inch):
         try:
-            fig.update_layout(paper_bgcolor="white", plot_bgcolor="white", font=dict(color="black"))
-            img_bytes = fig.to_image(format="png", width=800, height=450, scale=2)
+            # Force white background for PDF clarity (regardless of dark mode app)
+            fig.update_layout(
+                paper_bgcolor="white", 
+                plot_bgcolor="white", 
+                font=dict(color="black", size=14),
+                title=dict(font=dict(color="#00743c"))
+            )
+            img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
             story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
-            story.append(Image(BytesIO(img_bytes), width=6*inch, height=3.5*inch))
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 5))
+            story.append(Image(BytesIO(img_bytes), width=width, height=height))
+            story.append(Spacer(1, 15))
         except Exception:
-            story.append(Paragraph(f"<font color=red>Error rendering chart: {title}. Ensure 'kaleido==0.2.1' is installed.</font>", styles['Normal']))
+            story.append(Paragraph(f"<font color=red>Image Render Error: {title}. Install 'kaleido'.</font>", styles['Normal']))
 
-    add_plot(fig1, "Figure 1: Mass Balance Distribution")
-    add_plot(fig2, "Figure 2: Solid Composition")
-    
+    add_plot_to_pdf(fig1, "Figure A: Mass Balance Distribution")
+    add_plot_to_pdf(fig2, "Figure B: Solid Composition Analysis")
+
+    # --- 4. FOOTER ---
     story.append(Spacer(1, 30))
-    story.append(Paragraph("<font color=grey size=8>Chemisco Simulator v3.6</font>", styles['Normal']))
+    footer_text = Paragraph(
+        f"<font color='grey' size=8>Generated by Chemisco Pro Simulator v3.7 | Confidential Engineering Report | {current_time}</font>",
+        ParagraphStyle(name='Footer', alignment=1)
+    )
+    story.append(footer_text)
+
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -368,10 +362,10 @@ def main():
     profit = revenue - (cost_feed + cost_ops)
 
     # --- DARK MODE CHART CONFIG ---
-    APP_TXT_COLOR = "#FFFFFF"   # White text for dark mode
-    APP_BG_COLOR = "#121212"    # Match the CSS dark bg
+    APP_TXT_COLOR = "#FFFFFF"   
+    APP_BG_COLOR = "#121212"    
     
-    # Palette matching #00743c in Dark Mode (Green shades)
+    # Palette matching #00743c in Dark Mode
     colors_seq = ["#00743c", "#4CAF50", "#81C784", "#A5D6A7"]
 
     # 1. Pie Chart
@@ -389,7 +383,8 @@ def main():
         paper_bgcolor=APP_BG_COLOR, 
         plot_bgcolor=APP_BG_COLOR, 
         font=dict(color=APP_TXT_COLOR, size=15, family="Segoe UI"),
-        title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold")
+        title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
+        legend=dict(font=dict(color="#E0E0E0"))
     )
 
     # 2. Bar Chart
@@ -449,8 +444,8 @@ def main():
     with c7: 
         st.markdown(f'''
             <div class="bfd-block" style="border-top-color: #00743c;">
-                <div style="color:#00743c;">BIOCHAR</div>
-                <div class="bfd-sub" style="font-size:14px; font-weight:bold;">{res["char_kg"]:.1f} kg</div>
+                <div style="color:#00743c; text-shadow:0px 0px 10px rgba(0,116,60,0.5);">BIOCHAR</div>
+                <div class="bfd-sub" style="font-size:14px; font-weight:bold; color:#FFFFFF;">{res["char_kg"]:.1f} kg</div>
             </div>
         ''', unsafe_allow_html=True)
     
@@ -476,7 +471,7 @@ def main():
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#00743c')))
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#2E7D32')))
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#4CAF50')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#66BB6A')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#81C784')))
         
         fig_area.update_layout(
             paper_bgcolor=APP_BG_COLOR, 
@@ -485,7 +480,8 @@ def main():
             title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
             font=dict(color=APP_TXT_COLOR, family="Segoe UI"),
             xaxis=dict(title="Time (min)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"), gridcolor="#333"),
-            yaxis=dict(title="Mass (kg)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"), gridcolor="#333")
+            yaxis=dict(title="Mass (kg)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"), gridcolor="#333"),
+            legend=dict(font=dict(color="#E0E0E0"))
         )
         st.plotly_chart(fig_area, use_container_width=True)
 
