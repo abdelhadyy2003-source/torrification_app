@@ -21,13 +21,23 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (DARK MODE) ---
+# --- 2. Styles (DARK MODE + Hide Header) ---
 GLOBAL_CSS = """
 <style>
     /* 1. Main Background - Dark Mode */
     .stApp { 
         background-color: #121212; 
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+    }
+    
+    /* --- HIDE STREAMLIT HEADER & FOOTER (Fix for shortcuts) --- */
+    header[data-testid="stHeader"] {
+        visibility: hidden;
+        height: 0%;
+    }
+    footer {
+        visibility: hidden;
+        height: 0%;
     }
     
     /* --- SIDEBAR STYLING --- */
@@ -251,17 +261,16 @@ def create_pdf(res, profit, fig1, fig2):
 
     def add_plot_to_pdf(fig, title, width=6*inch, height=3.2*inch):
         try:
-            # Force white background for PDF clarity (regardless of dark mode app)
             fig.update_layout(
                 paper_bgcolor="white", 
                 plot_bgcolor="white", 
-                font=dict(color="black", size=12, family="Helvetica"), # Force black font
+                font=dict(color="black", size=12, family="Helvetica"), 
                 title=dict(font=dict(color="#00743c")),
                 xaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=False),
                 yaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black"), showgrid=True, gridcolor="#eeeeee"),
                 legend=dict(font=dict(color="black"))
             )
-            fig.update_traces(textfont=dict(color="black")) # Black text on charts
+            fig.update_traces(textfont=dict(color="black")) 
             
             img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
             story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
@@ -271,14 +280,10 @@ def create_pdf(res, profit, fig1, fig2):
         except Exception:
             story.append(Paragraph(f"<font color=red>Image Render Error: {title}. Install 'kaleido'.</font>", styles['Normal']))
 
-    # Configure Fig 2 for PDF (Bar Labels)
     fig2.update_traces(texttemplate='%{y:.1f}', textposition='auto')
     
     add_plot_to_pdf(fig1, "Figure A: Mass Balance Distribution")
-    
-    # --- PAGE BREAK for Figure 2 ---
     story.append(PageBreak())
-    
     add_plot_to_pdf(fig2, "Figure B: Solid Composition Analysis")
 
     # --- 4. FOOTER ---
@@ -297,9 +302,10 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS ***
+    # *** 🚀 INJECT BOTPRESS & KEYBOARD FIX ***
     js_code = """
     <script>
+        // 1. Botpress Injection
         if (!window.parent.document.getElementById('botpress-inject')) {
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
@@ -313,6 +319,15 @@ def main():
                 window.parent.document.body.appendChild(script2);
             };
         }
+
+        // 2. Prevent Streamlit 'C' shortcut (Clear Cache) unless typing
+        document.addEventListener('keydown', function(e) {
+            if (e.key.toLowerCase() === 'c') {
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                    e.stopPropagation();
+                }
+            }
+        }, true);
     </script>
     """
     components.html(js_code, height=0, width=0)
