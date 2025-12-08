@@ -288,17 +288,18 @@ def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
     # *** 🚀 INJECT BOTPRESS & FIX 'C' SHORTCUT ***
+    # Updated to Botpress v3.5 and new configuration file
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
-            script1.src = 'https://cdn.botpress.cloud/webchat/v3.4/inject.js';
+            script1.src = 'https://cdn.botpress.cloud/webchat/v3.5/inject.js';
             window.parent.document.head.appendChild(script1);
             
             script1.onload = function() {
                 var script2 = window.parent.document.createElement('script');
-                script2.src = 'https://files.bpcontent.cloud/2025/11/28/23/20251128230307-F5JAD1ML.js';
+                script2.src = 'https://files.bpcontent.cloud/2025/12/08/20/20251208203130-UR77LT73.js';
                 script2.defer = true;
                 window.parent.document.body.appendChild(script2);
             };
