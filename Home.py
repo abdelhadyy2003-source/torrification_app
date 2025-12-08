@@ -27,35 +27,51 @@ GLOBAL_CSS = """
     /* Main Background */
     .stApp { background-color: #F5F7F8; font-family: 'Segoe UI', sans-serif; }
     
-    /* --- SIDEBAR STYLING (FIXED VISIBILITY) --- */
+    /* --- SIDEBAR STYLING (IMPROVED COORDINATION) --- */
     section[data-testid="stSidebar"] { 
-        background-color: #1A3C34; 
+        /* تدرج لوني يعطي فخامة بدلاً من اللون المصمت */
+        background: linear-gradient(180deg, #1A3C34 0%, #0F2822 100%);
         border-right: 1px solid rgba(255,255,255,0.1);
     }
     
-    /* 1. جعل العناوين والنصوص التعريفية باللون الأبيض */
+    /* 1. تنسيق العناوين في السايد بار لتكون بلون التمييز (Teal) */
     section[data-testid="stSidebar"] h1, 
     section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3, 
+    section[data-testid="stSidebar"] h3 { 
+        color: #26A69A !important; 
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+
+    /* 2. النصوص العادية والـ Labels تظل بيضاء للقراءة */
     section[data-testid="stSidebar"] label, 
     section[data-testid="stSidebar"] .stMarkdown,
     section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] span { 
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] div[data-testid="stTickBar"] > div,
+    section[data-testid="stSidebar"] div[data-testid="stThumbValue"] { 
         color: #FFFFFF !important; 
     }
-    
-    /* 2. جعل أرقام الـ Sliders والتدريج باللون الأبيض */
-    section[data-testid="stSidebar"] div[data-testid="stTickBar"] > div,
-    section[data-testid="stSidebar"] div[data-testid="stThumbValue"] {
-        color: #FFFFFF !important;
-    }
 
-    /* 3. استثناء: النصوص داخل مربعات الإدخال البيضاء تظل سوداء */
+    /* 3. تنسيق مربعات الإدخال (أبيض وكتابة سوداء) */
     section[data-testid="stSidebar"] input {
         color: #000000 !important;
+        background-color: #ffffff !important;
+        border-radius: 5px;
     }
     section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
         color: #000000 !important;
+        background-color: #ffffff !important;
+        border-radius: 5px;
+    }
+    
+    /* تنسيق العناوين الفرعية للإكسباندر */
+    section[data-testid="stSidebar"] .streamlit-expanderHeader {
+        color: #FFFFFF !important;
+        font-weight: 600;
+        background-color: rgba(255,255,255,0.05); /* خلفية شفافة خفيفة */
+        border-radius: 5px;
+        margin-bottom: 5px;
     }
 
     /* --- REST OF STYLES --- */
@@ -116,8 +132,9 @@ GLOBAL_CSS = """
     }
     
     .header-box {
-        background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; 
-        text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.2);
+        background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; 
+        text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     
     #MainMenu, footer, .stDeployButton {visibility: hidden;}
@@ -372,7 +389,7 @@ def main():
     st.title("CHEMISCO: Process Dashboard")
     st.markdown("---")
     
-    # --- UPDATED FLOW CHART (Clean Blocks with Drying) ---
+    # --- FLOW CHART (Clean Blocks with Drying) ---
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 0.2, 1, 0.2, 1, 0.2, 1])
     
     with c1: 
