@@ -21,22 +21,22 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles ---
+# --- 2. Styles (DARK MODE) ---
 GLOBAL_CSS = """
 <style>
-    /* 1. Main Background - Clean Professional Grey-White */
+    /* 1. Main Background - Dark Mode */
     .stApp { 
-        background-color: #F9FAFA; 
+        background-color: #121212; 
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     }
     
-    /* --- SIDEBAR STYLING (UNCHANGED as requested) --- */
+    /* --- SIDEBAR STYLING (Kept the Green Gradient, looks great in dark mode) --- */
     section[data-testid="stSidebar"] { 
-        background: linear-gradient(180deg, #00743c 0%, #005029 100%);
-        border-right: 1px solid rgba(255,255,255,0.2);
+        background: linear-gradient(180deg, #00743c 0%, #004d26 100%);
+        border-right: 1px solid rgba(255,255,255,0.1);
     }
     section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 { 
-        color: #FFFFFF !important; font-weight: 800; text-shadow: 0px 1px 2px rgba(0,0,0,0.1);
+        color: #FFFFFF !important; font-weight: 800; text-shadow: 0px 1px 2px rgba(0,0,0,0.5);
     }
     section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] .stMarkdown,
     section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span,
@@ -45,63 +45,64 @@ GLOBAL_CSS = """
     section[data-testid="stSidebar"] .stSlider div { 
         color: #FFFFFF !important; 
     }
+    /* Inputs in sidebar - Darker background for dark mode feel */
     section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
-        color: #000000 !important; background-color: #ffffff !important; border-radius: 8px;
+        color: #FFFFFF !important; background-color: #1E1E1E !important; border-radius: 8px; border: 1px solid #333;
     }
     section[data-testid="stSidebar"] .streamlit-expanderHeader {
-        background-color: rgba(255, 255, 255, 0.15) !important; color: #FFFFFF !important;
+        background-color: rgba(0, 0, 0, 0.2) !important; color: #FFFFFF !important;
         border-radius: 6px; font-weight: 600;
     }
 
-    /* --- MAIN CONTENT HARMONIZATION --- */
+    /* --- MAIN CONTENT HARMONIZATION (DARK) --- */
     
-    /* Headings - Matching the Sidebar Green */
+    /* Headings - White for readability on dark bg */
     h1, h2, h3 { 
-        color: #005029 !important; /* Slightly darker than sidebar for contrast on white */
+        color: #FFFFFF !important; 
         font-weight: 800; 
         letter-spacing: -0.5px;
     }
     
-    /* Metrics Cards - Clean & Professional */
+    /* Text - Light Grey */
+    p, div, li {
+        color: #E0E0E0;
+    }
+    
+    /* Metrics Cards - Dark Cards */
     div[data-testid="stMetric"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #E0E0E0; 
-        border-left: 5px solid #00743c; /* Accent Color */
+        background-color: #1E1E1E !important;
+        border: 1px solid #333333; 
+        border-left: 5px solid #00743c; /* Keep the Green Accent */
         border-radius: 8px; 
         padding: 15px; 
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        transition: transform 0.2s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
-    div[data-testid="stMetricValue"] { color: #00743c !important; font-weight: 800; font-size: 26px !important; }
-    div[data-testid="stMetricLabel"] { color: #546E7A !important; font-weight: 600; font-size: 14px; }
+    div[data-testid="stMetricValue"] { color: #4ADE80 !important; font-weight: 800; font-size: 26px !important; } /* Lighter green text for contrast */
+    div[data-testid="stMetricLabel"] { color: #B0BEC5 !important; font-weight: 600; font-size: 14px; }
 
-    /* Tabs - Professional Look */
+    /* Tabs - Dark Mode */
     div[data-testid="stTabs"] button { 
-        color: #607D8B !important; 
+        color: #9E9E9E !important; 
         font-weight: 600; 
         font-size: 15px; 
     }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
-        color: #00743c !important; 
-        border-bottom: 3px solid #00743c !important; 
+        color: #4ADE80 !important; /* Neon/Light Green for selection */
+        border-bottom: 3px solid #4ADE80 !important; 
         font-weight: 800;
     }
 
-    /* Flow Chart Blocks - Harmonized */
+    /* Flow Chart Blocks - Dark Mode */
     .bfd-block {
         padding: 15px; 
         border-radius: 8px; 
         text-align: center; 
-        background: #FFFFFF; 
-        border: 1px solid #CFD8DC; 
+        background: #1E1E1E; /* Dark Card */
+        border: 1px solid #333; 
         border-top: 5px solid #00743c;
-        color: #005029; 
+        color: #FFFFFF; 
         font-weight: 800;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         font-size: 15px;
         height: 100%;
         display: flex;
@@ -112,7 +113,7 @@ GLOBAL_CSS = """
     .bfd-sub {
         font-weight: 500;
         font-size: 13px;
-        color: #546E7A; /* Blue Grey for subtitle */
+        color: #B0BEC5; 
         margin-top: 5px;
     }
     .arrow-container {
@@ -121,7 +122,7 @@ GLOBAL_CSS = """
         justify-content: center;
         height: 100%;
         font-size: 24px;
-        color: #00743c; /* Green Arrows */
+        color: #00743c; 
         font-weight: bold;
     }
 
@@ -132,18 +133,18 @@ GLOBAL_CSS = """
         border-radius: 6px;
         font-weight: 600;
         border: none;
-        box-shadow: 0 2px 5px rgba(0, 116, 60, 0.2);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
     }
     .stButton > button:hover {
-        background-color: #005029 !important;
-        box-shadow: 0 4px 8px rgba(0, 116, 60, 0.3);
+        background-color: #00965e !important; /* Slightly lighter on hover */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
     }
     
     /* Header Box in Sidebar */
     .header-box {
-        background: rgba(255, 255, 255, 0.2); padding: 15px; border-radius: 8px; 
-        text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.3);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; 
+        text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
     
     #MainMenu, footer, .stDeployButton {visibility: hidden;}
@@ -366,12 +367,12 @@ def main():
     revenue = res['char_kg'] * st.session_state.price_char
     profit = revenue - (cost_feed + cost_ops)
 
-    # --- UPDATED COLORS & FONTS ---
-    APP_TXT_COLOR = "#005029"  # Darker shade of #00743c for better readability
-    APP_BG_COLOR = "#F9FAFA"   # Very clean, professional white-grey
+    # --- DARK MODE CHART CONFIG ---
+    APP_TXT_COLOR = "#FFFFFF"   # White text for dark mode
+    APP_BG_COLOR = "#121212"    # Match the CSS dark bg
     
-    # Harmonized Palette: #00743c (Primary), #009688 (Teal), #66BB6A (Light Green), #BDBDBD (Grey)
-    colors_seq = ["#00743c", "#26A69A", "#66BB6A", "#B0BEC5"] 
+    # Palette matching #00743c in Dark Mode (Green shades)
+    colors_seq = ["#00743c", "#4CAF50", "#81C784", "#A5D6A7"]
 
     # 1. Pie Chart
     df_pie = pd.DataFrame({
@@ -471,11 +472,11 @@ def main():
     with t2:
         df_time = get_time_series(mass, moisture, ash, temp, time_min, params)
         fig_area = go.Figure()
-        # Area chart matching the new green palette
+        # Area chart with Dark Mode Colors
         fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#00743c')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#26A69A')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#81C784')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#E8F5E9')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#2E7D32')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#4CAF50')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#66BB6A')))
         
         fig_area.update_layout(
             paper_bgcolor=APP_BG_COLOR, 
@@ -483,8 +484,8 @@ def main():
             title="Product Evolution", 
             title_font=dict(size=18, color=APP_TXT_COLOR, family="Segoe UI", weight="bold"),
             font=dict(color=APP_TXT_COLOR, family="Segoe UI"),
-            xaxis=dict(title="Time (min)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold")),
-            yaxis=dict(title="Mass (kg)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"))
+            xaxis=dict(title="Time (min)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"), gridcolor="#333"),
+            yaxis=dict(title="Mass (kg)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR, weight="bold"), gridcolor="#333")
         )
         st.plotly_chart(fig_area, use_container_width=True)
 
