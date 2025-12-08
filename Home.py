@@ -14,6 +14,7 @@ import math
 import random 
 import streamlit.components.v1 as components 
 import os 
+import base64
 
 # --- 1. Constants & Defaults ---
 R_GAS = 8.314
@@ -389,27 +390,38 @@ def main():
         showlegend=False
     )
 
-    # Dashboard - Header Section with Logo
+    # Dashboard - NEW HTML BANNER
     
-    # 2. Banner Layout (Columns)
-    c_logo, c_title = st.columns([1, 5])
-    
-    with c_logo:
-        # Increased size to 240
-        if os.path.exists("logo.png"):
-            st.image("logo.png", width=240)
-        else:
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=240) 
-        
-    with c_title:
-        st.markdown("""
-            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 15px;">
-                <h1 style="margin-bottom: 0; color: #00743c; font-size: 42px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
-                <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1px;">TORREFACTION SIMULATOR</p>
-            </div>
-        """, unsafe_allow_html=True)
+    # Logic to load logo if exists, else fallback
+    logo_html = ""
+    if os.path.exists("logo.png"):
+        with open("logo.png", "rb") as f:
+            data = base64.b64encode(f.read()).decode("utf-8")
+        logo_html = f'<img src="data:image/png;base64,{data}" style="height: 140px; margin-right: 30px;">' # Large Logo
+    else:
+        # Fallback to green leaf
+        logo_html = '<img src="https://i.imgur.com/7Q2y7Yt.png" style="height: 140px; margin-right: 30px;">'
 
-    st.markdown("---")
+    # The HTML Banner Container
+    st.markdown(f"""
+        <div style="
+            background: linear-gradient(90deg, #00743c 0%, #004d26 100%);
+            padding: 30px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            margin-bottom: 30px;
+            border: 1px solid #00965e;
+        ">
+            {logo_html}
+            <div style="text-align: left;">
+                <h1 style="color: white !important; margin: 0; font-size: 55px; font-weight: 900; letter-spacing: -2px; text-shadow: 0 4px 6px rgba(0,0,0,0.3);">CHEMISCO</h1>
+                <p style="color: #A5D6A7 !important; margin: 0; font-size: 18px; letter-spacing: 4px; font-weight: 600; text-transform: uppercase;">Torrefaction Simulator</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
     
     # --- FLOW CHART ---
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 0.2, 1, 0.2, 1, 0.2, 1])
