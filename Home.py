@@ -328,7 +328,7 @@ def main():
     if 'cost_biomass' not in st.session_state: 
         st.session_state.update({'cost_biomass': 30.0, 'cost_energy': 0.15, 'price_char': 1.20})
 
-    # Sidebar - REVERTED TO ORIGINAL PLACE (Just Text)
+    # Sidebar
     with st.sidebar:
         st.markdown("""
             <div class="header-box">
@@ -406,30 +406,52 @@ def main():
         showlegend=False
     )
 
-    # 1. THE BANNER (Full width top - unnamed.jpg)
+    # 1. THE BANNER
     if os.path.exists("unnamed.jpg"):
         st.image("unnamed.jpg", use_column_width=True)
     else:
         # Fallback if image not found
         st.markdown("<div style='height: 5px; background-color: #00743c; margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
-    # 2. Header Section (Logo + Title) - "Original Place"
-    c_logo, c_title = st.columns([1, 5])
+    # 2. HTML Banner with Logo & Text (Replaced column layout with this Flex box)
     
-    with c_logo:
-        # Use logo.png if available, else fallback online
-        if os.path.exists("logo.png"):
-            st.image("logo.png", width=120)
-        else:
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=120) 
-        
-    with c_title:
-        st.markdown("""
-            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 15px;">
-                <h1 style="margin-bottom: 0; color: #00743c; font-size: 42px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
-                <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1px;">TORREFACTION SIMULATOR</p>
+    # Check for uploaded logo
+    logo_html = ""
+    if os.path.exists("logo.png"):
+        with open("logo.png", "rb") as f:
+            data = base64.b64encode(f.read()).decode("utf-8")
+        logo_html = f'<img src="data:image/png;base64,{data}" style="max-height: 240px; margin-bottom: 15px;">'
+    else:
+        logo_html = '<img src="https://i.imgur.com/7Q2y7Yt.png" style="max-height: 240px; margin-bottom: 15px;">'
+
+    st.markdown(f"""
+        <div style="
+            background: linear-gradient(90deg, #00743c 0%, #004d26 100%);
+            padding: 40px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column; 
+            align-items: center;    
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            margin-bottom: 30px;
+            border: 1px solid #00965e;
+            text-align: center;
+        ">
+            {logo_html}
+            <div style="text-align: center;">
+                <p style="
+                    color: #FFFFFF !important; 
+                    margin: 0; 
+                    font-size: 24px; 
+                    letter-spacing: 6px; 
+                    font-weight: 700; 
+                    text-transform: uppercase;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                ">TORREFACTION SIMULATOR</p>
             </div>
-        """, unsafe_allow_html=True)
+        </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
     
