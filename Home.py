@@ -11,6 +11,7 @@ from io import BytesIO
 from reportlab.lib import colors
 from datetime import datetime
 import math
+import random # Import random for the game logic
 import streamlit.components.v1 as components 
 
 # --- 1. Constants & Defaults ---
@@ -20,7 +21,7 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (نفس التنسيق والألوان السابقة تماماً) ---
+# --- 2. Styles ---
 GLOBAL_CSS = """
 <style>
     /* Main Background */
@@ -31,40 +32,22 @@ GLOBAL_CSS = """
         background-color: #1A3C34; 
         border-right: 1px solid rgba(255,255,255,0.1);
     }
-    /* إجبار النصوص داخل الشريط الجانبي فقط على اللون الأبيض */
-    section[data-testid="stSidebar"] * {
-        color: #FFFFFF !important;
-    }
-    /* استثناء الحقول البيضاء داخل الشريط الجانبي ليكون النص فيها أسود */
-    section[data-testid="stSidebar"] input {
-        color: #000000 !important;
-    }
+    section[data-testid="stSidebar"] * { color: #FFFFFF !important; }
+    section[data-testid="stSidebar"] input { color: #000000 !important; }
 
     /* --- MAIN CONTENT STYLING --- */
     h1, h2, h3 { color: #1A3C34 !important; font-weight: 800; }
     
     /* --- TABS CORRECTION --- */
-    div[data-testid="stTabs"] button {
-        color: #546E7A !important; 
-        font-weight: 600;
-        font-size: 16px;
-    }
+    div[data-testid="stTabs"] button { color: #546E7A !important; font-weight: 600; font-size: 16px; }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
-        color: #1A3C34 !important; 
-        border-bottom: 3px solid #1A3C34 !important; 
-        font-weight: 800;
+        color: #1A3C34 !important; border-bottom: 3px solid #1A3C34 !important; font-weight: 800;
     }
 
     /* --- ALERTS CORRECTION --- */
-    div[data-testid="stMarkdownContainer"] {
-        color: #333333; 
-    }
-    .stAlert {
-        color: #000000 !important; 
-    }
-    .stAlert p {
-        color: #000000 !important;
-    }
+    div[data-testid="stMarkdownContainer"] { color: #333333; }
+    .stAlert { color: #000000 !important; }
+    .stAlert p { color: #000000 !important; }
 
     /* --- METRICS & BLOCKS --- */
     div[data-testid="stMetric"] {
@@ -79,25 +62,15 @@ GLOBAL_CSS = """
     div[data-testid="stMetricLabel"] { color: #546e7a !important; font-weight: 600; }
 
     .bfd-block {
-        padding: 15px; 
-        border-radius: 8px; 
-        text-align: center; 
-        background: #FFFFFF;
-        border: 1px solid #CFD8DC; 
-        border-bottom: 4px solid #1A3C34;
-        color: #1A3C34; 
-        font-weight: bold;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+        padding: 15px; border-radius: 8px; text-align: center; 
+        background: #FFFFFF; border: 1px solid #CFD8DC; border-bottom: 4px solid #1A3C34;
+        color: #1A3C34; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.03);
     }
     
     /* Sidebar Logo Box */
     .header-box {
-        background: rgba(255, 255, 255, 0.1); 
-        padding: 15px; 
-        border-radius: 8px; 
-        text-align: center; 
-        margin-bottom: 25px;
-        border: 1px solid rgba(255,255,255,0.2);
+        background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; 
+        text-align: center; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.2);
     }
     
     #MainMenu, footer, .stDeployButton {visibility: hidden;}
@@ -284,7 +257,6 @@ def main():
         st.header("⚙️ Inputs")
         reactor = st.selectbox("Reactor Type", ["Rotary Drum", "Fluidized Bed", "Screw Reactor"])
         
-        # NOTE: Keys are essential here for the reset functionality
         with st.expander("🌲 Feedstock", expanded=True):
             mass = st.number_input("Mass (kg)", 1.0, 10000.0, 100.0, 10.0, key='mass_input')
             moisture = st.slider("Moisture (%)", 0.0, 60.0, 15.0)
@@ -403,24 +375,43 @@ def main():
     # --- Game Mode Updates ---
     with t4:
         if game_mode:
-            TARGET_HHV, MIN_YIELD, TARGET_PROFIT = 22.0, 55.0, 0.0
-            
-            st.markdown("### 🎯 Engineering Challenge Console")
-            
-            # --- FIX: Callback Function to handle Reset ---
-            def reset_parameters():
-                st.session_state['mass_input'] = 100.0
-                st.session_state['temp_input'] = 275
-                st.session_state['time_input'] = 30
-            
-            # --- NEW CLIENT BUTTON (Using on_click to avoid error) ---
-            col_reset, col_title = st.columns([1, 4])
-            with col_reset:
-                st.button("🔄 New Client", help="Reset all parameters to default", on_click=reset_parameters)
+            # --- Initialize Game State if not present ---
+            if 'game_target_hhv' not in st.session_state:
+                st.session_state['game_target_hhv'] = 22.0
+                st.session_state['game_min_yield'] = 55.0
+                st.session_state['game_target_profit'] = 0.0
+                st.session_state['client_name'] = "Default Corp"
 
-            st.markdown("Optimize the reactor to meet all 3 targets simultaneously!")
+            # --- Callback: Generate New Targets (Randomize Challenge) ---
+            def generate_new_client():
+                # Randomize targets within realistic bounds to create a "New Client"
+                # HHV: 20 to 24 MJ/kg
+                st.session_state['game_target_hhv'] = round(random.uniform(20.0, 24.0), 1)
+                # Yield: 45% to 65%
+                st.session_state['game_min_yield'] = round(random.uniform(45.0, 65.0), 1)
+                # Profit: $10 to $100
+                st.session_state['game_target_profit'] = round(random.uniform(10.0, 100.0), 1)
+                
+                # Random Client Name
+                companies = ["EcoChar Solutions", "GreenEnergy Inc", "CarbonFix Ltd", "AgriFuel Systems", "Sustainable Tech"]
+                st.session_state['client_name'] = f"{random.choice(companies)} #{random.randint(100, 999)}"
+
+            # --- NEW CLIENT BUTTON (Does NOT reset sliders, only targets) ---
+            st.markdown(f"### 🎯 Engineering Challenge: {st.session_state['client_name']}")
+            
+            col_reset, col_info = st.columns([1, 4])
+            with col_reset:
+                st.button("🔄 New Client", help="Get a new client contract (New Targets)", on_click=generate_new_client)
+            with col_info:
+                st.caption("Pressing this will generate a new set of requirements (Targets) without resetting your process parameters.")
+
             st.markdown("---")
             
+            # Use Session State Targets
+            TARGET_HHV = st.session_state['game_target_hhv']
+            MIN_YIELD = st.session_state['game_min_yield']
+            TARGET_PROFIT = st.session_state['game_target_profit']
+
             score = 0
             if res['hhv_final'] >= TARGET_HHV: score += 33
             if res['mass_yield_pct'] >= MIN_YIELD: score += 33
@@ -434,36 +425,35 @@ def main():
             # 1. HHV Target
             with col_g1:
                 is_hhv_ok = res['hhv_final'] >= TARGET_HHV
-                st.metric("Target HHV (>22)", f"{res['hhv_final']:.2f}", 
+                st.metric(f"Target HHV (>{TARGET_HHV})", f"{res['hhv_final']:.2f}", 
                          delta=f"{res['hhv_final'] - TARGET_HHV:.2f}", 
                          delta_color="normal" if is_hhv_ok else "inverse")
                 if not is_hhv_ok:
-                    st.info("💡 **Hint:** Increase Temperature or Residence Time to boost Energy Density.")
+                    st.info("💡 **Hint:** Increase Temperature or Residence Time.")
 
             # 2. Yield Target
             with col_g2:
                 is_yield_ok = res['mass_yield_pct'] >= MIN_YIELD
-                st.metric("Target Yield (>55%)", f"{res['mass_yield_pct']:.1f}%", 
+                st.metric(f"Target Yield (>{MIN_YIELD}%)", f"{res['mass_yield_pct']:.1f}%", 
                          delta=f"{res['mass_yield_pct'] - MIN_YIELD:.1f}%", 
                          delta_color="normal" if is_yield_ok else "inverse")
                 if not is_yield_ok:
-                    st.info("💡 **Hint:** Temperature is too high! Lower it to save Mass.")
+                    st.info("💡 **Hint:** Temperature is too high! Lower it.")
 
             # 3. Profit Target
             with col_g3:
                 is_profit_ok = profit > TARGET_PROFIT
-                st.metric("Target Profit (>$0)", f"${profit:.2f}", 
+                st.metric(f"Target Profit (>${TARGET_PROFIT})", f"${profit:.2f}", 
                          delta="Net Profit", 
                          delta_color="normal" if is_profit_ok else "inverse")
                 if not is_profit_ok:
-                    st.info("💡 **Hint:** High energy costs? Reduce Time. Low revenue? Increase Mass.")
+                    st.info("💡 **Hint:** Reduce Time or Increase Mass.")
 
             st.markdown("---")
             
             if score >= 100:
                 st.balloons()
-                st.success("🏆 **MISSION ACCOMPLISHED!** You have balanced the process perfectly.")
-                st.markdown("**Engineering Certificate Unlocked in 'Export' Tab.**")
+                st.success(f"🏆 **CONTRACT FULFILLED!** {st.session_state['client_name']} is satisfied.")
             else:
                 st.warning("⚠️ Optimization Incomplete. Adjust the sliders in the sidebar.")
                 
