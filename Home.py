@@ -314,9 +314,21 @@ def main():
 
     # Sidebar
     with st.sidebar:
+        # LOGO IS BACK HERE IN SIDEBAR
         st.markdown("""
             <div class="header-box">
-                <h1 style="color:white !important; text-shadow:none;">CHEMISCO</h1>
+        """, unsafe_allow_html=True)
+        
+        # Check for uploaded logo
+        if os.path.exists("#00743c.jpg"):
+            st.image("#00743c.jpg", width=120)
+        elif os.path.exists("logo.png"):
+            st.image("logo.png", width=120)
+        else:
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=120) # Fallback leaf
+            
+        st.markdown("""
+                <h1 style="color:white !important; text-shadow:none; margin-top:10px;">CHEMISCO</h1>
                 <p style="color:#E8F5E9 !important; font-weight:bold;">TORREFACTION SIMULATOR</p>
             </div>
             """, unsafe_allow_html=True)
@@ -390,38 +402,13 @@ def main():
         showlegend=False
     )
 
-    # Dashboard - NEW HTML BANNER
-    
-    # Logic to load logo if exists, else fallback
-    logo_html = ""
-    if os.path.exists("logo.png"):
-        with open("logo.png", "rb") as f:
-            data = base64.b64encode(f.read()).decode("utf-8")
-        logo_html = f'<img src="data:image/png;base64,{data}" style="height: 140px; margin-right: 30px;">' # Large Logo
+    # 1. THE BANNER (Full width top)
+    if os.path.exists("unnamed.jpg"):
+        st.image("unnamed.jpg", use_column_width=True)
     else:
-        # Fallback to green leaf
-        logo_html = '<img src="https://i.imgur.com/7Q2y7Yt.png" style="height: 140px; margin-right: 30px;">'
+        st.title("CHEMISCO TORREFACTION SIMULATOR")
 
-    # The HTML Banner Container
-    st.markdown(f"""
-        <div style="
-            background: linear-gradient(90deg, #00743c 0%, #004d26 100%);
-            padding: 30px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            margin-bottom: 30px;
-            border: 1px solid #00965e;
-        ">
-            {logo_html}
-            <div style="text-align: left;">
-                <h1 style="color: white !important; margin: 0; font-size: 55px; font-weight: 900; letter-spacing: -2px; text-shadow: 0 4px 6px rgba(0,0,0,0.3);">CHEMISCO</h1>
-                <p style="color: #A5D6A7 !important; margin: 0; font-size: 18px; letter-spacing: 4px; font-weight: 600; text-transform: uppercase;">Torrefaction Simulator</p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("---")
     
     # --- FLOW CHART ---
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 0.2, 1, 0.2, 1, 0.2, 1])
