@@ -30,9 +30,10 @@ GLOBAL_CSS = """
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     }
     
-    /* Hide Header and Footer completely */
-    header[data-testid="stHeader"] { visibility: hidden; height: 0%; }
-    footer { visibility: hidden; height: 0%; }
+    /* --- FIXED: Header restored so Sidebar toggle works --- */
+    header[data-testid="stHeader"] {
+        background-color: transparent; /* Transparent to blend in */
+    }
     
     /* --- SIDEBAR STYLING --- */
     section[data-testid="stSidebar"] { 
@@ -186,7 +187,6 @@ def create_pdf(res, profit, fig1, fig2):
     CHEMISCO_GREEN = colors.HexColor('#00743c')
     LIGHT_GREY_BG = colors.HexColor('#f5f5f5')
     
-    # Time Adjustment
     current_time = (datetime.utcnow() + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
 
     # --- 1. HEADER ---
@@ -286,10 +286,9 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS & FIX 'C' SHORTCUT ***
+    # *** 🚀 INJECT BOTPRESS (Cleaned from Shortcuts) ***
     js_code = """
     <script>
-        // 1. Botpress Injection
         if (!window.parent.document.getElementById('botpress-inject')) {
             var script1 = window.parent.document.createElement('script');
             script1.id = 'botpress-inject';
@@ -303,23 +302,6 @@ def main():
                 window.parent.document.body.appendChild(script2);
             };
         }
-
-        // 2. AGGRESSIVE FIX: Disable Streamlit 'C' shortcut (Clear Cache)
-        window.parent.document.addEventListener('keydown', function(e) {
-            if (e.key.toLowerCase() === 'c') {
-                var target = e.target;
-                var isInput = (target.tagName === 'INPUT' || 
-                               target.tagName === 'TEXTAREA' || 
-                               target.isContentEditable);
-
-                if (!isInput) {
-                    e.stopImmediatePropagation();
-                    e.stopPropagation();
-                    e.preventDefault();
-                    console.log("Chemisco: Blocked 'C' shortcut to prevent cache clear.");
-                }
-            }
-        }, true);
     </script>
     """
     components.html(js_code, height=0, width=0)
