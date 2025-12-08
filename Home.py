@@ -21,7 +21,7 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (DARK MODE + Hide Header) ---
+# --- 2. Styles (DARK MODE) ---
 GLOBAL_CSS = """
 <style>
     /* 1. Main Background - Dark Mode */
@@ -30,15 +30,9 @@ GLOBAL_CSS = """
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     }
     
-    /* --- HIDE STREAMLIT HEADER & FOOTER (Fix for shortcuts) --- */
-    header[data-testid="stHeader"] {
-        visibility: hidden;
-        height: 0%;
-    }
-    footer {
-        visibility: hidden;
-        height: 0%;
-    }
+    /* Hide Header and Footer completely */
+    header[data-testid="stHeader"] { visibility: hidden; height: 0%; }
+    footer { visibility: hidden; height: 0%; }
     
     /* --- SIDEBAR STYLING --- */
     section[data-testid="stSidebar"] { 
@@ -64,14 +58,8 @@ GLOBAL_CSS = """
     }
 
     /* --- MAIN CONTENT HARMONIZATION (DARK) --- */
-    h1, h2, h3 { 
-        color: #FFFFFF !important; 
-        font-weight: 800; 
-        letter-spacing: -0.5px;
-    }
-    p, div, li {
-        color: #E0E0E0;
-    }
+    h1, h2, h3 { color: #FFFFFF !important; font-weight: 800; letter-spacing: -0.5px; }
+    p, div, li { color: #E0E0E0; }
     
     div[data-testid="stMetric"] {
         background-color: #1E1E1E !important;
@@ -84,9 +72,7 @@ GLOBAL_CSS = """
     div[data-testid="stMetricValue"] { color: #4ADE80 !important; font-weight: 800; font-size: 26px !important; }
     div[data-testid="stMetricLabel"] { color: #B0BEC5 !important; font-weight: 600; font-size: 14px; }
 
-    div[data-testid="stTabs"] button { 
-        color: #9E9E9E !important; font-weight: 600; font-size: 15px; 
-    }
+    div[data-testid="stTabs"] button { color: #9E9E9E !important; font-weight: 600; font-size: 15px; }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
         color: #4ADE80 !important; border-bottom: 3px solid #4ADE80 !important; font-weight: 800;
     }
@@ -98,9 +84,7 @@ GLOBAL_CSS = """
         font-size: 15px; height: 100%; display: flex; flex-direction: column; 
         justify-content: center; align-items: center;
     }
-    .bfd-sub {
-        font-weight: 500; font-size: 13px; color: #B0BEC5; margin-top: 5px;
-    }
+    .bfd-sub { font-weight: 500; font-size: 13px; color: #B0BEC5; margin-top: 5px; }
     .arrow-container {
         display: flex; align-items: center; justify-content: center; height: 100%;
         font-size: 24px; color: #00743c; font-weight: bold;
@@ -202,7 +186,7 @@ def create_pdf(res, profit, fig1, fig2):
     CHEMISCO_GREEN = colors.HexColor('#00743c')
     LIGHT_GREY_BG = colors.HexColor('#f5f5f5')
     
-    # Time Adjustment
+    # Time Adjustment (UTC+2 for Egypt)
     current_time = (datetime.utcnow() + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M")
 
     # --- 1. HEADER ---
@@ -302,7 +286,9 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS & KEYBOARD FIX ***
+    # *** 🚀 INJECT BOTPRESS & FIX 'C' SHORTCUT ***
+    # This updated script intercepts the 'keydown' event in the capturing phase (true).
+    # It stops propagation immediately if 'c' is pressed outside of inputs.
     js_code = """
     <script>
         // 1. Botpress Injection
@@ -320,11 +306,21 @@ def main():
             };
         }
 
-        // 2. Prevent Streamlit 'C' shortcut (Clear Cache) unless typing
-        document.addEventListener('keydown', function(e) {
+        // 2. AGGRESSIVE FIX: Disable Streamlit 'C' shortcut (Clear Cache)
+        // Using capturing phase (third argument = true) to catch it before Streamlit.
+        window.parent.document.addEventListener('keydown', function(e) {
             if (e.key.toLowerCase() === 'c') {
-                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                // Check if the user is typing in an input, textarea, or contentEditable element
+                var target = e.target;
+                var isInput = (target.tagName === 'INPUT' || 
+                               target.tagName === 'TEXTAREA' || 
+                               target.isContentEditable);
+
+                if (!isInput) {
+                    e.stopImmediatePropagation();
                     e.stopPropagation();
+                    e.preventDefault();
+                    console.log("Chemisco: Blocked 'C' shortcut to prevent cache clear.");
                 }
             }
         }, true);
