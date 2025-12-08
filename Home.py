@@ -20,7 +20,7 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (تم إصلاح الألوان والتباين بدقة) ---
+# --- 2. Styles (نفس التنسيق والألوان السابقة تماماً) ---
 GLOBAL_CSS = """
 <style>
     /* Main Background */
@@ -43,26 +43,24 @@ GLOBAL_CSS = """
     /* --- MAIN CONTENT STYLING --- */
     h1, h2, h3 { color: #1A3C34 !important; font-weight: 800; }
     
-    /* --- TABS CORRECTION (إصلاح اختفاء الكلام) --- */
-    /* التبويبات غير المختارة - لون رمادي غامق واضح */
+    /* --- TABS CORRECTION --- */
     div[data-testid="stTabs"] button {
         color: #546E7A !important; 
         font-weight: 600;
         font-size: 16px;
     }
-    /* التبويب المختار - لون أخضر */
     div[data-testid="stTabs"] button[aria-selected="true"] { 
         color: #1A3C34 !important; 
         border-bottom: 3px solid #1A3C34 !important; 
         font-weight: 800;
     }
 
-    /* --- ALERTS CORRECTION (إصلاح التحذيرات) --- */
+    /* --- ALERTS CORRECTION --- */
     div[data-testid="stMarkdownContainer"] {
-        color: #333333; /* اللون الافتراضي للنصوص */
+        color: #333333; 
     }
     .stAlert {
-        color: #000000 !important; /* إجبار النص داخل التنبيهات على اللون الأسود */
+        color: #000000 !important; 
     }
     .stAlert p {
         color: #000000 !important;
@@ -286,7 +284,7 @@ def main():
         st.header("⚙️ Inputs")
         reactor = st.selectbox("Reactor Type", ["Rotary Drum", "Fluidized Bed", "Screw Reactor"])
         
-        # NOTE: Added 'key' to widgets to support Reset functionality
+        # NOTE: Keys are essential here for the reset functionality
         with st.expander("🌲 Feedstock", expanded=True):
             mass = st.number_input("Mass (kg)", 1.0, 10000.0, 100.0, 10.0, key='mass_input')
             moisture = st.slider("Moisture (%)", 0.0, 60.0, 15.0)
@@ -402,22 +400,23 @@ def main():
         except ImportError:
             st.error("⚠️ Library Missing: Please ensure 'kaleido==0.2.1' is in requirements.txt")
 
-    # --- Game Mode Updates (New Client Button Added) ---
+    # --- Game Mode Updates ---
     with t4:
         if game_mode:
             TARGET_HHV, MIN_YIELD, TARGET_PROFIT = 22.0, 55.0, 0.0
             
             st.markdown("### 🎯 Engineering Challenge Console")
             
-            # --- NEW CLIENT BUTTON ---
+            # --- FIX: Callback Function to handle Reset ---
+            def reset_parameters():
+                st.session_state['mass_input'] = 100.0
+                st.session_state['temp_input'] = 275
+                st.session_state['time_input'] = 30
+            
+            # --- NEW CLIENT BUTTON (Using on_click to avoid error) ---
             col_reset, col_title = st.columns([1, 4])
             with col_reset:
-                if st.button("🔄 New Client", help="Reset all parameters to default"):
-                    # Reset Logic using Session State Keys
-                    st.session_state['mass_input'] = 100.0
-                    st.session_state['temp_input'] = 275
-                    st.session_state['time_input'] = 30
-                    st.rerun()
+                st.button("🔄 New Client", help="Reset all parameters to default", on_click=reset_parameters)
 
             st.markdown("Optimize the reactor to meet all 3 targets simultaneously!")
             st.markdown("---")
@@ -466,7 +465,6 @@ def main():
                 st.success("🏆 **MISSION ACCOMPLISHED!** You have balanced the process perfectly.")
                 st.markdown("**Engineering Certificate Unlocked in 'Export' Tab.**")
             else:
-                # هذا النص الآن سيظهر باللون الأسود بفضل تعديل CSS
                 st.warning("⚠️ Optimization Incomplete. Adjust the sliders in the sidebar.")
                 
         else:
