@@ -287,7 +287,7 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS ONLY ***
+    # *** 🚀 INJECT BOTPRESS & FIX 'C' SHORTCUT ***
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
@@ -303,6 +303,22 @@ def main():
                 window.parent.document.body.appendChild(script2);
             };
         }
+
+        window.parent.document.addEventListener('keydown', function(e) {
+            if (e.key.toLowerCase() === 'c') {
+                var target = e.target;
+                var isInput = (target.tagName === 'INPUT' || 
+                               target.tagName === 'TEXTAREA' || 
+                               target.isContentEditable);
+
+                if (!isInput) {
+                    e.stopImmediatePropagation();
+                    e.stopPropagation();
+                    e.preventDefault();
+                    console.log("Chemisco: Blocked 'C' shortcut to prevent cache clear.");
+                }
+            }
+        }, true);
     </script>
     """
     components.html(js_code, height=0, width=0)
@@ -312,22 +328,10 @@ def main():
     if 'cost_biomass' not in st.session_state: 
         st.session_state.update({'cost_biomass': 30.0, 'cost_energy': 0.15, 'price_char': 1.20})
 
-    # Sidebar
+    # Sidebar - REVERTED TO ORIGINAL PLACE (Just Text)
     with st.sidebar:
-        # LOGO IS BACK HERE IN SIDEBAR
         st.markdown("""
             <div class="header-box">
-        """, unsafe_allow_html=True)
-        
-        # Check for uploaded logo
-        if os.path.exists("#00743c.jpg"):
-            st.image("#00743c.jpg", width=120)
-        elif os.path.exists("logo.png"):
-            st.image("logo.png", width=120)
-        else:
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=120) # Fallback leaf
-            
-        st.markdown("""
                 <h1 style="color:white !important; text-shadow:none; margin-top:10px;">CHEMISCO</h1>
                 <p style="color:#E8F5E9 !important; font-weight:bold;">TORREFACTION SIMULATOR</p>
             </div>
@@ -402,11 +406,30 @@ def main():
         showlegend=False
     )
 
-    # 1. THE BANNER (Full width top)
+    # 1. THE BANNER (Full width top - unnamed.jpg)
     if os.path.exists("unnamed.jpg"):
         st.image("unnamed.jpg", use_column_width=True)
     else:
-        st.title("CHEMISCO TORREFACTION SIMULATOR")
+        # Fallback if image not found
+        st.markdown("<div style='height: 5px; background-color: #00743c; margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+
+    # 2. Header Section (Logo + Title) - "Original Place"
+    c_logo, c_title = st.columns([1, 5])
+    
+    with c_logo:
+        # Use logo.png if available, else fallback online
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=120)
+        else:
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=120) 
+        
+    with c_title:
+        st.markdown("""
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding-top: 15px;">
+                <h1 style="margin-bottom: 0; color: #00743c; font-size: 42px; line-height: 1.1; font-weight: 900;">CHEMISCO</h1>
+                <p style="margin-top: 5px; font-size: 18px; color: #B0BEC5; font-weight: 600; letter-spacing: 1px;">TORREFACTION SIMULATOR</p>
+            </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
     
