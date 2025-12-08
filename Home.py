@@ -11,7 +11,7 @@ from io import BytesIO
 from reportlab.lib import colors
 from datetime import datetime
 import math
-import random # Import random for the game logic
+import random 
 import streamlit.components.v1 as components 
 
 # --- 1. Constants & Defaults ---
@@ -27,29 +27,48 @@ GLOBAL_CSS = """
     /* Main Background */
     .stApp { background-color: #F5F7F8; font-family: 'Segoe UI', sans-serif; }
     
-    /* --- SIDEBAR STYLING --- */
+    /* --- SIDEBAR STYLING (FIXED COLORS) --- */
     section[data-testid="stSidebar"] { 
         background-color: #1A3C34; 
         border-right: 1px solid rgba(255,255,255,0.1);
     }
-    section[data-testid="stSidebar"] * { color: #FFFFFF !important; }
-    section[data-testid="stSidebar"] input { color: #000000 !important; }
+    
+    /* 1. جعل كل النصوص والأرقام الظاهرة مباشرة على الخلفية الخضراء باللون الأبيض */
+    section[data-testid="stSidebar"] label, 
+    section[data-testid="stSidebar"] .stMarkdown, 
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] div[data-testid="stTickBar"] > div,
+    section[data-testid="stSidebar"] div[data-testid="stThumbValue"] { 
+        color: #FFFFFF !important; 
+    }
+
+    /* 2. جعل الأرقام داخل مربعات الإدخال (Inputs) باللون الأسود لأن المربع أبيض */
+    section[data-testid="stSidebar"] input {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
 
     /* --- MAIN CONTENT STYLING --- */
     h1, h2, h3 { color: #1A3C34 !important; font-weight: 800; }
     
-    /* --- TABS CORRECTION --- */
+    /* Tabs */
     div[data-testid="stTabs"] button { color: #546E7A !important; font-weight: 600; font-size: 16px; }
     div[data-testid="stTabs"] button[aria-selected="true"] { 
         color: #1A3C34 !important; border-bottom: 3px solid #1A3C34 !important; font-weight: 800;
     }
 
-    /* --- ALERTS CORRECTION --- */
+    /* Alerts */
     div[data-testid="stMarkdownContainer"] { color: #333333; }
     .stAlert { color: #000000 !important; }
     .stAlert p { color: #000000 !important; }
 
-    /* --- METRICS & BLOCKS --- */
+    /* Metrics */
     div[data-testid="stMetric"] {
         background-color: #FFFFFF !important;
         border: 1px solid #E0E0E0; 
@@ -61,10 +80,38 @@ GLOBAL_CSS = """
     div[data-testid="stMetricValue"] { color: #1A3C34 !important; font-weight: bold; }
     div[data-testid="stMetricLabel"] { color: #546e7a !important; font-weight: 600; }
 
+    /* --- FLOW CHART BLOCKS (NEW DESIGN) --- */
     .bfd-block {
-        padding: 15px; border-radius: 8px; text-align: center; 
-        background: #FFFFFF; border: 1px solid #CFD8DC; border-bottom: 4px solid #1A3C34;
-        color: #1A3C34; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+        padding: 12px; 
+        border-radius: 8px; 
+        text-align: center; 
+        background: #FFFFFF; 
+        border: 1px solid #B0BEC5; 
+        border-top: 5px solid #1A3C34; /* Green Top Border */
+        color: #1A3C34; 
+        font-weight: 700;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.05);
+        font-size: 14px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    .bfd-sub {
+        font-weight: 400;
+        font-size: 12px;
+        color: #546E7A;
+        margin-top: 4px;
+    }
+    .arrow-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        font-size: 24px;
+        color: #26A69A;
+        font-weight: bold;
     }
     
     /* Sidebar Logo Box */
@@ -325,13 +372,46 @@ def main():
     st.title("CHEMISCO: Process Dashboard")
     st.markdown("---")
     
-    # Flow Chart
-    c1, c2, c3, c4, c5 = st.columns([1.5, 0.5, 1.5, 0.5, 1.5])
-    with c1: st.markdown(f'<div class="bfd-block">FEED<br><span style="font-weight:normal; font-size:0.9em;">{mass} kg<br>{moisture}% H2O</span></div>', unsafe_allow_html=True)
-    with c2: st.markdown('<div class="bfd-stream" style="text-align:center;">➜</div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="bfd-block">{reactor.upper()}<br><span style="font-weight:normal; font-size:0.9em;">{temp}°C | {time_min}min</span></div>', unsafe_allow_html=True)
-    with c4: st.markdown('<div class="bfd-stream" style="text-align:center;">➜</div>', unsafe_allow_html=True)
-    with c5: st.markdown(f'<div class="bfd-block" style="border-color:#26A69A;">BIOCHAR<br><span style="color:#26A69A;">{res["char_kg"]:.1f} kg</span></div>', unsafe_allow_html=True)
+    # --- UPDATED FLOW CHART (Clean Blocks with Drying) ---
+    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 0.2, 1, 0.2, 1, 0.2, 1])
+    
+    with c1: 
+        st.markdown(f'''
+            <div class="bfd-block">
+                <div>FEEDSTOCK</div>
+                <div class="bfd-sub">{mass} kg<br>{moisture}% H2O</div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+    with c2: st.markdown('<div class="arrow-container">➜</div>', unsafe_allow_html=True)
+    
+    with c3: 
+        st.markdown(f'''
+            <div class="bfd-block">
+                <div>DRYING</div>
+                <div class="bfd-sub">Removing H2O<br>Evap: {res['water_evap_kg']:.1f} kg</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with c4: st.markdown('<div class="arrow-container">➜</div>', unsafe_allow_html=True)
+
+    with c5: 
+        st.markdown(f'''
+            <div class="bfd-block">
+                <div>{reactor.upper().split()[0]}</div>
+                <div class="bfd-sub">{temp}°C | {time_min} min<br>Pyrolysis</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with c6: st.markdown('<div class="arrow-container">➜</div>', unsafe_allow_html=True)
+
+    with c7: 
+        st.markdown(f'''
+            <div class="bfd-block" style="border-top-color: #26A69A;">
+                <div style="color:#26A69A;">BIOCHAR</div>
+                <div class="bfd-sub" style="font-size:14px; font-weight:bold;">{res["char_kg"]:.1f} kg</div>
+            </div>
+        ''', unsafe_allow_html=True)
     
     st.markdown("---")
     k1, k2, k3, k4 = st.columns(4)
