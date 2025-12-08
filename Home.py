@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import math
 import random 
 import streamlit.components.v1 as components 
-import os # Import os check file existence
+import os 
 
 # --- 1. Constants & Defaults ---
 R_GAS = 8.314
@@ -390,17 +390,14 @@ def main():
     )
 
     # Dashboard - Header Section with Logo
-    
-    # 2. Banner Layout (Columns)
     c_logo, c_title = st.columns([1, 5])
     
     with c_logo:
-        # Check if local logo.png exists, else use placeholder
+        # Increased size to 180 as requested
         if os.path.exists("logo.png"):
-            st.image("logo.png", width=120)
+            st.image("logo.png", width=180)
         else:
-            # Fallback to the requested online image (Green Leaf)
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=120) 
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=180) 
         
     with c_title:
         st.markdown("""
