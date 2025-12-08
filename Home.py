@@ -11,7 +11,7 @@ from io import BytesIO
 from reportlab.lib import colors
 from datetime import datetime
 import math
-import streamlit.components.v1 as components # Import components for AI Injection
+import streamlit.components.v1 as components 
 
 # --- 1. Constants & Defaults ---
 R_GAS = 8.314
@@ -20,66 +20,123 @@ CP_WATER = 4180.0
 H_VAPOR = 2260000.0
 HHV_DRY_INITIAL_DEFAULT = 18.0
 
-# --- 2. Styles (Professional Clean Theme) ---
+# --- 2. Styles (Modern Two-Tone Theme) ---
+# Color Palette:
+# Primary (Dark): #1A3C34 (Deep Pine Green) - Used for Sidebar, Text, Headers
+# Accent (Light): #26A69A (Teal/Turquoise) - Used for Buttons, Highlights, Graphs
+# Background: #F7F9F9 (Clean White/Grey)
+
 GLOBAL_CSS = """
 <style>
-    /* Main Background */
-    .stApp { background-color: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    /* Main Layout */
+    .stApp { 
+        background-color: #F7F9F9; 
+        font-family: 'Inter', sans-serif; 
+    }
     
     /* Sidebar Styles */
-    section[data-testid="stSidebar"] { background-color: #1a3c34; color: #ffffff; }
-    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] label { color: #e0f2f1 !important; }
-    section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] p { color: #b2dfdb !important; }
+    section[data-testid="stSidebar"] { 
+        background-color: #1A3C34; 
+        border-right: 1px solid #14302a;
+    }
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 { 
+        color: #ffffff !important; 
+        font-weight: 700;
+    }
+    section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] .stMarkdown { 
+        color: #B2DFDB !important; 
+    }
+    
+    /* Typography */
+    h1, h2, h3 { color: #1A3C34 !important; font-family: 'Inter', sans-serif; letter-spacing: -0.5px; }
+    p, div, span, li { color: #37474F; }
 
-    /* Text Colors */
-    h1, h2, h3 { color: #1a3c34 !important; font-weight: 700; }
-    .stMarkdown, p, div, span, li { color: #2c3e50; }
-
-    /* Metrics Cards */
+    /* Modern Metric Cards */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important;
-        border: 1px solid #d1d5db; border-left: 6px solid #1a3c34;
-        border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: none;
+        border-left: 4px solid #26A69A;
+        border-radius: 12px; 
+        padding: 20px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        transition: transform 0.2s ease;
     }
-    div[data-testid="stMetricValue"] { color: #1a3c34 !important; }
-    div[data-testid="stMetricLabel"] { color: #546e7a !important; font-weight: 600; }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+    }
+    div[data-testid="stMetricValue"] { color: #1A3C34 !important; font-weight: 700; }
+    div[data-testid="stMetricLabel"] { color: #607D8B !important; font-size: 14px; }
 
-    /* Buttons */
+    /* Modern Buttons */
     .stButton > button { 
-        background-color: #1a3c34 !important; color: white !important; 
-        border: none; font-weight: bold; border-radius: 6px;
+        background-color: #26A69A !important; 
+        color: white !important; 
+        border: none; 
+        font-weight: 600; 
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        box-shadow: 0 2px 5px rgba(38, 166, 154, 0.3);
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        background-color: #1A3C34 !important;
+        box-shadow: 0 4px 10px rgba(26, 60, 52, 0.3);
     }
 
-    /* Flow Visualization Blocks */
+    /* Flow Visualization Blocks (Modernized) */
     .bfd-block {
-        padding: 15px; border-radius: 8px; text-align: center; background: #ffffff;
-        border: 2px solid #1a3c34; color: #37474f; font-weight: bold;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    }
-    .bfd-stream { color: #1a3c34; font-size: 24px; padding-top: 10px; font-weight: bold; }
-
-    /* Sidebar Header - Logo Box Style */
-    .header-box {
-        background-color: #2e7d32; 
-        padding: 15px; 
-        border-radius: 8px; 
+        padding: 20px; 
+        border-radius: 12px; 
         text-align: center; 
-        margin-bottom: 25px;
-        border: 1px solid #4caf50;
+        background: #ffffff;
+        border: 1px solid #E0E0E0; 
+        border-top: 4px solid #1A3C34;
+        color: #1A3C34; 
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        font-size: 14px;
     }
-    .header-box h1 { color: #ffffff !important; margin: 0; font-size: 1.8rem; font-weight: 800; letter-spacing: 2px; }
-    .header-box p { color: #e8f5e9 !important; margin: 0; font-size: 0.9rem; margin-top: 5px; }
+    .bfd-stream { 
+        color: #26A69A; 
+        font-size: 20px; 
+        padding-top: 15px; 
+        font-weight: bold; 
+    }
 
-    /* Tabs */
+    /* Sidebar Header - Modern Minimalist */
+    .header-box {
+        background: rgba(255, 255, 255, 0.1); 
+        padding: 20px; 
+        border-radius: 12px; 
+        text-align: center; 
+        margin-bottom: 30px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .header-box h1 { color: #ffffff !important; margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: 1px; }
+    .header-box p { color: #80CBC4 !important; margin: 0; font-size: 0.8rem; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* Tabs Styling */
     div[data-testid="stTabs"] button { color: #546e7a; font-weight: 600; }
-    div[data-testid="stTabs"] button[aria-selected="true"] { color: #1a3c34 !important; border-bottom: 3px solid #1a3c34 !important; }
+    div[data-testid="stTabs"] button[aria-selected="true"] { 
+        color: #26A69A !important; 
+        border-bottom: 3px solid #26A69A !important; 
+    }
     
+    /* Expander Styling */
+    .streamlit-expanderHeader {
+        background-color: transparent;
+        color: #1A3C34 !important;
+        font-weight: 600;
+    }
+
     #MainMenu, footer, .stDeployButton {visibility: hidden;}
 </style>
 """
 
-# --- 3. Mathematical Models ---
+# --- 3. Mathematical Models (UNCHANGED) ---
 def moisture_evap_linear(initial_moisture_kg, T_C, t_min, k_f=0.02):
     if T_C <= 100: return 0.0
     evap_kg = k_f * (T_C - 100) * t_min * initial_moisture_kg
@@ -146,15 +203,17 @@ def get_time_series(mass_in, moisture_pct, ash_pct_dry, temp_c, time_min, params
         })
     return pd.DataFrame(data)
 
-# --- 4. Professional PDF Generator ---
+# --- 4. Professional PDF Generator (Colors matched to Theme) ---
 def create_pdf(res, profit, fig1, fig2):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []
     
-    CHEMISCO_GREEN = colors.HexColor('#1a3c34')
-    LOGO_BLUE_GREEN = colors.HexColor('#2e7d32')
+    # Updated Colors for PDF to match Web
+    CHEMISCO_PRIMARY = colors.HexColor('#1A3C34')
+    CHEMISCO_ACCENT = colors.HexColor('#26A69A')
+    
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # Header with Logo
@@ -164,7 +223,7 @@ def create_pdf(res, profit, fig1, fig2):
     logo_content = [[Paragraph("CHEMISCO", logo_style)], [Paragraph("Torrefaction Simulator", sub_logo_style)]]
     t_logo = Table(logo_content, colWidths=[2.5*inch])
     t_logo.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), LOGO_BLUE_GREEN),
+        ('BACKGROUND', (0,0), (-1,-1), CHEMISCO_PRIMARY),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('BOX', (0,0), (-1,-1), 1, colors.white), ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 8),
     ]))
@@ -178,7 +237,7 @@ def create_pdf(res, profit, fig1, fig2):
     story.append(Spacer(1, 25))
     
     # Title & Metrics
-    story.append(Paragraph("Technical Engineering Report", ParagraphStyle(name='Title', parent=styles['Heading2'], textColor=CHEMISCO_GREEN, fontSize=16)))
+    story.append(Paragraph("Technical Engineering Report", ParagraphStyle(name='Title', parent=styles['Heading2'], textColor=CHEMISCO_PRIMARY, fontSize=16)))
     story.append(Spacer(1, 10))
     story.append(Paragraph("This document summarizes the simulation results for the biomass torrefaction process.", styles['Normal']))
     story.append(Spacer(1, 20))
@@ -193,7 +252,7 @@ def create_pdf(res, profit, fig1, fig2):
     ]
     t = Table(data, colWidths=[3.5*inch, 2.5*inch])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), CHEMISCO_GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('BACKGROUND', (0,0), (-1,0), CHEMISCO_PRIMARY), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('BOTTOMPADDING', (0,0), (-1,0), 12), ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
         ('GRID', (0,0), (-1,-1), 1, colors.grey)
@@ -297,18 +356,20 @@ def main():
     revenue = res['char_kg'] * st.session_state.price_char
     profit = revenue - (cost_feed + cost_ops)
 
-    # Visualization
-    APP_TXT_COLOR = "#000000"
-    APP_BG_COLOR = "#f4f6f9"
-    colors_seq = ["#1a3c34", "#5c6bc0", "#ffa726", "#ef5350"]
+    # Visualization Theme Settings
+    APP_TXT_COLOR = "#1A3C34"
+    APP_BG_COLOR = "#F7F9F9"
+    # Strict 2-Color Palette (Monochromatic tones of the primary/accent)
+    colors_seq = ["#1A3C34", "#26A69A", "#4DB6AC", "#80CBC4"]
 
     # 1. Pie Chart
     df_pie = pd.DataFrame({
         "Component": ["Biochar", "Water Vapor", "Bio-Oil", "Gases"],
         "Mass (kg)": [res['char_kg'], res['water_evap_kg'], res['oil_kg'], res['gas_kg']]
     })
-    fig1 = px.pie(df_pie, values='Mass (kg)', names='Component', hole=0.5, color_discrete_sequence=colors_seq, title="Mass Balance")
+    fig1 = px.pie(df_pie, values='Mass (kg)', names='Component', hole=0.6, color_discrete_sequence=colors_seq, title="Mass Balance")
     fig1.update_layout(paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14))
+    fig1.update_traces(textinfo='percent+label')
 
     # 2. Bar Chart
     organic_char = res['char_kg'] - res['ash_kg']
@@ -316,7 +377,7 @@ def main():
         "Type": ["Organic Carbon", "Ash"],
         "Mass (kg)": [organic_char, res['ash_kg']]
     })
-    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#1a3c34', '#b0bec5'], title="Solid Composition")
+    fig2 = px.bar(df_bar, x='Type', y='Mass (kg)', color='Type', color_discrete_sequence=['#1A3C34', '#B0BEC5'], title="Solid Composition")
     fig2.update_layout(
         paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, font=dict(color=APP_TXT_COLOR, size=14),
         xaxis=dict(title_font=dict(color=APP_TXT_COLOR), tickfont=dict(color=APP_TXT_COLOR)),
@@ -328,12 +389,13 @@ def main():
     st.title("CHEMISCO: Process Dashboard")
     st.markdown("---")
     
+    # Modernized Flow Chart Logic
     c1, c2, c3, c4, c5 = st.columns([1.5, 0.5, 1.5, 0.5, 1.5])
-    with c1: st.markdown(f'<div class="bfd-block">FEED<br>{mass} kg<br>{moisture}% H2O</div>', unsafe_allow_html=True)
-    with c2: st.markdown('<div class="bfd-stream">➜</div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="bfd-block">{reactor.upper()}<br>{temp}°C | {time_min}min</div>', unsafe_allow_html=True)
-    with c4: st.markdown('<div class="bfd-stream">➜</div>', unsafe_allow_html=True)
-    with c5: st.markdown(f'<div class="bfd-block">BIOCHAR<br>{res["char_kg"]:.1f} kg</div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="bfd-block">FEED<br><span style="color:#607D8B; font-weight:normal;">{mass} kg<br>{moisture}% H2O</span></div>', unsafe_allow_html=True)
+    with c2: st.markdown('<div class="bfd-stream" style="text-align:center;">➜</div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="bfd-block">{reactor.upper()}<br><span style="color:#607D8B; font-weight:normal;">{temp}°C | {time_min}min</span></div>', unsafe_allow_html=True)
+    with c4: st.markdown('<div class="bfd-stream" style="text-align:center;">➜</div>', unsafe_allow_html=True)
+    with c5: st.markdown(f'<div class="bfd-block">BIOCHAR<br><span style="color:#26A69A;">{res["char_kg"]:.1f} kg</span></div>', unsafe_allow_html=True)
     
     st.markdown("---")
     k1, k2, k3, k4 = st.columns(4)
@@ -353,15 +415,16 @@ def main():
     with t2:
         df_time = get_time_series(mass, moisture, ash, temp, time_min, params)
         fig_area = go.Figure()
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#1a3c34')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#ffa726')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#ef5350')))
-        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#5c6bc0')))
+        # Updated Area colors to match the theme
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Char (kg)'], stackgroup='one', name='Char', line=dict(width=0, color='#1A3C34')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Bio-Oil (kg)'], stackgroup='one', name='Bio-Oil', line=dict(width=0, color='#26A69A')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Gases (kg)'], stackgroup='one', name='Gases', line=dict(width=0, color='#80CBC4')))
+        fig_area.add_trace(go.Scatter(x=df_time['Time (min)'], y=df_time['Water Vapor (kg)'], stackgroup='one', name='Water Vapor', line=dict(width=0, color='#B2DFDB')))
         fig_area.update_layout(
             paper_bgcolor=APP_BG_COLOR, plot_bgcolor=APP_BG_COLOR, title="Product Evolution", 
             font=dict(color=APP_TXT_COLOR),
-            xaxis=dict(title="Time (min)", tickfont=dict(color="black"), title_font=dict(color="black")),
-            yaxis=dict(title="Mass (kg)", tickfont=dict(color="black"), title_font=dict(color="black"))
+            xaxis=dict(title="Time (min)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR)),
+            yaxis=dict(title="Mass (kg)", tickfont=dict(color=APP_TXT_COLOR), title_font=dict(color=APP_TXT_COLOR))
         )
         st.plotly_chart(fig_area, use_container_width=True)
 
