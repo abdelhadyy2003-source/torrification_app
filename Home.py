@@ -30,10 +30,9 @@ GLOBAL_CSS = """
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     }
     
-    /* --- FIXED: Header restored so Sidebar toggle works --- */
-    header[data-testid="stHeader"] {
-        background-color: transparent; /* Transparent to blend in */
-    }
+    /* Hide Header and Footer completely */
+    header[data-testid="stHeader"] { background-color: transparent; }
+    footer { visibility: hidden; height: 0%; }
     
     /* --- SIDEBAR STYLING --- */
     section[data-testid="stSidebar"] { 
@@ -286,7 +285,7 @@ def create_pdf(res, profit, fig1, fig2):
 def main():
     st.set_page_config(page_title="Chemisco Pro", layout="wide", initial_sidebar_state="expanded")
     
-    # *** 🚀 INJECT BOTPRESS (Cleaned from Shortcuts) ***
+    # *** 🚀 INJECT BOTPRESS ONLY (Removed conflicting shortcut script) ***
     js_code = """
     <script>
         if (!window.parent.document.getElementById('botpress-inject')) {
@@ -389,8 +388,25 @@ def main():
         showlegend=False
     )
 
-    # Dashboard
-    st.title("CHEMISCO TORREFACTION SIMULATOR")
+    # Dashboard - Header Section with Logo
+    
+    # 1. Image URL (Placeholder - You can replace this with "logo.png")
+    LOGO_URL = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+    
+    # 2. Banner Layout (Columns)
+    c_logo, c_title = st.columns([1, 5])
+    
+    with c_logo:
+        st.image(LOGO_URL, width=85)
+        
+    with c_title:
+        st.markdown("""
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                <h1 style="margin-bottom: 0; color: #00743c; font-size: 38px; line-height: 1.2;">CHEMISCO</h1>
+                <p style="margin-top: 0; font-size: 16px; color: #B0BEC5; font-weight: 500;">TORREFACTION SIMULATOR</p>
+            </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("---")
     
     # --- FLOW CHART ---
