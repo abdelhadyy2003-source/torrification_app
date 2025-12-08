@@ -419,9 +419,9 @@ def main():
     with c_logo:
         # Use logo.png if available, else fallback online
         if os.path.exists("logo.png"):
-            st.image("logo.png", width=120)
+            st.image("logo.png", width=230)
         else:
-            st.image("https://i.imgur.com/7Q2y7Yt.png", width=120) 
+            st.image("https://i.imgur.com/7Q2y7Yt.png", width=230) 
         
     with c_title:
         st.markdown("""
